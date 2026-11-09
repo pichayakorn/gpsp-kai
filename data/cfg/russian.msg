@@ -207,7 +207,7 @@
 !\n
 !Настройка растягиваня картинки GBA под экран PSP.\n
 !unscaled 3:2 - оригинальное разрешения GBA,\n
-!scaled 3:2     $- растягивание с сохранением пропорций,\n
+!scaled 3:2     $$- растягивание с сохранением пропорций,\n
 !fullscreen    $$$- полноэкранное изображение.
 
 # MSG_G_S_MENU_HELP_1
@@ -322,7 +322,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----$$----------  --:--:--          
+!--.--.---- ----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.

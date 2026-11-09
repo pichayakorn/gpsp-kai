@@ -175,7 +175,7 @@
 
 # MSG_SKIP_VALUE
 #Frameskip value:   %d
-!N. frame da saltare   $: %d
+!N. frame da saltare   $$: %d
 
 # MSG_SKIP_RANDOM
 #Frameskip variation:  %s
@@ -209,7 +209,7 @@
 !\n
 !Determina come ridimensionare il video del GBA rispetto allo schermo PSP\n
 !unscaled 3:2 - mantiene la risoluzione originale del GBA,\n
-!scaled 3:2     $- altezza schermo GBA uguale a quella del video della PSP,\n
+!scaled 3:2     $$- altezza schermo GBA uguale a quella del video della PSP,\n
 !fullscreen    $$$- riempie tutto lo schermo della PSP.
 
 # MSG_G_S_MENU_HELP_1
@@ -330,7 +330,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----$$----------  --:--:--          
+!--.--.---- ----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.
