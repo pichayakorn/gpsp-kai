@@ -21,3 +21,7 @@ PSP_LARGE_MEMORY = 1
 
 #CPUコアのARMエミュレータを使用する
 USE_C_CORE = 0
+
+# Text appended to the XMB title, to tell this build apart from the
+# official release. Leave empty for the plain release title.
+TITLE_SUFFIX = (src)
