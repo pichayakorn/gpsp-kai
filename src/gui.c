@@ -913,7 +913,7 @@ u32 menu(u16 *original_screen)
   MENU_OPTION_TYPE *display_option;
   u32 current_option_num;
 
-  auto void choose_menu();
+  auto void choose_menu(MENU_TYPE *new_menu);
   auto void menu_exit();
   auto void menu_quit();
   auto void menu_load();
