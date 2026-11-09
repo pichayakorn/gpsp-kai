@@ -18,60 +18,33 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * draw.c
- * 基本描画の処理
- ******************************************************************************/
-
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 #include <stdarg.h>
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
-#define progress_sx (screen_width2 - screen_width / 3)  // 中心から -160/-80
-#define progress_ex (screen_width2 + screen_width / 3)  // 中心から +160/+80
-#define progress_sy (screen_height2 + 3)                // 中心から+3
-#define progress_ey (screen_height2 + 13)               // 中心から+13
-#define yesno_sx    (screen_width2 - screen_width / 3)  // 中心から -160/-80
-#define yesno_ex    (screen_width2 + screen_width / 3)  // 中心から +160/+80
-#define yesno_sy    (screen_height2 + 3)                // 中心から+3
-#define yesno_ey    (screen_height2 + 13)               // 中心から+13
+#define progress_sx (screen_width2 - screen_width / 3)  // center -160 (480 px) / -80 (240 px)
+#define progress_ex (screen_width2 + screen_width / 3)  // center +160 (480 px) / +80 (240 px)
+#define progress_sy (screen_height2 + 3)                // center +3
+#define progress_ey (screen_height2 + 13)               // center +13
+#define yesno_sx    (screen_width2 - screen_width / 3)  // center -160 (480 px) / -80 (240 px)
+#define yesno_ex    (screen_width2 + screen_width / 3)  // center +160 (480 px) / +80 (240 px)
+#define yesno_sy    (screen_height2 + 3)                // center +3
+#define yesno_ey    (screen_height2 + 13)               // center +13
 #define progress_color COLOR16(15,15,15)
 #define progress_wait (0.5 * 1000 * 1000)
 
 #define VRAM_POS(x, y)  (screen_address + (x + y * screen_pitch));
 
-/******************************************************************************
- * グローバル関数の宣言
- ******************************************************************************/
 u32 yesno_dialog(char *text);
 
-/******************************************************************************
- * グローバル変数の定義
- ******************************************************************************/
 static int progress_total;
 static int progress_current;
 static char progress_message[256];
 static u32 __attribute__((aligned(32))) display_list[2048];
 
-/******************************************************************************
- * ローカル変数の定義
- ******************************************************************************/
-
-/******************************************************************************
- * ローカル関数の宣言
- ******************************************************************************/
 void draw_dialog(u32 sx, u32 sy, u32 ex, u32 ey);
 
-/******************************************************************************
- * グローバル関数の定義
- ******************************************************************************/
 /*------------------------------------------------------
-  文字列を描画 / センタリング処理
+  Draw a string centered horizontally
 ------------------------------------------------------*/
 void print_string_center(u32 sy, u32 color, u32 bg_color, char *str)
 {
@@ -82,7 +55,7 @@ void print_string_center(u32 sy, u32 color, u32 bg_color, char *str)
 }
 
 /*------------------------------------------------------
-  文字列を描画 / 影付き / センタリング処理
+  Draw a centered string with a drop shadow
 ------------------------------------------------------*/
 void print_string_shadow_center(u32 sy, u32 color, char *str)
 {
@@ -92,9 +65,6 @@ void print_string_shadow_center(u32 sy, u32 color, char *str)
   PRINT_STRING_SHADOW(str, color, sx, sy);
 }
 
-/*------------------------------------------------------
-  水平線描画
-------------------------------------------------------*/
 void hline(u32 sx, u32 ex, u32 y, u32 color)
 {
   u32 x;
@@ -105,9 +75,6 @@ void hline(u32 sx, u32 ex, u32 y, u32 color)
     *dst++ = (u16)color;
 }
 
-/*------------------------------------------------------
-  垂直線描画
-------------------------------------------------------*/
 void vline(u32 x, u32 sy, u32 ey, u32 color)
 {
   int y;
@@ -121,9 +88,6 @@ void vline(u32 x, u32 sy, u32 ey, u32 color)
   }
 }
 
-/*------------------------------------------------------
-  矩形描画 (16bit)
-------------------------------------------------------*/
 void box(u32 sx, u32 sy, u32 ex, u32 ey, u32 color)
 {
   hline(sx, ex - 1, sy, color);
@@ -132,9 +96,6 @@ void box(u32 sx, u32 sy, u32 ex, u32 ey, u32 color)
   vline(sx, sy + 1, ey, color);
 }
 
-/*------------------------------------------------------
-  矩形塗りつぶし
-------------------------------------------------------*/
 void boxfill(u32 sx, u32 sy, u32 ex, u32 ey, u32 color)
 {
   u32 x, y;
@@ -151,12 +112,8 @@ void boxfill(u32 sx, u32 sy, u32 ex, u32 ey, u32 color)
   }
 }
 
-/*------------------------------------------------------
-  ダイアログボックス表示
-------------------------------------------------------*/
 void draw_dialog(u32 sx, u32 sy, u32 ex, u32 ey)
 {
-// 影の表示
   boxfill(sx + 5, sy + 5, ex + 5, ey + 5, COLOR_DIALOG_SHADOW);
 
   hline(sx, ex - 1, sy, COLOR_FRAME);
@@ -183,9 +140,9 @@ void draw_dialog(u32 sx, u32 sy, u32 ex, u32 ey)
 }
 
 /*--------------------------------------------------------
-  yes/no ダイヤログボックス
+  Yes/no dialog box
   input
-    char *text 表示テキスト
+    char *text  message to display
   return
     0 YES
     1 NO
@@ -211,12 +168,6 @@ u32 yesno_dialog(char *text)
     return 1;
 }
 
-/*--------------------------------------------------------
-  プログレスバー
---------------------------------------------------------*/
-/*--------------------------------------------------------
-  プログレスバー初期化
---------------------------------------------------------*/
 void init_progress(u32 total, char *text)
 {
   progress_current = 0;
@@ -233,9 +184,6 @@ void init_progress(u32 total, char *text)
   flip_screen();
 }
 
-/*--------------------------------------------------------
-  プログレスバー更新
---------------------------------------------------------*/
 void update_progress(void)
 {
   int width = (int)( ((float)++progress_current / (float)progress_total) * ((float)screen_width / 3.0 * 2.0) );
@@ -251,7 +199,7 @@ void update_progress(void)
 }
 
 /*--------------------------------------------------------
-  プログレスバー結果表示
+  Show the final progress result
 --------------------------------------------------------*/
 void show_progress(char *text)
 {
@@ -273,7 +221,7 @@ void show_progress(char *text)
 }
 
 /*--------------------------------------------------------
-  スクロールバー表示(メニュー画面のみ対応)
+  Scroll bar (menu screen only)
 --------------------------------------------------------*/
 #define SCROLLBAR_COLOR1 COLOR16( 0, 2, 8)
 #define SCROLLBAR_COLOR2 COLOR16(15,15,15)
@@ -302,7 +250,7 @@ void scrollbar(u32 sx, u32 sy, u32 ex, u32 ey, u32 all,u32 view,u32 now)
 }
 
 /*------------------------------------------------------
-  VRAMへのテクスチャ転送(拡大縮小つき)
+  Copy a texture to VRAM with scaling (via the GU)
 ------------------------------------------------------*/
 void bitblt(u32 vram_adr,u32 pitch, u32 sx, u32 sy, u32 ex, u32 ey, u32 x_size, u32 y_size, u32 *data)
 {
@@ -334,7 +282,7 @@ void bitblt(u32 vram_adr,u32 pitch, u32 sx, u32 sy, u32 ex, u32 ey, u32 x_size, 
 }
 
 /******************************************************************************
-  簡易書式付文字列表示(メニュー画面のみ対応)
+  Simple formatted text output (menu screen only)
 ******************************************************************************/
 
 #define MAX_LINES 21
@@ -352,7 +300,7 @@ static int msg_color[MAX_LINES];
 #define COLOR_MSG_TITLE COLOR16(0, 0, 0)
 
 /*--------------------------------------------------------
-  メッセージ画面の表示
+  Draw the message screen frame
 --------------------------------------------------------*/
 void msg_screen_draw()
 {
@@ -361,9 +309,6 @@ void msg_screen_draw()
   print_string_center(22, COLOR_MSG_TITLE, COLOR_DIALOG, msg_title);
 }
 
-/*--------------------------------------------------------
-  メッセージ初期化
---------------------------------------------------------*/
 void msg_screen_init(const char *title)
 {
   cy = 0;
@@ -374,26 +319,17 @@ void msg_screen_init(const char *title)
   msg_screen_draw();
 }
 
-/*--------------------------------------------------------
-  メッセージ消去
---------------------------------------------------------*/
 void msg_screen_clear(void)
 {
   cy = 0;
   linefeed = 1;
 }
 
-/*--------------------------------------------------------
-  テキストカラー設定
---------------------------------------------------------*/
 void msg_set_text_color(u32 color)
 {
   text_color = color;
 }
 
-/*--------------------------------------------------------
-  メッセージ表示
---------------------------------------------------------*/
 void msg_printf(const char *text, ...)
 {
   int y;
@@ -443,6 +379,3 @@ void msg_printf(const char *text, ...)
   }
   flip_screen();
 }
-/******************************************************************************
- * ローカル関数の定義
- ******************************************************************************/

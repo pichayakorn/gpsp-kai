@@ -4,7 +4,7 @@
                                                                       by mok
 ****************************************************************************/
 
-// gpSP用に不必要な部分を削除(32bit modeなど)
+// Trimmed for gpSP (32-bit mode etc. removed)
 
 #include "common.h"
 
@@ -45,7 +45,7 @@ static u8 utf8_ucs2(const char *utf8, u16 *ucs);
 static u32 ucslen(const u16 *ucs);
 
 /*------------------------------------------------------
-  フォントの初期設定
+  Initialize fonts
   s_path: Single Byte Font (ex.ASCII)
   d_path: Double Byte Font (ex.SJIS)
 ------------------------------------------------------*/
@@ -129,9 +129,6 @@ int fbm_init(char *m_path, char *s_path)
   return result;
 }
 
-/*------------------------------------------------------
-  フォントの解放
-------------------------------------------------------*/
 void fbm_freeall()
 {
 	fbm_free((void *)&fbm_path[0]);
@@ -149,7 +146,7 @@ void fbm_freeall()
 	fbmMaxCol = fbmMaxRow = 0;
 }
 /*------------------------------------------------------
-  文字列の横幅を計算
+  Compute the pixel width of a string
   str: Draw String
   RET: Draw Width
 ------------------------------------------------------*/
@@ -191,7 +188,7 @@ int fbm_getwidth(char *str)
 }
 
 /*------------------------------------------------------
-  指定したフレームバッファに文字列を書込む
+  Write a string to the given frame buffer
   Print String: Base VRAM Addr + XY Pixel
   vram: Base VRAM Addr
   bufferwidth: buffer-width per line,
@@ -212,7 +209,7 @@ int fbm_printVRAM(void *vram, int bufferwidth, int x, int y, char *str, u32 colo
   if (x >= 0) nextx = x % FBM_PSP_WIDTH;
   if (y >= 0) nexty = y % FBM_PSP_HEIGHT;
 
-  // utf-8nをUCS2に変換
+  // Convert UTF-8 to UCS-2
   utf8_ucs2(str, ucs);
   len = ucslen(ucs);
 
@@ -245,7 +242,7 @@ int fbm_printVRAM(void *vram, int bufferwidth, int x, int y, char *str, u32 colo
   return 0;
 }
 
-// TODO GUでの描画
+// TODO: draw with the GU
 /////////////////////////////////////////////////////////////////////////////
 // Print String Subroutine (Draw VRAM)
 // vram: Base VRAM Addr, bufferwidth: buffer-width per line,
@@ -288,7 +285,6 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
     index = i * byteperline;
     pt = font->font[index++];
 
-    // ビットマップの表示
     for (j = 0; j < *(font->width); j++)
     {
       if (shift >= 8)
@@ -299,11 +295,9 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
 
       if (pt & 0x80)
       {
-        // 文字描画時
         if (fill & 0x01)
           *vptr =  (u16)color;
       }
-      // 背景描画時
       else
       {
         if (fill & 0x10)
@@ -491,8 +485,8 @@ fbm_font_t * fbm_getfont(u16 index, u8 isdouble)
 }
 
 /*------------------------------------------------------
-  UTF-8をucs2に変換
-  return 次の文字へのポインタ
+  Convert UTF-8 to UCS-2
+  return: pointer to the next character
 ------------------------------------------------------*/
 static const char* utf8decode(const char *utf8, u16 *ucs)
 {

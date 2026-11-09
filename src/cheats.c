@@ -18,14 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * cheat.c
- * チートの処理
- ******************************************************************************/
-
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 
 u32 g_cheats_num = 0;
@@ -234,8 +226,8 @@ static void process_cheat_gs1(cheat_t *cheat)
       }
 
       case 0x6:
-        if(gamepak_file_large == -1)  // オンメモリのROMの場合だけ
-          ADDRESS16(gamepak_rom, (address * 2) - 0x08000000) = (value & 0xFFFF);  // データの書込み
+        if(gamepak_file_large == -1)  // only when the whole ROM is in memory
+          ADDRESS16(gamepak_rom, (address * 2) - 0x08000000) = (value & 0xFFFF);
         break;
 
       // GS button down not supported yet

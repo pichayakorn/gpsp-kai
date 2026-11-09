@@ -18,19 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * gui.c
- * GUI周りの処理
- ******************************************************************************/
-
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
 #define STATUS_ROWS 0
 #define CURRENT_DIR_ROWS 1
 #define FILE_LIST_ROWS 25
@@ -42,15 +31,13 @@
 
 #define GAMEPAD_MENU_WIDTH 15
 
-// gpSPの設定ファイルのヘッダー
-// ヘッダーは4byteまで
+// gpSP config file header (4 bytes max)
 #define GPSP_CONFIG_HEADER     "gpSP"
 #define GPSP_CONFIG_HEADER_U32 0x50537067
 const u32 gpsp_config_ver = 0x00010000;
 gpsp_config_t g_gpsp_config;
 
-// GAMEの設定ファイルのヘッダー
-// ヘッダーは4byteまで
+// Per-game config file header (4 bytes max)
 #define GAME_CONFIG_HEADER     "gcfg"
 #define GAME_CONFIG_HEADER_U32 0x67666367
 const u32 game_config_ver = 0x00010000;
@@ -248,9 +235,6 @@ typedef enum
   MISC_MENU
 } MENU_ENUM;
 
-/******************************************************************************
- * グローバル変数の定義
- ******************************************************************************/
 char g_default_rom_dir[MAX_PATH];
 char g_default_save_dir[MAX_PATH];
 char g_default_cfg_dir[MAX_PATH];
@@ -259,19 +243,13 @@ char g_default_cheat_dir[MAX_PATH];
 u32 g_savestate_slot_num = 0;
 
 char *msg[MSG_END];
-char msg_data[16 * 1024]; // メッセージ用のデータ 16kb
+char msg_data[16 * 1024]; // 16 KB buffer holding the message strings
 
-/******************************************************************************
- * ローカル変数の定義
- ******************************************************************************/
 static char m_font[MAX_PATH];
 static char s_font[MAX_PATH];
 static u32 menu_cheat_page = 0;
 static u32 gamepad_config_line_to_button[] = { 8, 6, 7, 9, 1, 2, 3, 0, 4, 5, 11, 10 };
 
-/******************************************************************************
- * ローカル関数の宣言
- ******************************************************************************/
 static void get_savestate_snapshot(char *savestate_filename, u32 slot_num);
 static void get_savestate_filename(u32 slot, char *name_buffer);
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
@@ -297,11 +275,8 @@ static int sort_function(const void *dest_str_ptr, const void *src_str_ptr)
   return strcasecmp(dest_str, src_str);
 }
 
-/******************************************************************************
- * グローバル関数の定義
- ******************************************************************************/
 /*--------------------------------------------------------
-  汎用ファイル読込み
+  Generic file browser / loader
 --------------------------------------------------------*/
 s32 load_file(char **wildcards, char *result,char *default_dir_name)
 {
@@ -315,15 +290,15 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
   u32 total_dirnames_allocated;
   char **file_list;
   char **dir_list;
-  u32 num_files;                      // カレントディレクトリのファイル数
-  u32 num_dirs;                       // カレントディレクトリのフォルダ数
+  u32 num_files;                      // files in the current directory
+  u32 num_dirs;                       // directories in the current directory
   char *file_name;
   u32 file_name_length;
   s32 ext_pos = -1;
   u32 chosen_file, chosen_dir;
   s32 return_value = 1;
-  u32 current_file_selection;         // 選択しているファイル
-  u32 current_file_scroll_value;      // スクロールの位置
+  u32 current_file_selection;
+  u32 current_file_scroll_value;
   u32 current_dir_selection;
   u32 current_dir_scroll_value;
   u32 current_file_in_scroll;
@@ -649,7 +624,6 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
               repeat = 0;
               return_value = 0;
               strcpy(result, file_list[current_file_selection]);
-              // ROMのフルパスを取得
               getcwd(rom_path, MAX_PATH);
             }
           }
@@ -740,7 +714,7 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
   return return_value;
 }
 
-//標準のキーマップ
+// Default key map
 const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP] =
 {
     BUTTON_ID_MENU,     /* △ */
@@ -761,9 +735,6 @@ const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP] =
     BUTTON_ID_RIGHT     /* (→) */
 };
 
-/*--------------------------------------------------------
-  game cfgの初期化
---------------------------------------------------------*/
 void init_game_config()
 {
   u32 i;
@@ -783,9 +754,6 @@ void init_game_config()
   g_game_config.allocate_sensor = NO;
 }
 
-/*--------------------------------------------------------
-  gpSP cfgの初期化
---------------------------------------------------------*/
 void init_gpsp_config()
 {
   int temp;
@@ -813,8 +781,7 @@ void init_gpsp_config()
 }
 
 /*--------------------------------------------------------
-  game cfgファイルの読込み
-  3/4修正
+  Load the per-game config file
 --------------------------------------------------------*/
 void load_game_config_file(void)
 {
@@ -823,7 +790,6 @@ void load_game_config_file(void)
   FILE_ID game_config_file;
   u32 header, ver;
 
-  // 初期値の設定
   init_game_config();
 
   change_ext(gamepak_filename, game_config_filename, ".cfg");
@@ -837,11 +803,9 @@ void load_game_config_file(void)
 
   if(FILE_CHECK_VALID(game_config_file))
   {
-    // ヘッダーのチェック
     FILE_READ_VARIABLE(game_config_file, header);
     if(header == GAME_CONFIG_HEADER_U32)
     {
-      // バージョンのチェック
       FILE_READ_VARIABLE(game_config_file, ver);
       switch(ver)
       {
@@ -859,7 +823,7 @@ void load_game_config_file(void)
 }
 
 /*--------------------------------------------------------
-  gpSP cfgファイルの読込み
+  Load the gpSP config file
 --------------------------------------------------------*/
 s32 load_config_file()
 {
@@ -867,7 +831,6 @@ s32 load_config_file()
   FILE_ID gpsp_config_file;
   u32 header, ver;
 
-  // 初期値の設定
   init_gpsp_config();
   sprintf(gpsp_config_path, "%s/%s", main_path, GPSP_CONFIG_FILENAME);
 
@@ -875,7 +838,6 @@ s32 load_config_file()
 
   if(FILE_CHECK_VALID(gpsp_config_file))
   {
-    // ヘッダーのチェック
     FILE_READ_VARIABLE(gpsp_config_file, header);
     if(header != GPSP_CONFIG_HEADER_U32)
     {
@@ -897,9 +859,6 @@ s32 load_config_file()
   return -1;
 }
 
-/*--------------------------------------------------------
-  メニューの表示
---------------------------------------------------------*/
 u32 menu(u16 *original_screen)
 {
   gui_action_type gui_action;
@@ -969,7 +928,6 @@ u32 menu(u16 *original_screen)
     msg[MSG_PAD_MENU_CFG_HELP_21]
   };
 
-  //ローカル関数の定義
   void menu_exit()
   {
     if(!first_load)
@@ -989,7 +947,7 @@ u32 menu(u16 *original_screen)
     save_config_file();
     save_game_config_file();
 
-//    if(!g_gpsp_config.update_backup_flag) // TODO タイミングを検討
+//    if(!g_gpsp_config.update_backup_flag) // TODO: reconsider when to do this
       update_backup_force();
 
     if(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
@@ -1085,7 +1043,6 @@ u32 menu(u16 *original_screen)
     }
   }
 
-  // メニュー:チートファイルのロード
   void menu_load_cheat_file()
   {
     char *file_ext[] = { ".cht", NULL };
@@ -1275,9 +1232,6 @@ u32 menu(u16 *original_screen)
   };
 #endif
 
-  /*--------------------------------------------------------
-     グラフィック・サウンド オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE graphics_sound_options[] =
   {
     /* 00 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SCALE], scale_options, &g_gpsp_config.screen_mode, 5, msg[MSG_G_S_MENU_HELP_0], 0),
@@ -1301,9 +1255,6 @@ u32 menu(u16 *original_screen)
 
   MAKE_MENU(graphics_sound, submenu_graphics_sound, NULL);
 
-  /*--------------------------------------------------------
-     チート オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE cheats_options[] =
   {
     /* 00 */ CHEAT_OPTION((10 * menu_cheat_page) + 0),
@@ -1327,9 +1278,6 @@ u32 menu(u16 *original_screen)
 
   MAKE_MENU(cheats, submenu_cheats, NULL);
 
-  /*--------------------------------------------------------
-     その他 オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE misc_options[] =
   {
     STRING_SELECTION_OPTION(NULL, msg[MSG_CHEAT_MENU_2], clock_speed_options, &g_game_config.clock_speed_number, 10, msg[MSG_CHEAT_MENU_HELP_2], 0),
@@ -1355,9 +1303,6 @@ u32 menu(u16 *original_screen)
 
   MAKE_MENU(misc, submenu_misc, NULL);
 
-  /*--------------------------------------------------------
-     セーブステート オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE savestate_options[] =
   {
     NUMERIC_SELECTION_HIDE_OPTION(menu_load_state, menu_change_state, msg[MSG_STATE_MENU_0], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_0], 6),
@@ -1374,9 +1319,6 @@ u32 menu(u16 *original_screen)
 
   MAKE_MENU(savestate, submenu_savestate, NULL);
 
-  /*--------------------------------------------------------
-     ゲームパッド オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE gamepad_config_options[] =
   {
     GAMEPAD_CONFIG_OPTION(msg[MSG_PAD_MENU_0], 0),
@@ -1399,9 +1341,6 @@ u32 menu(u16 *original_screen)
 
   MAKE_MENU(gamepad_config, submenu_gamepad, NULL);
 
-  /*--------------------------------------------------------
-     アナログパッド オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE analog_config_options[] =
   {
     ANALOG_CONFIG_OPTION(msg[MSG_A_PAD_MENU_0], 0),
@@ -1424,13 +1363,10 @@ u32 menu(u16 *original_screen)
   MAKE_MENU(analog_config, submenu_analog, NULL);
 
 #ifdef USE_ADHOC
-  /*--------------------------------------------------------
-     ADHOC オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE adhoc_options[] =
   {
-    ACTION_OPTION(adhoc_connect_menu, NULL, "adhoc connect", "adhoc connect", 0),                                                      /*  0行目 */
-    ACTION_OPTION(adhoc_disconnect_menu, NULL, "adhoc disconnect", "adhoc disconnect", 1),                                                      /*  0行目 */
+    ACTION_OPTION(adhoc_connect_menu, NULL, "adhoc connect", "adhoc connect", 0),
+    ACTION_OPTION(adhoc_disconnect_menu, NULL, "adhoc disconnect", "adhoc disconnect", 1),
 
 
 
@@ -1451,32 +1387,29 @@ u32 menu(u16 *original_screen)
   MAKE_MENU(adhoc, submenu_adhoc, NULL);
 #endif
 
-  /*--------------------------------------------------------
-     メイン オプション
-  --------------------------------------------------------*/
   MENU_OPTION_TYPE main_options[] =
   {
     /* Same order and lines as b225/b230 */
-    ACTION_OPTION(menu_load, NULL, msg[MSG_MAIN_MENU_7], msg[MSG_MAIN_MENU_HELP_7], 0),                                               /*  0行目 */
-    ACTION_OPTION(menu_exit, NULL, msg[MSG_MAIN_MENU_9], msg[MSG_MAIN_MENU_HELP_9], 1),                                               /*  1行目 */
-    ACTION_OPTION(menu_restart, NULL, msg[MSG_MAIN_MENU_8], msg[MSG_MAIN_MENU_HELP_8], 2),                                            /*  2行目 */
+    ACTION_OPTION(menu_load, NULL, msg[MSG_MAIN_MENU_7], msg[MSG_MAIN_MENU_HELP_7], 0),
+    ACTION_OPTION(menu_exit, NULL, msg[MSG_MAIN_MENU_9], msg[MSG_MAIN_MENU_HELP_9], 1),
+    ACTION_OPTION(menu_restart, NULL, msg[MSG_MAIN_MENU_8], msg[MSG_MAIN_MENU_HELP_8], 2),
 
-    NUMERIC_SELECTION_ACTION_OPTION(menu_load_state, NULL, msg[MSG_MAIN_MENU_1], &g_savestate_slot_num, 11, msg[MSG_MAIN_MENU_HELP_1], 4),  /*  4行目 */
-    NUMERIC_SELECTION_ACTION_OPTION(menu_save_state, NULL, msg[MSG_MAIN_MENU_2], &g_savestate_slot_num, 11, msg[MSG_MAIN_MENU_HELP_2], 5),  /*  5行目 */
-    SUBMENU_OPTION(&savestate_menu, msg[MSG_MAIN_MENU_3], msg[MSG_MAIN_MENU_HELP_3], 6),                                              /*  6行目 */
+    NUMERIC_SELECTION_ACTION_OPTION(menu_load_state, NULL, msg[MSG_MAIN_MENU_1], &g_savestate_slot_num, 11, msg[MSG_MAIN_MENU_HELP_1], 4),
+    NUMERIC_SELECTION_ACTION_OPTION(menu_save_state, NULL, msg[MSG_MAIN_MENU_2], &g_savestate_slot_num, 11, msg[MSG_MAIN_MENU_HELP_2], 5),
+    SUBMENU_OPTION(&savestate_menu, msg[MSG_MAIN_MENU_3], msg[MSG_MAIN_MENU_HELP_3], 6),
 
-    SUBMENU_OPTION(&cheats_menu, msg[MSG_MAIN_MENU_6], msg[MSG_MAIN_MENU_HELP_6], 8),                                                 /*  8行目 */
+    SUBMENU_OPTION(&cheats_menu, msg[MSG_MAIN_MENU_6], msg[MSG_MAIN_MENU_HELP_6], 8),
 #ifdef USE_ADHOC
-    SUBMENU_OPTION(&adhoc_menu, "adhoc", "adhoc", 9),                                                                                 /*  9行目 */
+    SUBMENU_OPTION(&adhoc_menu, "adhoc", "adhoc", 9),
 #endif
 
-    SUBMENU_OPTION(&gamepad_config_menu, msg[MSG_MAIN_MENU_4], msg[MSG_MAIN_MENU_HELP_4], 10),                                        /* 10行目 */
-    SUBMENU_OPTION(&analog_config_menu, msg[MSG_MAIN_MENU_5], msg[MSG_MAIN_MENU_HELP_5], 11),                                         /* 11行目 */
+    SUBMENU_OPTION(&gamepad_config_menu, msg[MSG_MAIN_MENU_4], msg[MSG_MAIN_MENU_HELP_4], 10),
+    SUBMENU_OPTION(&analog_config_menu, msg[MSG_MAIN_MENU_5], msg[MSG_MAIN_MENU_HELP_5], 11),
 
-    SUBMENU_OPTION(&graphics_sound_menu, msg[MSG_MAIN_MENU_0], msg[MSG_MAIN_MENU_HELP_0], 13),                                        /* 13行目 */
-    SUBMENU_OPTION(&misc_menu, msg[MSG_MAIN_MENU_11], msg[MSG_MAIN_MENU_HELP_11], 14),                                                /* 14行目 */
+    SUBMENU_OPTION(&graphics_sound_menu, msg[MSG_MAIN_MENU_0], msg[MSG_MAIN_MENU_HELP_0], 13),
+    SUBMENU_OPTION(&misc_menu, msg[MSG_MAIN_MENU_11], msg[MSG_MAIN_MENU_HELP_11], 14),
 
-    ACTION_OPTION(menu_quit, NULL, msg[MSG_MAIN_MENU_10], msg[MSG_MAIN_MENU_HELP_10], 16)                                             /* 16行目 */
+    ACTION_OPTION(menu_quit, NULL, msg[MSG_MAIN_MENU_10], msg[MSG_MAIN_MENU_HELP_10], 16)
   };
 
   MAKE_MENU(main, submenu_main, NULL);
@@ -1525,10 +1458,6 @@ u32 menu(u16 *original_screen)
     }
   }
 
-  // ローカル関数の定義 終了
-
-  // ここからメニューの処理
-
   pause_sound(1);
 
   button_up_wait();
@@ -1537,7 +1466,7 @@ u32 menu(u16 *original_screen)
 
   clear_screen(COLOR_BG);
 
-  // MENU時は222MHz
+  // The menu runs at 222 MHz
   set_cpu_clock(10);
 
   if(gamepak_filename[0] == 0)
@@ -1566,7 +1495,6 @@ u32 menu(u16 *original_screen)
 
   current_menu->init_function();
 
-  // メニューのメインループ
   while(repeat)
   {
 
@@ -1692,7 +1620,6 @@ u32 menu(u16 *original_screen)
     clear_screen(COLOR_BG);
   }  // end while
 
-// menu終了時の処理
   button_up_wait();
 
   clear_screen(0);
@@ -1722,7 +1649,7 @@ void button_up_wait()
 }
 
 
-u32 load_dircfg(char *file_name)  // TODO:スマートな実装に書き直す
+u32 load_dircfg(char *file_name)  // TODO: rewrite more cleanly
 {
   int loop;
   int next_line;
@@ -1837,7 +1764,7 @@ u32 load_dircfg(char *file_name)  // TODO:スマートな実装に書き直す
   return -1;
 }
 
-u32 load_fontcfg(char *file_name)  // TODO:スマートな実装に書き直す
+u32 load_fontcfg(char *file_name)  // TODO: rewrite more cleanly
 {
   int loop;
   int next_line;
@@ -1911,13 +1838,12 @@ u32 load_msgcfg(char *file_name)
         if (loop <= (MSG_END + 1 + next_line)) {
           if (next_line == 0)
           {
-            // 新しい行の場合
-            msg[loop] = &msg_data[offset];  // 新しい行
+            msg[loop] = &msg_data[offset];
             next_line = 1;
             loop++;
           }
           strcpy(&msg_data[offset], current_str);
-          offset = offset + strlen(current_str);  // offset はNULLの位置を示す
+          offset = offset + strlen(current_str);  // offset points at the terminating NUL
         }
       }
       else
@@ -1941,9 +1867,6 @@ u32 load_msgcfg(char *file_name)
   return -1;
 }
 
-/*--------------------------------------------------------
-  フォントの読込
---------------------------------------------------------*/
 u32 load_font()
 {
     return fbm_init(m_font,s_font);
@@ -1958,7 +1881,7 @@ void get_savestate_filename_noshot(u32 slot, char *name_buffer)
 }
 
 /*--------------------------------------------------------
-  game cfgファイルの書込
+  Save the per-game config file
 --------------------------------------------------------*/
 s32 save_game_config_file()
 {
@@ -1992,7 +1915,7 @@ s32 save_game_config_file()
 }
 
 /*--------------------------------------------------------
-  gpSP cfgファイルの書込
+  Save the gpSP config file
 --------------------------------------------------------*/
 s32 save_config_file()
 {
@@ -2019,9 +1942,6 @@ s32 save_config_file()
   return -1;
 }
 
-/******************************************************************************
- * ローカル関数の定義
- ******************************************************************************/
 static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
   {
     static u16 snapshot_buffer[240 * 160];

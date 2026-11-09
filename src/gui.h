@@ -18,10 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * gui.h
- * gui周りの処理
- ******************************************************************************/
 #ifndef GUI_H
 #define GUI_H
 
@@ -69,9 +65,6 @@ typedef struct
 #define GAME_CART 0
 #define GBA_BIOS  1
 
-/******************************************************************************
- * グローバル変数の宣言
- ******************************************************************************/
 extern u32 g_savestate_slot_num;
 extern char g_default_rom_dir[MAX_PATH];
 extern char g_default_save_dir[MAX_PATH];
@@ -82,9 +75,6 @@ extern char g_default_cheat_dir[MAX_PATH];
 extern gpsp_config_t g_gpsp_config;
 extern game_config_t g_game_config;
 
-/******************************************************************************
- * グローバル関数の宣言
- ******************************************************************************/
 s32 load_file(char **wildcards, char *result, char *default_dir_name);
 void load_game_config_file(void);
 s32 load_config_file();

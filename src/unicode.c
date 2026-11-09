@@ -1705,10 +1705,6 @@ static const unsigned short *convert_table[0x100] =
 #define issjis2(c)	((c) >= 0x40 && (c) <= 0xfc && (c) != 0x7f)
 
 
-/*--------------------------------------------------------
-	Shift_JISからUSC2に変換
---------------------------------------------------------*/
-
 unsigned short sjis_to_ucs2(unsigned short sjis)
 {
 	const unsigned short *table;
@@ -1719,10 +1715,6 @@ unsigned short sjis_to_ucs2(unsigned short sjis)
 	return 0;
 }
 
-
-/*--------------------------------------------------------
-	Shift_JISからUTF-8に変換
---------------------------------------------------------*/
 
 int sjis_to_utf8(const void *sjis_text, void *buf)
 {
@@ -1768,10 +1760,6 @@ int sjis_to_utf8(const void *sjis_text, void *buf)
 }
 
 
-/*--------------------------------------------------------
-	Shift_JISからUTF-16LEに変換
---------------------------------------------------------*/
-
 int sjis_to_utf16le(const void *sjis_text, void *buf)
 {
 	unsigned short unicode;
@@ -1800,10 +1788,6 @@ int sjis_to_utf16le(const void *sjis_text, void *buf)
 	return i;
 }
 
-
-/*--------------------------------------------------------
-	Shift_JISからUTF-16BEに変換
---------------------------------------------------------*/
 
 int sjis_to_utf16be(const void *sjis_text, void *buf)
 {

@@ -21,7 +21,6 @@
 #ifndef UNICODE_H
 #define UNICODE_H
 
-// 関数宣言
 // UTF-8 -> Shift_JIS
 int utf8_to_sjis(const void *utf8_text, void *buf);
 

@@ -18,16 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * draw.h
- * 基本描画の処理
- ******************************************************************************/
 #ifndef DRAW_H
 #define DRAW_H
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
 #define COLOR16(red, green, blue) ((blue << 10) | (green << 5) | red)
 #define GET_R16(color) (color & 0x1f)
 #define GET_G16(color) ((color >> 5) & 0x1f)
@@ -52,7 +45,7 @@
   fbm_printVRAM( screen_address, screen_pitch, x, y, utf8, fg_color, bg_color, FBM_FONT_FILL | FBM_BACK_FILL)          \
 
 
-// 基本カラーの設定
+// Base colors
 #define COLOR_WHITE         COLOR16(31, 31, 31)
 #define COLOR_BLACK         COLOR16( 0,  0,  0)
 #define COLOR_TEXT          COLOR16(31, 31, 31)
@@ -69,13 +62,7 @@
 #define COLOR_DIALOG_SHADOW COLOR16( 0,  2,  8)
 #define COLOR_FRAME         COLOR16( 0,  0,  0)
 #define COLOR_YESNO_TEXT    COLOR16( 0,  0,  0)
-/******************************************************************************
- * グローバル変数の宣言
- ******************************************************************************/
 
-/******************************************************************************
- * グローバル関数の宣言
- ******************************************************************************/
 extern void print_string_center(u32 sy, u32 color, u32 bg_color, char *str);
 extern void print_string_shadow_center(u32 sy, u32 color, char *str);
 extern void hline(u32 sx, u32 ex, u32 y, u32 color);

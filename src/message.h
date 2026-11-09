@@ -331,6 +331,6 @@ enum MSG
 };
 
 extern char *msg[MSG_END];
-extern char msg_data[16 * 1024]; // メッセージ用のデータ 16kb
+extern char msg_data[16 * 1024]; // 16 KB buffer holding the message strings
 
 #endif

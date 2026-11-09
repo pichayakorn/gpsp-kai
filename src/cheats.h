@@ -43,11 +43,7 @@ typedef struct
   cheat_variant_t cheat_variant;
 } cheat_t;
 
-// グローバル変数宣言
-
 extern u32 g_cheats_num;
-
-// 関数宣言
 
 void process_cheats();
 void add_cheats(char *cheats_filename);

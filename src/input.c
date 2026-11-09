@@ -80,7 +80,7 @@ static u32 button_cross;
 #define BUTTON_REPEAT_START    200000
 #define BUTTON_REPEAT_CONTINUE 50000
 
-// GUI用の入力処理
+// Input handling for the GUI
 gui_action_type get_gui_input()
 {
   SceCtrlData ctrl_data;
@@ -252,7 +252,7 @@ gui_action_type get_gui_input_fs_hold(u32 button_id)
 
 u32 rapidfire_flag = 1;
 
-// エミュレーション時の入力処理
+// Input handling during emulation
 u32 update_input()
 {
   SceCtrlData ctrl_data;
@@ -293,9 +293,8 @@ u32 update_input()
     }
     else
     {
-      tilt_sensor_x = ctrl_data.Lx * 16;    // センター 2048(0x800) 最小値 0(0x0) 最大値 1143(0xFFF) 幅 4096
-      tilt_sensor_y = ctrl_data.Ly * 16;    // センター 2048(0x800) 最小値 0(0x0) 最大値 1152(0xFFF) 幅 4096
-      //    sensorR = ctrl_data.Lx * 12.5;  // センター 1600(0x640) 最小値 0(0x0) 最大値 3200(0xC80) 幅 3200
+      tilt_sensor_x = ctrl_data.Lx * 16;    // center 2048 (0x800), min 0, max 4095 (0xFFF), range 4096
+      tilt_sensor_y = ctrl_data.Ly * 16;    // center 2048 (0x800), min 0, max 4095 (0xFFF), range 4096
     }
   }
 
@@ -306,7 +305,7 @@ u32 update_input()
   {
     if(non_repeat_buttons & button_psp_mask_to_config[i])
       button_id = gamepad_config_map[i];
-    // HOMEが押されたらMENUに移行
+    // HOME opens the menu
     if (buttons & PSP_CTRL_HOME) button_id = BUTTON_ID_MENU;
 
     switch(button_id)
@@ -439,7 +438,7 @@ void input_read_mem_savestate(u32 ver)
 void input_write_mem_savestate(u32 ver)
   input_savestate_body(WRITE_MEM, ver);
 
-// 以降OSK用のコード
+// On-screen keyboard (OSK) code below
 #ifdef OSK
 
 static unsigned int __attribute__((aligned(16))) list[262144];
