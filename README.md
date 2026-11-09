@@ -95,26 +95,45 @@ Options are in `Makefile.set`:
 
 ## Installing
 
-Copy these into a folder under `PSP/GAME/` on the Memory Stick:
+```sh
+make package    # builds, then assembles the Memory Stick folder in out/gpSP/
+```
+
+Copy `out/gpSP/` to `PSP/GAME/` on the Memory Stick, then add your own dump of
+the GBA BIOS as `gba_bios.bin` next to `EBOOT.PBP` (it is not included). Put
+games in `GBA/ROM/`. The folder contains:
 
 ```
 EBOOT.PBP
 homehook.prx  dvemgr.prx  SystemButtons.prx
-cfg/          (data/cfg)
-font/         (data/font) eureka.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
-game_config.txt (data/game_config.txt)
-gba_bios.bin  (your own dump of the GBA BIOS; not included)
-GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty folders)
+cfg/          message, font and directory settings (from data/cfg)
+font/         eureka.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
+game_config.txt
+licenses/     COPYING and the font/library license notices
+GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty)
 ```
 
 About the PRX modules:
-- `homehook.prx` is always loaded; `dvemgr.prx` (TV output) is loaded on
+- `homehook.prx` is always loaded. `dvemgr.prx` (TV output) is loaded on
   PSP-2000 and later, unless the Fake Fat option is on.
 - `SystemButtons.prx` is shipped as in b230 but not loaded by the current code.
-- Prebuilt PRX modules from takka's tree are in `prx/prebuilt/`; they are the ones used
-  in the tested package. `make` also rebuilds them into `out/`.
+- By default the package ships the hardware-tested modules from
+  `prx/prebuilt/` (takka's builds). `make package PACKAGE_PRX=built` ships the
+  ones just built into `out/` instead.
 
 When upgrading from another build, delete the old `gpsp.cfg` first.
+
+## Repository layout
+
+```
+src/            emulator source
+prx/            kernel PRX module sources; prx/prebuilt/ holds tested binaries
+eboot/          EBOOT Makefile
+data/           files for the Memory Stick: cfg/, font/, game_config.txt
+image/          XMB icon and background
+docs/           original and Japanese documentation, changelog, licenses/
+tools/fonts/    font conversion tools and BDF sources of the shipped fonts
+```
 
 ## Credits
 
