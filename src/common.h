@@ -205,10 +205,10 @@ typedef u32 FIXED8_24;     // 整数部 8bit 実数部24bit の固定小数点
 #define DBGOUT_3(...) if(g_gpsp_config.debug_flag >= 3) fprintf(g_dbg_file, __VA_ARGS__)
 #define DBGOUT_4(...) if(g_gpsp_config.debug_flag >= 4) fprintf(g_dbg_file, __VA_ARGS__)
 #define DBGOUT_5(...) if(g_gpsp_config.debug_flag >= 5) fprintf(g_dbg_file, __VA_ARGS__)
-FILE *g_dbg_file;
+extern FILE *g_dbg_file;
 
-u64 dbg_time_1;
-u64 dbg_time_2;
+extern u64 dbg_time_1;
+extern u64 dbg_time_2;
 #define GET_TIME_1() sceRtcGetCurrentTick(&dbg_time_1);
 #define GET_TIME_2() sceRtcGetCurrentTick(&dbg_time_2);
 #define WRITE_TIME(msg) DBGOUT("%s: %d μs\n",msg,(int)(dbg_time_2 - dbg_time_1));
