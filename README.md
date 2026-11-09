@@ -137,17 +137,17 @@ When upgrading from another build, delete the old `gpsp.cfg` first.
 
 Source files that carry a GPL header are licensed under the **GNU General
 Public License, version 2 or (at your option) any later version**; see
-[COPYING](COPYING) (also `documents/gpl-2.0.txt`). The other parts have their
+[COPYING](COPYING). The other parts have their
 own terms or none stated:
 
 | Part | Terms |
 |---|---|
-| `src/fbm_print.c`, `src/fbm_print.h` | Based on mok's FBM print library (modified for gpSP); free to use in PSP freeware (`Docs/fbm_print/fbm_print.txt`) |
+| `src/fbm_print.c`, `src/fbm_print.h` | Based on mok's FBM print library (modified for gpSP); free to use in PSP freeware (`docs/licenses/fbm_print/fbm_print.txt`) |
 | `prx/homehookprx`, `prx/systembuttons_prx`, `src/homehook.*`, `src/SystemButtons.*` | Based on NJ's homehook.prx; no license stated |
 | `prx/dvemgr`, `src/pspDveManager.S`, `src/dvemgr.h` | Based on Dark_Alex's dvemgr.prx; no license stated |
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
-| `font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`Docs/knj10/README`) and keep its terms |
-| `font/batang10.fbm` | Baekmuk license; keep `Docs/batang/COPYRIGHT` and `Docs/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
+| `font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
+| `font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
 | `font/eureka.fbm` | From the b225 release; no license stated |
 | `tool/font_tools/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
