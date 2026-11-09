@@ -2190,16 +2190,27 @@ static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u1
     msg[MSG_WDAY_4], msg[MSG_WDAY_5], msg[MSG_WDAY_6], ""
   };
 
+  // The b225 message files put the weekday after the date in the menu and
+  // savestate formats, but keep it first in the screenshot file name formats
+  // (MSG_SS_FMT_1/2). The argument order must match, or %s reads an integer.
+  u32 weekday_first = (msg_id == MSG_SS_FMT_0);
+
   switch(date_format)
   {
     case PSP_SYSTEMPARAM_DATE_FORMAT_YYYYMMDD:
       sprintf(buffer, msg[msg_id    ], year, mon, day, weekday_strings[wday], hour, min, sec, msec / 1000);
       break;
     case PSP_SYSTEMPARAM_DATE_FORMAT_MMDDYYYY:
-      sprintf(buffer, msg[msg_id + 1], weekday_strings[wday], mon, day, year, hour, min, sec, msec / 1000);
+      if(weekday_first)
+        sprintf(buffer, msg[msg_id + 1], weekday_strings[wday], mon, day, year, hour, min, sec, msec / 1000);
+      else
+        sprintf(buffer, msg[msg_id + 1], mon, day, year, weekday_strings[wday], hour, min, sec, msec / 1000);
       break;
     case PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY:
-      sprintf(buffer, msg[msg_id + 2], weekday_strings[wday], day, mon, year, hour, min, sec, msec / 1000);
+      if(weekday_first)
+        sprintf(buffer, msg[msg_id + 2], weekday_strings[wday], day, mon, year, hour, min, sec, msec / 1000);
+      else
+        sprintf(buffer, msg[msg_id + 2], day, mon, year, weekday_strings[wday], hour, min, sec, msec / 1000);
       break;
   }
 }
