@@ -1808,8 +1808,12 @@ int sjis_to_utf16le(const void *sjis_text, void *buf)
 int sjis_to_utf16be(const void *sjis_text, void *buf)
 {
 	int len = sjis_to_utf16le(sjis_text, buf);
+	unsigned short *p = (unsigned short *)buf;
+	int i;
 
-	swab((unsigned char *)buf, (unsigned char *)buf, len);
+	/* swap each UTF-16 unit in place (len counts units, not bytes) */
+	for (i = 0; i < len; i++)
+		p[i] = (unsigned short)((p[i] << 8) | (p[i] >> 8));
 
 	return len;
 }
