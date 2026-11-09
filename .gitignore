@@ -6,3 +6,4 @@ eboot/EBOOT.PBP
 eboot/PARAM.SFO
 prx/dvemgr/dvemgr.prx
 prx/dvemgr/exports.o
+__pycache__/

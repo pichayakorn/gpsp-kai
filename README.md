@@ -51,7 +51,9 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
 - UI font `gpsp10.fbm`: proportional, covering ASCII, the Latin-1 accented
   letters, Greek and Russian Cyrillic. It replaces b225's `eureka.fbm`, whose
   rights are unclear. Its glyphs come from the public-domain X11 misc-fixed
-  6x10 font. In the message files, `$` is a 1-pixel space used to line up
+  6x10 font, except `. , : ;` (misc-fixed 6x9, for square 2x2 dots) and the
+  digits `0 1 6 9`, drawn for this project in the classic 5x7 dot-matrix style.
+  In the message files, `$` is a 1-pixel space used to line up
   columns. The padding was recomputed for gpsp10, so every column stays where
   it was with eureka. The source is `tools/fonts/bdf/gpsp10.bdf`; rebuild it
   with `tools/fonts/bdf2fbm.py`.
@@ -166,7 +168,7 @@ tools/fonts/    font conversion tools and BDF sources of the shipped fonts
 - Fonts:
   - **NAGAO Sadakazu**: Naga10 (`knj10`, `knj10B`, `maru10`, `min10`, `5x10*`)
   - **Kim Jeong-Hwan**: Baekmuk; the 10px bitmap `batang10.fbm` was made by Won-kyu Park
-  - **Markus Kuhn** and the X11 misc-fixed contributors: the glyphs of `gpsp10.fbm`
+  - **Markus Kuhn** and the X11 misc-fixed contributors: most glyphs of `gpsp10.fbm`
 - **ITOU Hiroki**: bdf2bmp/bmp2bdf font tools (`tools/fonts/bdf_tool`)
 
 ## License
@@ -184,7 +186,7 @@ own terms or none stated:
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
 | `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
 | `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
-| `data/font/gpsp10.fbm`, `tools/fonts/bdf/gpsp10.bdf` | Public domain: glyphs from the X11 misc-fixed 6x10 font ("Public domain font. Share and enjoy.") |
+| `data/font/gpsp10.fbm`, `tools/fonts/bdf/gpsp10.bdf` | Public domain: glyphs from the X11 misc-fixed 6x10 and 6x9 fonts ("Public domain font. Share and enjoy."), plus four digits drawn for this project and released into the public domain |
 | `tools/fonts/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
 Do not add the GBA BIOS or game ROMs to this repository.
