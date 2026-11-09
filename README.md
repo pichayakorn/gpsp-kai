@@ -7,6 +7,11 @@ community releases **3.4 test 4 build 225** (ErikPshat, 2016) and **build 230**
 (Oldvic, 2017), and builds it with the current
 [pspdev](https://github.com/pspdev/pspdev) toolchain.
 
+The b225 changes follow ErikPshat's published source, archived in
+[PSP-Archive/unofficial-gpSP-kai](https://github.com/PSP-Archive/unofficial-gpSP-kai)
+(branch `erikpshat-mod`). No b230 source is known, so the b230 changes were
+reconstructed from the release binary.
+
 The PSP game list shows it as **UO gpSP kai 3.4 test 4 Build 230 (src)**. The
 `(src)` suffix tells it apart from the official binary release; see
 [Building](#building).
@@ -26,6 +31,8 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
 - Version 3.4 test 4 build 230, built like the release: `USE_DEBUG` off (this
   hides the Debug mode option) and `PSP_LARGE_MEMORY` on (`MEMSIZE=1`).
 - **Update backup** now defaults to **Automatic**; it is still set per game.
+- New configs start in **fullscreen** with **analog input off**, as in b225 and
+  b230. Turn analog on in Configure analog.
 - The pad config menu lists Cross before Circle, as in b225, with the button
   tables swapped to match. The default mapping is unchanged: Circle = GBA A,
   Cross = GBA B, and the analog nub mapped separately from the D-pad, as in
@@ -36,11 +43,13 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
 - Menu texts that were hard-coded now come from the message files: the misc
   menu (now "Language and other options"), display scale, tilt sensor, the
   yes/no prompt and the ROM/state progress texts.
-- The menus use the b230 order and layout.
+- The menus use the b230 order and layout, including the b225 header layout
+  (date, battery, version and ROM info lines) and colors.
 - New UI font `eureka.fbm` (from b225): proportional, covering ASCII, the
   Latin-1 accented letters, Greek and Russian Cyrillic. In the message files,
-  `$` is a 1-pixel space used to line up columns. `knj10.fbm` is updated to the
-  b225 version.
+  `$` is a 1-pixel space used to line up columns. Its source is
+  `tools/fonts/bdf/eureka.bdf`. `knj10.fbm` is the version shipped in the b230
+  release, which has small glyph fixes over takka's.
 - The b225 menu and savestate date formats put the weekday after the date, and
   the code now passes its arguments in that order. Without this fix, the menu
   crashed when the PSP was set to MM/DD/YYYY or DD/MM/YYYY.
@@ -167,7 +176,7 @@ own terms or none stated:
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
 | `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
 | `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
-| `data/font/eureka.fbm` | From the b225 release; no license stated |
+| `data/font/eureka.fbm`, `tools/fonts/bdf/eureka.bdf` | By ErikPshat: "Copyright 2016 (c) ErikPshat. All rights reserved." No license is granted; it is redistributed here as in the b225/b230 releases |
 | `tools/fonts/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
 Do not add the GBA BIOS or game ROMs to this repository.
