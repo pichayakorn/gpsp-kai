@@ -744,8 +744,8 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
 const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP] =
 {
     BUTTON_ID_MENU,     /* △ */
-    BUTTON_ID_A,        /* ○ */
     BUTTON_ID_B,        /* × */
+    BUTTON_ID_A,        /* ○ */
     BUTTON_ID_FPS,      /* □ */
     BUTTON_ID_L,        /* [L] */
     BUTTON_ID_R,        /* [R] */
