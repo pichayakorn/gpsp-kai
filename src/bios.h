@@ -21,7 +21,6 @@
 #ifndef BIOS_H
 #define BIOS_H
 
-// 関数宣言
 void bios_halt();
 u32 bios_sqrt(u32 value);
 void bios_cpuset(u32 source, u32 dest, u32 cnt);

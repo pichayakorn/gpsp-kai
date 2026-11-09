@@ -18,19 +18,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * common.h
- * 共通ヘッダ
- ******************************************************************************/
-
 #ifndef COMMON_H
 #define COMMON_H
 
 #define OLD_COUNT
 
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include <stdio.h>
 #include <sys/stat.h>
 #include <ctype.h>
@@ -67,13 +59,9 @@
 #include <psputility_netmodules.h>
 #endif
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
-
 typedef SceUID FILE_TAG_TYPE;
-typedef u32 FIXED16_16;    // 整数部16bit 実数部16bit の固定小数点
-typedef u32 FIXED8_24;     // 整数部 8bit 実数部24bit の固定小数点
+typedef u32 FIXED16_16;    // 16.16 fixed point
+typedef u32 FIXED8_24;     // 8.24 fixed point
 
 #define MAX_PATH 512
 #define MAX_FILE 256
@@ -197,7 +185,6 @@ typedef u32 FIXED8_24;     // 整数部 8bit 実数部24bit の固定小数点
 #define YES 1
 
 #ifdef USE_DEBUG
-// デバッグ用の設定
 #define DBG_FILE_NAME "dbg_msg.txt"
 #define DBGOUT(...) if(g_gpsp_config.debug_flag != NO) fprintf(g_dbg_file, __VA_ARGS__)
 #define DBGOUT_1(...) if(g_gpsp_config.debug_flag >= 1) fprintf(g_dbg_file, __VA_ARGS__)
@@ -216,10 +203,6 @@ extern u64 dbg_time_2;
 #define DBGOUT(...)
 #endif
 
-
-/******************************************************************************
- * ローカルなヘッダファイルの読込み
- ******************************************************************************/
 #include "cpu.h"
 #include "memory.h"
 #include "video.h"

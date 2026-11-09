@@ -1308,9 +1308,7 @@ typedef enum
 #define generate_op_mvn_imm(_rd, _rn)                                         \
   generate_load_imm(_rd, (~imm))                                              \
 
-// フラグの変更 TODO
-// 論理演算
-// Vフラグは変化しない
+// TODO: flag handling for logical ops; V is unaffected
 #define generate_op_logic_flags(_rd)                                          \
   if(check_generate_n_flag)                                                   \
   {                                                                           \

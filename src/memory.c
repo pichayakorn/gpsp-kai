@@ -26,7 +26,7 @@
 const char g_state_str[4] = "SVS";
 const u32 g_state_ver = 0x00010000;
 
-// TODO:PSP-1000はフレームバッファは256KBあれば足りるので、VRAMを使用する
+// TODO: PSP-1000 only needs 256 KB for the framebuffer, so use VRAM
 u8 savestate_write_buffer[512 * 1024];
 u8 *g_state_buffer_ptr;
 u32 g_state_size;
@@ -50,7 +50,6 @@ typedef enum
 } FLASH_MANUFACTURER_ID_TYPE;
 
 
-// 関数宣言
 
 void memory_read_mem_savestate(u32 ver);
 void memory_write_mem_savestate(u32 ver);
@@ -151,16 +150,16 @@ u8 cpu_waitstate_cycles_seq[2][16] =
 };
 #endif
 
-// GBAのROM/RAM 合計962kb
-// パレットRAM 1kb
+// GBA ROM/RAM, 962 KB total
+// Palette RAM, 1 KB
 u16 palette_ram[512];
-// オブジェクトアトリビュートRAM 1kb
+// OAM, 1 KB
 u16 oam_ram[512];
-// IOレジスタ 32kb
+// I/O registers, 32 KB
 u16 io_registers[1024 * 16];
-// ExtワークRAM 256KB x2
+// EWRAM, 256 KB x2
 u8 ewram[1024 * 256 * 2];
-// IntワークRAM 32KB x2
+// IWRAM, 32 KB x2
 u8 iwram[1024 * 32 * 2];
 // VRAM 192kb
 u8 vram[1024 * 96 * 2];
@@ -1475,15 +1474,15 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
       {
         switch(get_sio_mode(value, ADDRESS16(io_registers, 0x134)))
         {
-          case SIO_MULTIPLAYER: // マルチプレイヤーモード
-            if(value & 0x80) // bit7(start bit)が1の時 転送開始命令
+          case SIO_MULTIPLAYER:
+            if(value & 0x80) // bit 7 (start bit) set: begin transfer
             {
-              if(!g_multi_id)  // 親モードの時 g_multi_id = 0
+              if(!g_multi_id)  // parent: g_multi_id == 0
               {
-                if(!g_adhoc_transfer_flag) // g_adhoc_transfer_flag == 0 転送中で無いとき
+                if(!g_adhoc_transfer_flag) // no transfer in progress
                 {
-                  g_multi_mode = MULTI_START; // データの送信
-                } // 転送中の時
+                  g_multi_mode = MULTI_START;
+                }
                 value |= (g_adhoc_transfer_flag != 0)<<7;
               }
             }
@@ -1493,7 +1492,7 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
               value |= 0x8;
               value |= g_multi_id << 4;
               ADDRESS16(io_registers, 0x128) = value;
-              ADDRESS16(io_registers, 0x134) = 7; // 親と子で0x134の設定値を変える
+              ADDRESS16(io_registers, 0x134) = 7; // parent and child use different RCNT values
             }
             else
             {
@@ -1514,7 +1513,7 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
 
     // RCNT
     case 0x134:
-      if(!value) // 0の場合
+      if(!value)
       {
         ADDRESS16(io_registers, 0x134) = 0;
         return CPU_ALERT_NONE;
@@ -1777,7 +1776,7 @@ void write_backup(u32 address, u32 value)
 
 #define write_backup32()                                                      \
 
-// TODO bitmapモードにより動作に違いがある
+// TODO: behavior differs by bitmap mode
 #define write_vram8()                                                         \
   address &= 0x1FFFE;                                                         \
   if(address >= 0x18000)                                                      \
@@ -2126,8 +2125,8 @@ void write_cart_io(u32 address, u32 value)
     case 0x04:                                                                \
       /* I/O registers */                                                     \
       if(address < 0x04000400)                                                \
-        return write_io_register##type(address & 0x3FF, value);                 /* IOは0x803まで存在 */ \
-      break;                                                                    /* 0x800は0x800ごとにループしている:TODO */ \
+        return write_io_register##type(address & 0x3FF, value);                 /* I/O exists up to 0x803 */ \
+      break;                                                                    /* TODO: mirrors every 0x800 */  \
                                                                               \
     case 0x05:                                                                \
       /* palatte RAM */                                                       \
@@ -2515,8 +2514,8 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
               flash_device_id = FLASH_DEVICE_MACRONIX_128KB;
             }
 
-            // DBZLGCYGOKU2 のプロテクト回避
-            // EEPROM_V124で特殊な物(現在判別不可) で指定すれば動作可
+            // Work around the DBZLGCYGOKU2 copy protection
+            // Works if set to the special EEPROM_V124 type (cannot be auto-detected yet)
             if(!strcasecmp(current_variable, "save_type"))
             {
               if(!strcasecmp(current_value, "sram"))
@@ -2581,8 +2580,7 @@ s32 load_gamepak_raw(char *name)
       // Read in just enough for the header
       FILE_READ(gamepak_file, gamepak_rom, 0x100);
       gamepak_file_large = gamepak_file;
-      // ファイルリストでカレントディレクトリを変更された場合
-      // ファイルが読めなくなるので、フルパス指定
+      // Use the full path: the file list may have changed the current directory
       char temp_path[MAX_PATH];
       getcwd(temp_path, MAX_PATH);
       sprintf(gamepak_filename_full_path, "%s/%s", temp_path, name);
@@ -2601,7 +2599,6 @@ s32 load_gamepak(char *name)
   s32 file_size;
   char cheats_filename[MAX_FILE];
 
-  // ファイルが開いていたら閉じる
   if(FILE_CHECK_VALID(gamepak_file_large))
     FILE_CLOSE(gamepak_file_large);
 
@@ -2609,15 +2606,14 @@ s32 load_gamepak(char *name)
 
   if(!strcasecmp(dot_position, ".zip"))
   {
-    // プログレスバーの表示
-    set_cpu_clock(9); // 一時的に333MHzに
-    init_progress(5, msg[MSG_LOAD_ZIP_ROM]);  // TODO エラーチェック
+    set_cpu_clock(9); // temporarily 333 MHz
+    init_progress(5, msg[MSG_LOAD_ZIP_ROM]);  // TODO: error check
     file_size = load_file_zip(name);
     if(file_size == -2)
       file_size = load_gamepak_raw(ZIP_TMP);
   }
   else
-  {  // プログレスバーの表示
+  {
     init_progress(5, msg[MSG_LOAD_ROM]);
     file_size = load_gamepak_raw(name);
   }
@@ -2641,7 +2637,6 @@ s32 load_gamepak(char *name)
     gamepak_code[4] = 0;
     gamepak_maker[2] = 0;
 
-    // crc32を取得
     if (gamepak_file_large == LOAD_ON_MEMORY)
       gamepak_crc32 = crc32(gamepak_crc32, gamepak_rom, file_size);
     else
@@ -2667,8 +2662,7 @@ s32 load_gamepak(char *name)
 }
 
 
-// BIOSのロード
-// 返り値:MD5まで正常 0 / MD5が違う -2 / 読み込めない -1
+// Returns 0 on success, -2 on MD5 mismatch, -1 if unreadable
 s32 load_bios(char *name)
 {
   u8 md5[16];
@@ -2679,7 +2673,6 @@ s32 load_bios(char *name)
   {
     FILE_READ(bios_file, bios_rom, 0x4000);
     FILE_CLOSE(bios_file);
-    // BIOSファイルのMD5を得る
     sceKernelUtilsMd5Digest(bios_rom, 0x4000, md5);
     if ((memcmp(md5,gba_md5,16) == 0) || (memcmp(md5,nds_md5,16) == 0))
       return 0;
@@ -3683,13 +3676,13 @@ memory_savestate_body(GET_SIZE, ver);
   update_progress();                                                     \
 
 /*--------------------------------------------------------
-  ステートロード
+  Load state
   input
-    char *savestate_filename ロードするファイルネーム
-    u32 slot_num             スロットNo. メモリロードの判別に使用
+    char *savestate_filename file to load
+    u32 slot_num             slot number; also tells whether this is an in-memory load
   return
-    0 ロード失敗
-    1 ロード成功
+    0 on failure
+    1 on success
 --------------------------------------------------------*/
 u32 load_state(char *savestate_filename, u32 slot_num)
 {
@@ -3745,7 +3738,7 @@ u32 load_state(char *savestate_filename, u32 slot_num)
   }
   else
   {
-    // 旧バージョンチェック
+    // Old version check
     ver = 0;
     u32 lp = 255;
     while(savestate_write_buffer[SAVESTATE_SIZE - lp] == 0)
@@ -3776,7 +3769,7 @@ u32 load_state(char *savestate_filename, u32 slot_num)
 
   mem_save_flag = 1;
 
-  // TODO:違うROMのstatesaveファイルを読み込むとフリーズする
+  // TODO: loading a savestate from a different ROM freezes
   if(strcmp(current_gamepak_filename, gamepak_filename))
   {
     // We'll let it slide if the filenames of the savestate and
@@ -3817,14 +3810,14 @@ u32 load_state(char *savestate_filename, u32 slot_num)
 }
 
 /*--------------------------------------------------------
-  ステートセーブ
+  Save state
   input
-    char *savestate_filename ロードするファイルネーム
-    u16 *screen_capture      画面のイメージ
-    u32 slot_num             スロットNo. メモリロードの判別に使用
+    char *savestate_filename file to save
+    u16 *screen_capture      screenshot image
+    u32 slot_num             slot number; also tells whether this is an in-memory save
   return
-    0 セーブ失敗
-    1 セーブ成功
+    0 on failure
+    1 on success
 --------------------------------------------------------*/
 u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
 {
@@ -3849,27 +3842,23 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
   g_state_buffer_ptr = savestate_write_buffer;
 
   u64 current_time;
-  ScePspDateTime current_time_fix; // time関数が年月日を返さないので調整用
+  ScePspDateTime current_time_fix; // time() does not return the date, so fix it up
   init_progress(9, msg[MSG_SAVE_STATE]);
 
-  // 識別子/バージョンの保存
   FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_str);
   FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_ver);
 
-  // スクリーンの保存
   FILE_WRITE_MEM(g_state_buffer_ptr, screen_capture, 240 * 160 * 2);
   update_progress();
 
   sceRtcGetCurrentClock(&current_time_fix, 0);
   sceRtcGetTick(&current_time_fix, &current_time);
 
-  // 時刻の保存
   FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, current_time);
   update_progress();
 
   savestate_block(write_mem, 0x00010000);
 
-  // 実際のファイル書込
   if (slot_num != MEM_STATE_NUM)
   {
     FILE_OPEN(savestate_file, savestate_path, WRITE);
@@ -3913,7 +3902,7 @@ u32 get_sio_mode(u16 io1, u16 io2)
   return SIO_GP;
 }
 
-// multiモードのデータを送る
+// Send multiplayer-mode data
 u32 send_adhoc_multi()
 {
   return 0;

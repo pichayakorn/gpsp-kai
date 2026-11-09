@@ -18,16 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * main.h
- * メインヘッダ
- ******************************************************************************/
 #ifndef MAIN_H
 #define MAIN_H
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
 typedef enum
 {
   TIMER_INACTIVE,
@@ -68,22 +61,21 @@ typedef enum
   no_frameskip
 } FRAMESKIP_TYPE;
 
-// PSPの種類
 typedef enum
 {
   PSP_1000, /* PSP-1000 all CFW or PSP-2000*/
   PSP_2000, /* PSP-2000 CFW 3.71 M33-3 or higher */
 } MODEL_TYPE;
 
-// TODO:タイマーカウンタ周りの処理は再検討
+// TODO: revisit timer counter handling
 
-// タイマーリロード時のカウンタの設定(この時点ではタイマーにセットされない)
-// タイマースタート時にカウンタに設定される
-// ただし、32bitアクセス時には即座にタイマーにセットされる
-// 実機では0~0xFFFFだが、gpSP内部では (0x10000~1)<<prescale(0,6,8,10)の値をとる
-// 各カウンターにリロードする際にprescale分シフトされる
-// TODO:32bitアクセスと8/16bitアクセスで処理を分ける必要がある
-// 8/16ビットアクセス時には呼び出す必要がない？
+// Set the reload counter value (not loaded into the timer yet).
+// It is loaded into the counter when the timer starts,
+// except on 32-bit access, where it is loaded immediately.
+// Hardware range is 0-0xFFFF; gpSP uses (0x10000-n) << prescale (0,6,8,10).
+// The value is shifted by prescale when reloaded into each counter.
+// TODO: 32-bit and 8/16-bit accesses need separate handling.
+// Maybe no need to call this on 8/16-bit access?
 #define COUNT_TIMER(timer_number)                                             \
   timer[timer_number].reload = 0x10000 - value;                               \
   if(timer_number < 2)                                                        \
@@ -93,48 +85,35 @@ typedef enum
     SOUND_UPDATE_FREQUENCY_STEP(timer_number);                                \
   }                                                                           \
 
-// タイマーの値の調整
-// TODO:調整必要
+// TODO: needs tuning
 #define ADJUST_SOUND_BUFFER(timer_number, channel)                            \
   if(timer[timer_number].direct_sound_channels & (0x01 << channel))           \
   {                                                                           \
     direct_sound_channel[channel].buffer_index = gbc_sound_buffer_index;      \
   }                                                                           \
 
-// タイマーのアクセスとカウント開始処理
 #define TRIGGER_TIMER(timer_number)                                           \
   if(value & 0x80)                                                            \
   {                                                                           \
-    /* スタートビットが”1”だった場合 */                                     \
     if(timer[timer_number].status == TIMER_INACTIVE)                          \
     {                                                                         \
-      /* タイマーが停止していた場合 */                                        \
-      /* 各種設定をして、タイマー作動 */                                      \
                                                                               \
-      /* リロード値を読み込む */                                              \
       u32 timer_reload = timer[timer_number].reload;                          \
                                                                               \
-      /* カスケードモードか判別(タイマー0以外)*/                              \
       if(((value >> 2) & 0x01) && (timer_number != 0))                        \
       {                                                                       \
-        /* カスケードモード */                                                \
         timer[timer_number].status = TIMER_CASCADE;                           \
-        /* プリスケールの設定 */                                              \
         timer[timer_number].prescale = 0;                                     \
       }                                                                       \
       else                                                                    \
       {                                                                       \
-        /* プリスケールモード */                                              \
         timer[timer_number].status = TIMER_PRESCALE;                          \
         u32 prescale = prescale_table[value & 0x03];                          \
-        /* プリスケールの設定 */                                              \
         timer[timer_number].prescale = prescale;                              \
       }                                                                       \
                                                                               \
-      /* IRQの設定 */                                                         \
       timer[timer_number].irq = (value >> 6) & 0x01;                          \
                                                                               \
-      /* カウンタを設定 */                                                    \
       timer[timer_number].count = timer_reload << timer[timer_number].prescale; \
       ADDRESS16(io_registers, 0x100 + (timer_number * 4)) =                   \
       0x10000 - timer_reload;                                                 \
@@ -144,7 +123,7 @@ typedef enum
                                                                               \
       if(timer_number < 2)                                                    \
       {                                                                       \
-        /* 小数点以下を切り捨てていたので、GBCサウンドと同様の処理にした*/    \
+        /* Avoid truncating the fraction; same handling as GBC sound */       \
         SOUND_UPDATE_FREQUENCY_STEP(timer_number);                            \
         ADJUST_SOUND_BUFFER(timer_number, 0);                                 \
         ADJUST_SOUND_BUFFER(timer_number, 1);                                 \
@@ -160,9 +139,6 @@ typedef enum
   }                                                                           \
   ADDRESS16(io_registers, 0x102 + (timer_number * 4)) = value;                \
 
-/******************************************************************************
- * グローバル変数の宣言
- ******************************************************************************/
 extern u32 g_execute_cycles;
 //extern u32 global_cycles_per_instruction;
 extern u32 g_synchronize_flag;
@@ -178,9 +154,6 @@ extern MODEL_TYPE psp_model;
 extern char *lang[12];
 extern u32 g_use_home;
 
-/******************************************************************************
- * グローバル関数の宣言
- ******************************************************************************/
 void set_cpu_clock(u32 clock);
 u32 update_gba();
 void reset_gba();

@@ -274,7 +274,7 @@ typedef struct
     }                                                                         \
   }                                                                           \
                                                                               \
-  switch((opcode >> 20) & 0xFF) /* 20～27 bit */                              \
+  switch((opcode >> 20) & 0xFF) /* bits 20-27 */                             \
   {                                                                           \
     case 0x00:                                                                \
       if((opcode & 0x90) == 0x90)                                             \
@@ -2784,7 +2784,7 @@ u32 bios_block_tag_top = 0x0101;
 u32 translation_recursion_level = 0;
 u32 translation_flush_count = 0;
 
-// エミュレート開始後ここがコールされる
+// Called once emulation starts
 #define block_lookup_address_body(type)                                       \
 {                                                                             \
   u16 *location;                                                              \
@@ -2794,7 +2794,6 @@ u32 translation_flush_count = 0;
   /* Starting at the beginning, we allow for one translation cache flush. */  \
   if(translation_recursion_level == 0)                                        \
     translation_flush_count = 0;                                              \
-  /* modeにあわせてPCの位置を調整 */                                          \
   block_lookup_address_pc_##type();                                           \
   switch(pc >> 24)                                                            \
   {                                                                           \
@@ -3471,7 +3470,7 @@ void flush_translation_cache_ram()
   ram_block_tag_top = 0x0101;
 
   if(iwram_code_min != 0xFFFFFFFF)
-  { // iwramのキャッシュを使用していた場合
+  { // iwram cache was in use
     iwram_code_min &= 0x7FFF;
     iwram_code_max &= 0x7FFF;
     memset(iwram + iwram_code_min, 0, iwram_code_max - iwram_code_min + 1);

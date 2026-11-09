@@ -19,9 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 
 PSP_MODULE_INFO("gpSP", PSP_MODULE_USER, VERSION_MAJOR, VERSION_MINOR);
@@ -30,20 +27,13 @@ PSP_MAIN_THREAD_PRIORITY(0x11);
 PSP_MAIN_THREAD_STACK_SIZE_KB(640);
 PSP_HEAP_SIZE_KB(-1); /* all free memory minus 1KB, as the old PSP_HEAP_SIZE_MAX() did */
 
-/******************************************************************************
- * グローバル変数の定義
- ******************************************************************************/
 #ifdef USE_DEBUG
 FILE *g_dbg_file;
 u64 dbg_time_1;
 u64 dbg_time_2;
 #endif
 
-TIMER_TYPE timer[4];                              // タイマー
-
-/******************************************************************************
- * グローバル変数の定義
- ******************************************************************************/
+TIMER_TYPE timer[4];
 
 //u32 global_cycles_per_instruction = 1;
 //u64 frame_count_initial_timestamp = 0;
@@ -100,15 +90,9 @@ u32 prescale_table[] = { 0, 6, 8, 10 };
 
 char *file_ext[] = { ".gba", ".bin", ".zip", NULL };
 
-// PSPの種類
 MODEL_TYPE psp_model;
 u32 g_use_home;
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
-
-// エミュレーション サイクルの決定
 #define CHECK_COUNT(count_var)                                                \
   if((count_var) < g_execute_cycles)                                          \
     g_execute_cycles = count_var;                                             \
@@ -117,36 +101,27 @@ u32 g_use_home;
   if(timer[timer_number].status == TIMER_PRESCALE)                            \
     CHECK_COUNT(timer[timer_number].count);                                   \
 
-// タイマーのアップデート
-// 実機では0~0xFFFFだが、gpSP内部では (0x10000~1)<<prescale(0,6,8,10)の値をとる
+// Hardware range is 0-0xFFFF; gpSP uses (0x10000-n) << prescale (0,6,8,10)
 #define update_timer(timer_number)                                            \
   if(timer[timer_number].status != TIMER_INACTIVE)                            \
   {                                                                           \
-    /* タイマーがアクティブだった場合 */                                      \
     if(timer[timer_number].status != TIMER_CASCADE)                           \
     {                                                                         \
-      /* タイマーがプリスケールモードだった場合 */                            \
-      /* タイマー変更 */                                                      \
       timer[timer_number].count -= g_execute_cycles;                          \
-      /* レジスタに書込 */                                                    \
       io_registers[REG_TM##timer_number##D] =                                 \
       0x10000 - (timer[timer_number].count >> timer[timer_number].prescale);  \
     }                                                                         \
                                                                               \
     if(timer[timer_number].count <= 0)                                        \
     {                                                                         \
-      /* タイマーがオーバーフローした場合 */                                  \
-      /* IRQのトリガをON */                                                   \
       if(timer[timer_number].irq == TIMER_TRIGGER_IRQ)                        \
         irq_raised |= IRQ_TIMER##timer_number;                                \
                                                                               \
       if((timer_number != 3) &&                                               \
        (timer[timer_number + 1].status == TIMER_CASCADE))                     \
       {                                                                       \
-        /* タイマー0～2 かつ 次のタイマーがカスケードモードの場合 */          \
-        /* カウンタを変更 */                                                  \
+        /* Timers 0-2: if the next timer is in cascade mode */                \
         timer[timer_number + 1].count--;                                      \
-        /* レジスタに書込 */                                                  \
         io_registers[REG_TM0D + (timer_number + 1) * 2] =                     \
         0x10000 - (timer[timer_number + 1].count);                            \
       }                                                                       \
@@ -160,7 +135,6 @@ u32 g_use_home;
           sound_timer(timer[timer_number].frequency_step, 1);                 \
       }                                                                       \
                                                                               \
-      /* タイマーのリロード */                                                \
       timer[timer_number].count +=                                            \
         (timer[timer_number].reload << timer[timer_number].prescale);         \
       io_registers[REG_TM##timer_number##D] =                                 \
@@ -168,7 +142,6 @@ u32 g_use_home;
     }                                                                         \
   }                                                                           \
 
-// ローカル関数の宣言
 void vblank_interrupt_handler(u32 sub, u32 *parg);
 void init_main();
 int main(int argc, char *argv[]);
@@ -181,7 +154,6 @@ int SetupCallbacks();
 int user_main(SceSize args, char *argp[]);
 void psp_exception_handler(PspDebugRegBlock *regs);
 
-// クロックの変更
 void set_cpu_clock(u32 num)
 {
   const u32 clock_speed_table[11] = {33, 66, 100, 133, 166, 200, 233, 266, 300, 333, 222};
@@ -226,16 +198,14 @@ int exit_callback(int arg1, int arg2, void *common)
   return 0;
 }
 
-// サスペンド/復旧時の処理
 SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *common)
 {
   if (powerInfo & PSP_POWER_CB_POWER_SWITCH)
   {
-    // サスペンド時の処理
     power_flag = 1;
 
 #ifdef USE_EXT_MEM
-    // 新型PSPの場合、増設メモリの一部をメインメモリに待避
+    // PSP-2000+: save part of the extra memory into main memory
     if(psp_model == PSP_2000)
     {
       memcpy(gamepak_rom_resume,(void *)(PSP2K_MEM_TOP + 0x1c00000), 0x400000);
@@ -248,7 +218,7 @@ SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *commo
     power_flag = 0;
 
 #ifdef USE_EXT_MEM
-    // 新型PSPの場合、メインメモリから増設メモリへ内容を復旧
+    // PSP-2000+: restore it from main memory into the extra memory
     if(psp_model == PSP_2000)
     {
       memcpy((void *)(PSP2K_MEM_TOP + 0x1c00000),gamepak_rom_resume, 0x400000);
@@ -263,11 +233,9 @@ int CallbackThread(SceSize args, void *argp)
 {
   int id;
 
-  // 終了周りのコールバック
   id = sceKernelCreateCallback("Exit Callback", (void *)exit_callback, NULL);
   sceKernelRegisterExitCallback(id);
 
-  // 電源周りのコールバック
   id = sceKernelCreateCallback("Power Callback", (void *)power_callback, NULL);
   scePowerRegisterCallback(-1, id); // TODO
 
@@ -331,22 +299,20 @@ int main(int argc, char *argv[])
   chdir(main_path);
 
 #ifdef USE_DEBUG
-  // デバッグ出力ファイルのオープン
   g_dbg_file = fopen(DBG_FILE_NAME, "awb");
   DBGOUT("\nStart gpSP\n");
 #endif
 
-  // 設定ファイルの読込み
   load_config_file();
 
   psp_model = get_model();
   g_use_home = 1;
 
-  // HOMEボタンを読取り可能にする
+  // Allow reading the HOME button
   if(pspSdkLoadStartModule("homehook.prx", PSP_MEMORY_PARTITION_KERNEL) < 0)
     g_use_home = 0;
 
-  // PSP-2000(CFW3.71)なら、外部出力用のモジュールを読込む
+  // PSP-2000 (CFW 3.71): load the TV-out module
   if(psp_model == PSP_2000)
   {
     if(pspSdkLoadStartModule("dvemgr.prx", PSP_MEMORY_PARTITION_KERNEL) < 0)
@@ -361,12 +327,10 @@ int main(int argc, char *argv[])
   sceKernelEnableSubIntr(PSP_VBLANK_INT, 0);
 
   #ifdef USE_ADHOC
-  // adhoc用モジュールのロード
   if (load_adhoc_modules() != 0)
     error_msg("not load adhoc modules!!\n");
 #endif
 
-  // 初期化
   init_game_config();
 
   init_main();
@@ -384,10 +348,8 @@ int main(int argc, char *argv[])
   clear_screen(COLOR_BG);
   flip_screen();
 
-  // 初期設定用のプログレスバー
   init_progress(7, "");
 
-  // ディレクトリ設定の読込み
   if (load_dircfg("cfg/dir.cfg") != 0)
   {
     pspDebugScreenInit();
@@ -396,7 +358,6 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
-  // フォント設定の読込み
   sprintf(filename,"cfg/%s.fnt",lang[g_gpsp_config.language]);
   if (load_fontcfg(filename) != 0)
   {
@@ -406,7 +367,6 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
-  // メッセージファイルの読込み
   sprintf(filename,"cfg/%s.msg",lang[g_gpsp_config.language]);
   if (load_msgcfg(filename) != 0)
   {
@@ -416,7 +376,6 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
-  // フォントの読込み
   if (load_font() != 0)
   {
     pspDebugScreenInit();
@@ -425,18 +384,15 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
-  // ROMバッファの初期化
   init_gamepak_buffer();
   update_progress();
 
   sceImposeSetHomePopup(g_gpsp_config.enable_home);
 
-  // ROMファイル名の初期化
   gamepak_filename[0] = 0;
 
-  // BIOSの読込み
   u32 bios_ret = load_bios("gba_bios.bin");
-  if(bios_ret == -1) // 読込めない場合
+  if(bios_ret == -1) // not readable
   {
     PRINT_STRING_BG(msg[MSG_ERR_BIOS_1], 0xFFFF, 0x0000, 0, 0);
     PRINT_STRING_BG(msg[MSG_ERR_BIOS_2], 0xFFFF, 0x0000, 0, 60);
@@ -445,7 +401,7 @@ int main(int argc, char *argv[])
     quit(1);
   }
   update_progress();
-  if(bios_ret == -2) // MD5が違う場合
+  if(bios_ret == -2) // MD5 mismatch
   {
     PRINT_STRING_BG(msg[MSG_ERR_BIOS_MD5], 0xFFFF, 0x0000, 0, 0);
     flip_screen();
@@ -510,7 +466,6 @@ int main(int argc, char *argv[])
   real_frame_count = 0;
   virtual_frame_count = 0;
 
-  // エミュレートの開始
 #ifdef USE_C_CORE
   if(g_gpsp_config.emulate_core == ASM_CORE)
     execute_arm_translate(g_execute_cycles);
@@ -523,10 +478,9 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-// サスペンド時にメニューに入る処理
+// Enter the menu on suspend
 u32 into_suspend()
 {
-//  if (power_flag == 0) return 0; // TODO この処理はupdate_gba()側に移動
   FILE_CLOSE(gamepak_file_large);
   u16 *screen_copy = copy_screen();
   u32 ret_val = menu(screen_copy);
@@ -541,11 +495,11 @@ u32 sync_flag = 0;
 #define H_BLANK   (0x02)
 #define V_COUNTER (0x04)
 
-// video_countの初期値は960(水平表示クロック)
+// video_count starts at 960 (horizontal display clocks)
 
 u32 update_gba()
 {
-  // TODO このあたりのログをとる必要があるかも
+  // TODO: may need logging here
   IRQ_TYPE irq_raised = IRQ_NONE;
 
   do
@@ -568,19 +522,18 @@ u32 update_gba()
     video_count -= g_execute_cycles;
 
     if(video_count <= 0)
-    { // 状態移行の発生
+    {
       u32 vcount = io_registers[REG_VCOUNT];
       u32 dispstat = io_registers[REG_DISPSTAT];
 
       if(!(dispstat & H_BLANK))
-      { // H BLANKでないとき
-        // H BLANKに移行
+      { // not in H-blank
         video_count += 272;
-        dispstat |= H_BLANK; // H BLANKに設定
+        dispstat |= H_BLANK;
 
         if((dispstat & 0x01) == 0)
-        {  // VBLANKでないとき
-          // フレームスキップ時は描画しない
+        {  // not in V-blank
+          // Do not render when frame skipping
           if(!skip_next_frame_flag)
               update_scanline();
 
@@ -595,13 +548,12 @@ u32 update_gba()
             dma_transfer(dma + 3);
 
           if(dispstat & 0x10)
-            irq_raised |= IRQ_HBLANK; // HBLANK割込みはVBLANK中は発生しない
+            irq_raised |= IRQ_HBLANK; // HBLANK IRQ is not raised during VBLANK
         }
 
-      } // HBLANKでないとき
+      }
       else
-      { // HBLANKのとき
-        // 次のラインに移行
+      { // in H-blank
         video_count += 960;
         dispstat &= ~H_BLANK;
 
@@ -652,9 +604,9 @@ u32 update_gba()
 
           process_cheats();
 
-          vcount = 0; // TODO vcountを0にするタイミングを検討
+          vcount = 0; // TODO: decide when vcount should reset to 0
 
-          //TODO 調整必要
+          // TODO: needs tuning
           if((video_out_mode == 0) || (g_gpsp_config.screen_interlace == PROGRESSIVE))
             synchronize();
           else
@@ -668,7 +620,7 @@ u32 update_gba()
             flip_screen();
         } //(vcount == 228)
 
-        // vcountによる割込
+        // VCOUNT match interrupt
         if(vcount == (dispstat >> 8))
         {
           // vcount trigger
@@ -698,7 +650,7 @@ u32 update_gba()
     CHECK_TIMER(2);
     CHECK_TIMER(3);
 
-    // 画面のシンクロ・フリップ・ウェイト処理はここで行うべきでは？
+    // Should screen sync/flip/wait be done here instead?
 
   } while(reg[CPU_HALT_STATE] != CPU_ACTIVE);
   return g_execute_cycles;
@@ -710,8 +662,8 @@ void vblank_interrupt_handler(u32 sub, u32 *parg)
   vblank_count++;
 }
 
-// TODO:最適化/タイマー使ったものに変更
-// GBAの描画サイクルは 16.743 ms, 280896 cycles(16.78MHz) 59.737 Hz
+// TODO: optimize / switch to a timer-based approach
+// GBA frame: 16.743 ms, 280896 cycles at 16.78 MHz, 59.737 Hz
 void synchronize()
 {
 //  char char_buffer[64];
@@ -719,7 +671,6 @@ void synchronize()
   static u32 frames_drawn = 0;
   static u32 frames_drawn_count = 0;
 
-  // FPS等の表示
   if(psp_fps_debug)
   {
     char print_buffer[256];
@@ -727,56 +678,50 @@ void synchronize()
     PRINT_STRING_BG(print_buffer, 0xFFFF, 0x000, 0, 0);
   }
 
-  // フレームスキップ フラグの初期化
   skip_next_frame_flag = 0;
-  // 内部フレーム値の増加
   frames++;
 
   switch(g_game_config.frameskip_type)
   {
-  // オートフレームスキップ時
+  // Auto frameskip
     case auto_frameskip:
       virtual_frame_count++;
 
-      // 内部フレーム数に遅れが出ている場合
+      // Emulation is behind real time
       if(real_frame_count > virtual_frame_count)
       {
-        if(num_skipped_frames < g_game_config.frameskip_value)  // スキップしたフレームが設定より小さい
+        if(num_skipped_frames < g_game_config.frameskip_value)
         {
-          // 次のフレームはスキップ
           skip_next_frame_flag = 1;
-          // スキップしたフレーム数を増加
           num_skipped_frames++;
         }
         else
         {
-          // 設定の上限に達した場合
+          // Reached the configured skip limit
 //          real_frame_count = virtual_frame_count;
-          // スキップしたフレーム数は0に初期化
           num_skipped_frames = 0;
           frames_drawn_count++;
         }
       }
 
-      // 内部フレーム数が同じ場合
+      // Emulation is in step with real time
       if(real_frame_count == virtual_frame_count)
       {
-        // スキップしたフレーム数は0に初期化
         num_skipped_frames = 0;
         frames_drawn_count++;
       }
 
-      // 内部フレーム数が実機を上回る場合
+      // Emulation is ahead of real time
       if(real_frame_count < virtual_frame_count)
       {
         num_skipped_frames = 0;
         frames_drawn_count++;
       }
 
-      // 内部フレーム数が実機を上回る場合
+      // Emulation is ahead of real time
       if((real_frame_count < virtual_frame_count) && (g_synchronize_flag) && (skip_next_frame_flag == 0))
       {
-        // VBANK待ち
+        // Wait for VBlank
         synchronize_sound();
         sceDisplayWaitVblankStart();
         real_frame_count = 0;
@@ -784,10 +729,9 @@ void synchronize()
       }
       break;
 
-    // マニュアルフレームスキップ時
+    // Manual frameskip
     case manual_frameskip:
       virtual_frame_count++;
-      // フレームスキップ数増加
       num_skipped_frames = (num_skipped_frames + 1) % (g_game_config.frameskip_value + 1);
       if(g_game_config.random_skip)
       {
@@ -798,17 +742,17 @@ void synchronize()
       }
       else
       {
-        // フレームスキップ数=0の時だけ画面更新
+        // Only update the screen when the skip counter is 0
         if(num_skipped_frames != 0)
           skip_next_frame_flag = 1;
         else
           frames_drawn_count++;
       }
 
-      // 内部フレーム数が実機を上回る場合
+      // Emulation is ahead of real time
       if((real_frame_count < virtual_frame_count) && (g_synchronize_flag) && (skip_next_frame_flag == 0))
       {
-        // VBANK待ち
+        // Wait for VBlank
         synchronize_sound();
         sceDisplayWaitVblankStart();
       }
@@ -816,14 +760,14 @@ void synchronize()
       virtual_frame_count = 0;
       break;
 
-    // フレームスキップなし時
+    // No frameskip
     case no_frameskip:
       frames_drawn_count++;
       virtual_frame_count++;
       if((real_frame_count < virtual_frame_count) && (g_synchronize_flag))
       {
-        // 内部フレーム数が実機を上回る場合
-        // VBANK待ち
+        // Emulation is ahead of real time
+        // Wait for VBlank
         synchronize_sound();
         sceDisplayWaitVblankStart();
       }
@@ -832,8 +776,7 @@ void synchronize()
       break;
   }
 
-  // FPSのカウント
-  // 1/60秒のVBLANK割込みがあるので、タイマは使用しないようにした
+  // No timer needed: the 1/60 s VBLANK interrupt drives this
   if(frames == 60)
   {
     frames = 0;
@@ -959,7 +902,6 @@ void raise_interrupt(IRQ_TYPE irq_raised)
   }
 }
 
-
 MODEL_TYPE get_model()
 {
   if((kuKernelGetModel() <= 0) || ( g_gpsp_config.fake_fat == YES))
@@ -968,7 +910,7 @@ MODEL_TYPE get_model()
     return PSP_1000;
   }
   else
-    if(sceKernelDevkitVersion() < 0x03070110 /* Ver3.71以上を対象 */)
+    if(sceKernelDevkitVersion() < 0x03070110 /* firmware older than 3.71 */)
     {
       DBGOUT("PSP_1000\n");
       return PSP_1000;

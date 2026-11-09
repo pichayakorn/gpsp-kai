@@ -18,7 +18,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-# CPUエミュレート ASMコア
+# CPU emulation ASM core
 
 .align 4
 
@@ -3288,17 +3288,17 @@ ror_zero_shift:
   jr $ra                          # return
   rotrv $4, $4, $5                # return (value ror shift) delay
 
-# エミュレートの開始
-# 入力 $4: cycle counter
+# Start emulation
+# Input $4: cycle counter
 execute_arm_translate:
   addu $17, $4, $0                # $17 = cycle counter
   lui $16, %hi(reg)               # $16 = &reg
   addiu $16, %lo(reg)
-  extract_flags                   # $1にCPSR,ステータスフラグを$28~$31に展開
+  extract_flags                   # unpack CPSR into $1 and status flags into $28-$31
 
   and $1, $1, 0x20                # $1 = $1 & 0x20
 
-  bne $1, $0, 1f                  # $1 != 0(THUMBビットがON)ならば1:へ
+  bne $1, $0, 1f                  # THUMB bit set: go to 1:
   lw $4, REG_PC($16)              # $4 = PC (delay)
 
   jal block_lookup_address_arm    # lookup initial jump address

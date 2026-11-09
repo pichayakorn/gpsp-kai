@@ -144,8 +144,6 @@ typedef enum
   REG_HALTCNT     = 0x180
 } HARDWARE_REGISTER;
 
-// グローバル変数宣言
-
 extern u32 mem_save_flag;
 extern char gamepak_title[13];
 extern char gamepak_code[5];
@@ -208,8 +206,6 @@ extern u8 cpu_waitstate_cycles_seq[2][16];
 // SIO
 extern u32 g_multi_mode;
 extern u32 g_adhoc_transfer_flag;
-
-// 関数宣言
 
 extern u8 read_memory8(u32 address);
 extern u32 read_memory16(u32 address);
