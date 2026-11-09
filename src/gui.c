@@ -789,13 +789,13 @@ void init_game_config()
 void init_gpsp_config()
 {
   int temp;
-  g_gpsp_config.screen_mode = scaled_aspect;
+  g_gpsp_config.screen_mode = fullscreen;
   g_gpsp_config.screen_scale = 100;
   g_gpsp_config.screen_filter = filter_bilinear;
   g_gpsp_config.screen_ratio = R4_3;
   g_gpsp_config.screen_interlace = PROGRESSIVE;
   g_gpsp_config.enable_audio = YES;
-  g_gpsp_config.enable_analog = YES;
+  g_gpsp_config.enable_analog = NO;
   g_gpsp_config.analog_sensitivity_level = 4;
   g_gpsp_config.enable_home = NO;
   memcpy(g_gpsp_config.gamepad_config_map, gamepad_config_map_init, sizeof(gamepad_config_map_init));
