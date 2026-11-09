@@ -772,7 +772,7 @@ void init_game_config()
   g_game_config.random_skip = NO;
   g_game_config.clock_speed_number = 9;
   g_game_config.audio_buffer_size_number = 2;
-  g_game_config.update_backup_flag = NO;
+  g_game_config.update_backup_flag = YES;
   for(i = 0; i < MAX_CHEATS; i++)
   {
     g_game_config.cheats_flag[i].cheat_active = NO;
