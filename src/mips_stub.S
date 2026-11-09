@@ -212,7 +212,7 @@
 mips_update_gba:
   sw $4, REG_PC($16)              # current PC = $4
 
-  addiu $sp, $sp, -4              # make room on the stack
+  addiu $sp, $sp, -8              # make room on the stack
   sw $ra,($sp)                    # save return address
   collapse_flags                  # update cpsr
   save_registers                  # save registers
@@ -220,7 +220,7 @@ mips_update_gba:
   sw $0, CHANGED_PC_STATUS($16)
 
   lw $ra, ($sp)                   # restore return address
-  addiu $sp, $sp, 4               # fix stack
+  addiu $sp, $sp, 8               # fix stack
 
   lw $1, CHANGED_PC_STATUS($16)
   bne $1, $0, lookup_pc
@@ -2104,7 +2104,7 @@ execute_store_io_u8:
   region_check 4, patch_store_u8
   andi $5, $5, 0xFF               # make value 8bit
   andi $4, $4, 0x3FF              # wrap around address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
 
   save_registers
@@ -2201,7 +2201,7 @@ execute_store_io_u16:
   region_check 4, patch_store_u16
   andi $5, $5, 0xFFFF             # make value 16bit
   andi $4, $4, 0x3FE              # wrap around/align address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
 
   save_registers
@@ -2299,7 +2299,7 @@ execute_store_io_u32:
   region_check 4, patch_store_u32
   nop
   andi $4, $4, 0x3FC              # wrap around/align address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
 
   save_registers
@@ -2492,7 +2492,7 @@ execute_load_full_u8:
   lbu $2, ($1)                    # read the value
 
 ext_load_u8:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)                   # store return address
   save_registers
   jal read_memory8                # read the value
@@ -2500,7 +2500,7 @@ ext_load_u8:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 #execute_load_s8:
 execute_load_full_s8:
@@ -2517,7 +2517,7 @@ execute_load_full_s8:
   lb $2, ($1)                     # read the value
 
 ext_load_s8:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)                   # store return address
   save_registers
   jal read_memory8                # read the value
@@ -2526,7 +2526,7 @@ ext_load_s8:
   seb $2, $2                      # sign extend the read value
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 #execute_load_u16:
 execute_load_full_u16:
@@ -2544,7 +2544,7 @@ execute_load_full_u16:
   lhu $2, ($1)                    # read the value (delay)
 
 ext_load_u16:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)                   # store return address
   save_registers
   jal read_memory16               # read the value
@@ -2552,7 +2552,7 @@ ext_load_u16:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 #execute_load_s16:
 execute_load_full_s16:
@@ -2570,7 +2570,7 @@ execute_load_full_s16:
   lh $2, ($1)                     # read the value (delay)
 
 ext_load_s16:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)                   # store return address
   save_registers
   jal read_memory16_signed        # read the value
@@ -2579,7 +2579,7 @@ ext_load_s16:
   seh $2, $2                      # sign extend the return value
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 #execute_load_u32:
 execute_load_full_u32:
@@ -2597,7 +2597,7 @@ execute_load_full_u32:
   lw $2, ($1)                     # read the value (delay)
 
 ext_load_u32:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)                   # store return address
   save_registers
   jal read_memory32               # read the value
@@ -2605,7 +2605,7 @@ ext_load_u32:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 #execute_aligned_load32:
 #  srl $2, $4, 28                  # check if the address is out of range
@@ -2660,21 +2660,21 @@ alert_loop:
   lw $4, REG_PC($16)              # $4 = new PC
 
   j lookup_pc
-  addiu $sp, $sp, 4               # fix the stack (delay slot)
+  addiu $sp, $sp, 8               # fix the stack (delay slot)
 
 irq_alert:
   restore_registers
   j lookup_pc                     # PC has changed, get a new one
-  addiu $sp, $sp, 4               # fix the stack (delay)
+  addiu $sp, $sp, 8               # fix the stack (delay)
 
 no_alert:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # we can return
-  addiu $sp, $sp, 4               # fix the stack (delay)
+  addiu $sp, $sp, 8               # fix the stack (delay)
 
 smc_dma:
-  addiu $sp, $sp, 4               # fix the stack
+  addiu $sp, $sp, 8               # fix the stack
   jal flush_translation_cache_ram # flush translation cache
   nop
   j lookup_pc
@@ -2682,7 +2682,7 @@ smc_dma:
 
 
 ext_store_eeprom:
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_eeprom                # write the value out
@@ -2690,14 +2690,14 @@ ext_store_eeprom:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # we can return
-  addiu $sp, $sp, 4               # fix the stack (delay)
+  addiu $sp, $sp, 8               # fix the stack (delay)
 
 # 8bit ext memory routines
 
 ext_store_io8:
   andi $5, $5, 0xFF               # make value 8bit
   andi $4, $4, 0x3FF              # wrap around address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_io_register8          # write the value out
@@ -2738,7 +2738,7 @@ ext_store_oam8:
 ext_store_backup:
   andi $5, $5, 0xFF               # make value 8bit
   andi $4, $4, 0xFFFF             # mask value
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_backup                # write the value out
@@ -2746,7 +2746,7 @@ ext_store_backup:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # we can return
-  addiu $sp, $sp, 4               # fix the stack (delay)
+  addiu $sp, $sp, 8               # fix the stack (delay)
 
 ext_store_u8_jtable:
   .long ext_store_ignore    # 0x00 BIOS
@@ -2805,7 +2805,7 @@ ext_store_u8:
 ext_store_io16:
   andi $4, $4, 0x3FF              # wrap around address
   andi $5, $5, 0xFFFF             # make value 16bit
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_io_register16         # write the value out
@@ -2849,7 +2849,7 @@ ext_store_oam16:
 
 ext_store_rtc:
   andi $5, $5, 0xFFFF             # make value 16bit
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_cart_io               # write the value out
@@ -2857,7 +2857,7 @@ ext_store_rtc:
   restore_registers
   lw $ra, ($sp)                   # restore return address
   jr $ra                          # we can return
-  addiu $sp, $sp, 4               # fix the stack (delay)
+  addiu $sp, $sp, 8               # fix the stack (delay)
 
 ext_store_u16_jtable:
   .long ext_store_ignore          # 0x00 BIOS, ignore
@@ -2911,7 +2911,7 @@ ext_store_u16:
 
 ext_store_io32:
   andi $4, $4, 0x3FF              # wrap around address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_io_register32         # write the value out
@@ -3001,7 +3001,7 @@ ext_store_u32:
 
 ext_store_io32a:
   andi $4, $4, 0x3FF              # wrap around address
-  addiu $sp, $sp, -4              # make room on the stack for $ra
+  addiu $sp, $sp, -8              # make room on the stack for $ra
   sw $ra, ($sp)
   save_registers
   jal write_io_register32         # write the value out
@@ -3107,7 +3107,7 @@ execute_read_spsr:
 # $4: Current pc
 
 execute_swi:
-  addiu $sp, $sp, -4              # push $ra
+  addiu $sp, $sp, -8              # push $ra
   sw $ra, ($sp)
   lui $1, %hi(SUPERVISOR_LR)
   sw $4, %lo(SUPERVISOR_LR)($1)   # store next PC in the supervisor's LR
@@ -3123,7 +3123,7 @@ execute_swi:
   restore_registers
   lw $ra, ($sp)                   # pop $ra
   jr $ra                          # return
-  addiu $sp, $sp, 4               # fix stack (delay slot)
+  addiu $sp, $sp, 8               # fix stack (delay slot)
 
 # $4: pc to restore to
 # returns in $4
@@ -3139,7 +3139,7 @@ execute_spsr_restore:
   lw $1, %lo(spsr)($2)            # $1 = spsr[cpu_mode]
   sw $1, REG_CPSR($16)            # cpsr = spsr[cpu_mode]
   extract_flags_body              # extract flags from $1
-  addiu $sp, $sp, -4
+  addiu $sp, $sp, -8
   sw $ra, ($sp)
   save_registers
   jal execute_spsr_restore_body   # do the dirty work in this C function
@@ -3148,7 +3148,7 @@ execute_spsr_restore:
   addu $4, $2, $0                 # move return value to $4
   lw $ra, ($sp)
   jr $ra
-  addiu $sp, $sp, 4
+  addiu $sp, $sp, 8
 
 no_spsr_restore:
   jr $ra
@@ -3165,7 +3165,7 @@ execute_store_cpsr:
   and $2, $2, $4                  # $2 = (cpsr & (~store_mask))
   or $1, $1, $2                   # $1 = new cpsr combined with old
   extract_flags_body              # extract flags from $1
-  addiu $sp, $sp, -4
+  addiu $sp, $sp, -8
   sw $ra, ($sp)
   save_registers
   jal execute_store_cpsr_body     # do the dirty work in this C function
@@ -3178,14 +3178,14 @@ execute_store_cpsr:
 
   lw $ra, ($sp)
   jr $ra
-  addiu $sp, $sp, 4
+  addiu $sp, $sp, 8
 
 changed_pc_cpsr:
   jal block_lookup_address_arm    # GBA address is in $4
   addu $4, $2, $0                 # load new address in $4 (delay slot)
   restore_registers               # restore registers
   jr $2                           # jump to the new address
-  addiu $sp, $sp, 4               # get rid of the old ra (delay slot)
+  addiu $sp, $sp, 8               # get rid of the old ra (delay slot)
 
 
 # $4: new spsr
