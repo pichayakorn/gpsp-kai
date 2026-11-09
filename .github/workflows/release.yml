@@ -1,0 +1,47 @@
+# Release automation (see RELEASING.md).
+#
+# On every push to main, release-please keeps a "release PR" up to date: it
+# picks the next version from the commit types (fix -> patch, feat -> minor,
+# feat! -> major) and writes CHANGELOG.md. Merging that PR tags the version
+# and creates the GitHub release; the build workflow then attaches the zip.
+#
+# Pushing a v* tag by hand (used for the first release, 3.5.0) builds and
+# attaches the zip to that tag's release in the same way.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  package-release:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      release-tag: ${{ needs.release-please.outputs.tag_name }}
+
+  package-tag:
+    if: github.ref_type == 'tag'
+    uses: ./.github/workflows/build.yml
+    with:
+      release-tag: ${{ github.ref_name }}
