@@ -2,7 +2,7 @@
 out/
 *.o
 *.elf
-gpsp/EBOOT.PBP
-gpsp/PARAM.SFO
+eboot/EBOOT.PBP
+eboot/PARAM.SFO
 prx/dvemgr/dvemgr.prx
 prx/dvemgr/exports.o

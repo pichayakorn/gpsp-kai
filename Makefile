@@ -14,7 +14,7 @@ dvemgr:
 	make -C ./prx/dvemgr/
 
 main:
-	make -C ./gpsp/
+	make -C ./eboot/
 
 # Increment BUILD_COUNT in build_count.inc (run explicitly, not on every build)
 bump_build:
@@ -31,7 +31,7 @@ dvemgr_clean:
 	make -C ./prx/dvemgr/ clean
 
 main_clean:
-	make -C ./gpsp/ clean
+	make -C ./eboot/ clean
 
 homehookprx_clean:
 	make -C ./prx/homehookprx/ clean

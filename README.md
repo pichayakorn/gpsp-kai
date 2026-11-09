@@ -111,7 +111,7 @@ About the PRX modules:
 - `homehook.prx` is always loaded; `dvemgr.prx` (TV output) is loaded on
   PSP-2000 and later, unless the Fake Fat option is on.
 - `SystemButtons.prx` is shipped as in b230 but not loaded by the current code.
-- Prebuilt PRX modules from takka's tree are in `gpsp/`; they are the ones used
+- Prebuilt PRX modules from takka's tree are in `prx/prebuilt/`; they are the ones used
   in the tested package. `make` also rebuilds them into `out/`.
 
 When upgrading from another build, delete the old `gpsp.cfg` first.
