@@ -674,7 +674,7 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
           break;
       }
       print_status(1);
-      PRINT_STRING_BG_SJIS(utf8, current_dir_short, COLOR_ACTIVE_ITEM, COLOR_BG, 0, (CURRENT_DIR_ROWS * 10));
+      PRINT_STRING_BG_SJIS(utf8, current_dir_short, COLOR_ROM_INFO, COLOR_BG, 0, (CURRENT_DIR_ROWS * 10));
       PRINT_STRING_BG(msg[MSG_RETURN_MENU], COLOR_HELP_TEXT, COLOR_BG, 20, 260);
 
       for(i = 0, current_file_number = i + current_file_scroll_value;
@@ -1168,7 +1168,7 @@ u32 menu(u16 *original_screen)
 
   void submenu_savestate()
   {
-    PRINT_STRING_BG(msg[MSG_STATE_MENU_TITLE], COLOR_ACTIVE_ITEM, COLOR_BG, 10, 70);
+    PRINT_STRING_BG(msg[MSG_STATE_MENU_TITLE], COLOR_HELP_TEXT, COLOR_BG, 10, 70);
     menu_change_state();
   }
 
@@ -1544,7 +1544,7 @@ u32 menu(u16 *original_screen)
   {
     first_load = 1;
     memset(original_screen, 0x00, 240 * 160 * 2);
-    PRINT_STRING_EXT_BG(msg[MSG_NON_LOAD_GAME], 0xFFFF, 0x0000, 60, 75, original_screen, 240);
+    PRINT_STRING_EXT_BG(msg[MSG_NON_LOAD_GAME], 0xFFFF, 0x0000, 0, 75, original_screen, 240);
   }
 
   choose_menu(&main_menu);
@@ -2099,7 +2099,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     else
       {
         memset(snapshot_buffer, 0, 240 * 160 * 2);
-        PRINT_STRING_EXT_BG(msg[MSG_STATE_MENU_STATE_NONE], 0xFFFF, 0x0000, 15, 75, snapshot_buffer, 240);
+        PRINT_STRING_EXT_BG(msg[MSG_STATE_MENU_STATE_NONE], 0xFFFF, 0x0000, 0, 65, snapshot_buffer, 240);
         get_timestamp_string(savestate_timestamp_string, MSG_STATE_MENU_DATE_NONE_0, 0, 0, 0, 0, 0, 0, 0, 0);
         PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, 10, 40);
       }
@@ -2167,21 +2167,21 @@ static void print_status(u32 mode)
   get_timestamp_string(print_buffer_1, MSG_MENU_DATE_FMT_0, current_time.year, current_time.month , current_time.day, wday,
     current_time.hour, current_time.minute, current_time.second, 0);
   sprintf(print_buffer_2,"%s%s", msg[MSG_MENU_DATE], print_buffer_1);
-  PRINT_STRING_BG(print_buffer_2, COLOR_HELP_TEXT, COLOR_BG, 0, 0);
+  PRINT_STRING_BG(print_buffer_2, COLOR_HELP_TEXT, COLOR_BG, 10, 0);
 
   sprintf(print_buffer_1, msg[MSG_MENU_BATTERY], scePowerGetBatteryLifePercent(), scePowerGetBatteryLifeTime());
-  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 240, 0);
+  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 0);
 
-  sprintf(print_buffer_1, "MAX ROM BUF: %02d MB Ver:%d.%d %s %d Build %d",
+  sprintf(print_buffer_1, "MAX ROM BUF: %02d MB Ver: %d.%d %s %d Build %d",
       (int)(gamepak_ram_buffer_size/1024/1024), VERSION_MAJOR, VERSION_MINOR, VER_RELEASE, VERSION_BUILD, BUILD_COUNT);
-  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 240, 10);
+  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 10);
 
   if (mode == 0)
   {
     strncpy(print_buffer_1, gamepak_filename, 80);
-    PRINT_STRING_BG_SJIS(utf8, print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 10);
+    PRINT_STRING_BG_SJIS(utf8, print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 20);
     sprintf(print_buffer_1, "%s  %s  %s  %0X", gamepak_title, gamepak_code, gamepak_maker, (unsigned int)gamepak_crc32);
-    PRINT_STRING_BG(print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 20);
+    PRINT_STRING_BG(print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 10);
   }
 }
 
