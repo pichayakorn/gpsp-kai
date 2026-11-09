@@ -2000,7 +2000,10 @@ execute_load_bios_u32a:
   load_u32 bios_read_protect
 
 2:
-  open_load32_a
+  # The patch handler was missing here and old binutils encoded the empty
+  # branch target as offset 0 (branch to the delay slot), so the check never
+  # diverts. Keep that exact encoding; b230 contains the same instruction.
+  open_load32_a .+4
   nop
 
 execute_load_ewram_u32a:
