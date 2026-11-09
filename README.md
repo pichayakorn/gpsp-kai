@@ -155,6 +155,7 @@ tools/fonts/    font conversion tools and BDF sources of the shipped fonts
 - **mok**: the FBM font printer (`fbm_print.c`)
 - **pochi**, **frmb0001**: icons and images
 - **ErikPshat**: build 225, with its translations and the `eureka.fbm` font
+  (partly based on Naga10)
 - **Oldvic**: build 230
 - Fonts:
   - **NAGAO Sadakazu**: Naga10 (`knj10`, `knj10B`, `maru10`, `min10`, `5x10*`)
@@ -176,7 +177,7 @@ own terms or none stated:
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
 | `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
 | `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
-| `data/font/eureka.fbm`, `tools/fonts/bdf/eureka.bdf` | By ErikPshat: "Copyright 2016 (c) ErikPshat. All rights reserved." No license is granted; it is redistributed here as in the b225/b230 releases |
+| `data/font/eureka.fbm`, `tools/fonts/bdf/eureka.bdf` | By ErikPshat, partly derived from Naga10: its Greek letters, symbols and most Cyrillic letters are identical to Naga10 glyphs. The ASCII and Latin-1 glyphs are of unknown origin. The file is marked "Copyright 2016 (c) ErikPshat. All rights reserved." The Naga10 terms (see the Naga10 row) apply to the derived glyphs; no license is stated for the rest, which is redistributed as in the b225/b230 releases |
 | `tools/fonts/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
 Do not add the GBA BIOS or game ROMs to this repository.
