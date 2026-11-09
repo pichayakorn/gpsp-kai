@@ -20,8 +20,8 @@
 
 #include "common.h"
 
-// VIDEO OUTの有効画素は660x440(GBAの2.75倍)
-// インタレース時の有効画素は660x220},
+// VIDEO OUT visible area is 660x440 (2.75x GBA)
+// 660x220 when interlaced
 
 const SCREEN_PARAMETER screen_parameter_psp_menu_init =
 {

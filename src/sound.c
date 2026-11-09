@@ -19,39 +19,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * sound.c
- * サウンド周りの処理
- ******************************************************************************/
-
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
-// TODO:パラメータの調整が必要(サウンドバッファの設定は現在無視されている/調整必要)
-#define SAMPLE_COUNT        PSP_AUDIO_SAMPLE_ALIGN(256) // サンプル数
+// TODO: parameters need tuning (the sound buffer setting is currently ignored)
+#define SAMPLE_COUNT        PSP_AUDIO_SAMPLE_ALIGN(256)
 //#define SAMPLE_COUNT        256
-#define SAMPLE_SIZE         (SAMPLE_COUNT * 2)          // 1サンプルあたりのバッファ数
+#define SAMPLE_SIZE         (SAMPLE_COUNT * 2)          // buffer entries per sample block (stereo)
 #define GBC_NOISE_WRAP_FULL 32767
 #define GBC_NOISE_WRAP_HALF 126
 
 #define RENDER_SAMPLE_NULL()                                                  \
 
-// サウンドバッファにLEFT CHANNELのデータを書込む
 #define RENDER_SAMPLE_LEFT()                                                  \
   sound_buffer[sound_write_offset] += current_sample +                        \
    FP16_16_TO_U32((next_sample - current_sample) * fifo_fractional)           \
 
-// サウンドバッファにRIGHT CHANNELのデータを書込む
 #define RENDER_SAMPLE_RIGHT()                                                 \
   sound_buffer[sound_write_offset + 1] += current_sample +                    \
    FP16_16_TO_U32((next_sample - current_sample) * fifo_fractional)           \
 
-// サウンドバッファにLEFT/RIGHT CHANNELのデータを書込む
 #define RENDER_SAMPLE_BOTH()                                                  \
   dest_sample = current_sample +                                              \
    FP16_16_TO_U32((next_sample - current_sample) * fifo_fractional);          \
@@ -165,15 +151,12 @@
     UPDATE_TONE_##sweep_op();                                                 \
   }                                                                           \
 
-// サウンドバッファにLEFT CHANNELのデータを書込む
 #define GBC_SOUND_RENDER_SAMPLE_LEFT()                                        \
   sound_buffer[sound_write_offset] += (current_sample * volume_left) >> 22    \
 
-// サウンドバッファにRIGHT CHANNELのデータを書込む
 #define GBC_SOUND_RENDER_SAMPLE_RIGHT()                                       \
   sound_buffer[sound_write_offset + 1] += (current_sample * volume_right) >> 22 \
 
-// サウンドバッファにLEFT/RIGHT CHANNELのデータを書込む
 #define GBC_SOUND_RENDER_SAMPLE_BOTH()                                        \
   GBC_SOUND_RENDER_SAMPLE_RIGHT();                                            \
   GBC_SOUND_RENDER_SAMPLE_LEFT()                                              \
@@ -261,39 +244,27 @@
 #define SET_AUDIO_BUFFER_SIZE()                                               \
     audio_buffer_size = SAMPLE_SIZE * (5 + g_game_config.audio_buffer_size_number) \
 
-/******************************************************************************
- * グローバル変数の定義
- ******************************************************************************/
 DIRECT_SOUND_STRUCT direct_sound_channel[2];
 GBC_SOUND_STRUCT gbc_sound_channel[4];
 u32 sound_on = 0;
 u32 gbc_sound_wave_volume[4] = { 0, 16384, 8192, 4096 };
 u32 left_buffer;
 
-/******************************************************************************
- * ローカル変数の定義
- ******************************************************************************/
 static u32 audio_buffer_size;
-static s16 sound_buffer[BUFFER_SIZE]; // サウンド バッファ 2n = Left / 2n+1 = Right
-static u32 sound_read_offset = 0; // サウンドバッファの読み込みオフセット
+static s16 sound_buffer[BUFFER_SIZE]; // 2n = left, 2n+1 = right
+static u32 sound_read_offset = 0;
 static SceUID sound_thread;
 static u32 sound_last_cpu_ticks = 0;
 static FIXED16_16 gbc_sound_tick_step;
-volatile static u32 audio_thread_exit_flag; // オーディオスレッドの終了フラグ。
+volatile static u32 audio_thread_exit_flag;
 volatile static u32 pause_sound_flag;
 
-/******************************************************************************
- * ローカル関数の宣言
- ******************************************************************************/
 static void init_sound_thread();
 static void init_noise_table(u32 *table, u32 period, u32 bit_length);
 static int sound_update_thread(SceSize args, void *argp);
 
-/******************************************************************************
- * グローバル関数の定義
- ******************************************************************************/
 // Queue 1, 2, or 4 samples to the top of the DS FIFO, wrap around circularly
-// マジカルバケーションの不具合修正
+// Fixes a bug in Magical Vacation
 void sound_timer_queue32(u8 channel)
   {
     DIRECT_SOUND_STRUCT *ds = direct_sound_channel + channel;
@@ -354,7 +325,7 @@ void sound_timer(FIXED16_16 frequency_step, u32 channel)
     ds->buffer_index = sound_write_offset;
     ds->fifo_fractional = FP16_16_FRACTIONAL_PART(fifo_fractional);
 
-    // マジカルバケーションで動作が遅くなるのが改善される
+// Fixes the slowdown in Magical Vacation
     u8 fifo_length;
 
     if (ds->fifo_top > ds->fifo_base)
@@ -528,23 +499,19 @@ void update_gbc_sound(u32 cpu_ticks)
     ADDRESS16(io_registers, 0x84) = sound_status;
 
     gbc_sound_last_cpu_ticks = cpu_ticks;
-    // サウンドタイミングの調整
     gbc_sound_buffer_index =(gbc_sound_buffer_index + (buffer_ticks << 1)) % BUFFER_SIZE;
   }
 
-int audio_handle; // オーディオチャンネルのハンドル。
+int audio_handle;
 
 void init_sound_thread()
 {
-  // オーディオチャンネルの取得。
   audio_handle = sceAudioChReserve( PSP_AUDIO_NEXT_CHANNEL, SAMPLE_COUNT, PSP_AUDIO_FORMAT_STEREO);
 //  sceAudioSRCChReserve(SAMPLE_COUNT, SOUND_FREQUENCY, 2);
 
-  // サウンド スレッドの作成
   sound_thread = sceKernelCreateThread("Sound thread", sound_update_thread, 0x8, 0x8000, 0, NULL);
   if (sound_thread < 0) quit(1);
 
-  //スレッドの開始
   sceKernelStartThread(sound_thread, 0, 0);
 }
 
@@ -557,10 +524,8 @@ void init_sound()
     init_noise_table(noise_table15, 32767, 14);
     init_noise_table(noise_table7, 127, 6);
 
-    // 変数等の初期化
     reset_sound();
 
-    // サウンド スレッドの初期化
     init_sound_thread();
 
   }
@@ -639,13 +604,6 @@ void sound_read_mem_savestate(u32 ver)
 void sound_write_mem_savestate(u32 ver)
   sound_savestate_body(WRITE_MEM, ver);
 
-/******************************************************************************
- * ローカル関数の定義
- ******************************************************************************/
-
-/*--------------------------------------------------------
- サウンド スレッド
- --------------------------------------------------------*/
 static int sound_update_thread(SceSize args, void *argp)
 {
   s16 buffer[2][SAMPLE_SIZE];
@@ -653,13 +611,11 @@ static int sound_update_thread(SceSize args, void *argp)
   u32 buffer_num = 0;
   s16 sample;
 
-
-  // TODO:初期設定に移動
+  // TODO: move to initialization
   sound_read_offset = 0;
   memset(buffer, 0, sizeof(buffer) / 2);
   left_buffer = 0;
 
-  // メインループ
   while(!audio_thread_exit_flag)
   {
     left_buffer = CHECK_BUFFER() / SAMPLE_SIZE;
@@ -667,7 +623,7 @@ static int sound_update_thread(SceSize args, void *argp)
 
     if((CHECK_BUFFER() > SAMPLE_SIZE) && (pause_sound_flag == 0))
     {
-      // TODO memcopy*2と どっちが速い？
+      // TODO: is two memcpy calls faster?
       for(loop = 0; loop < SAMPLE_SIZE; loop++)
       {
         sample = sound_buffer[sound_read_offset];
@@ -683,9 +639,9 @@ static int sound_update_thread(SceSize args, void *argp)
     else
     {
       if (pause_sound_flag == 1)
-        buffer_num = 0;  // 全て0のデーターを再生
+        buffer_num = 0;  // play silence
       else
-        buffer_num = 1;  // 前回のデーターをそのまま再生
+        buffer_num = 1;  // replay the previous block
     }
     sceAudioOutputPannedBlocking(audio_handle, PSP_AUDIO_VOLUME_MAX, PSP_AUDIO_VOLUME_MAX, &buffer[buffer_num][0]);
 //    sceAudioSRCOutputBlocking(PSP_AUDIO_VOLUME_MAX, &buffer[buffer_num][0]);
@@ -729,9 +685,9 @@ void init_noise_table(u32 *table, u32 period, u32 bit_length)
     }
   }
 
-// サウンドデータが一定以下になるまで、エミュレータを停止
+// Block the emulator until the buffered sound data drops below the threshold
 void synchronize_sound()
 {
-  while(CHECK_BUFFER() >= audio_buffer_size) // TODO:調整必要
+  while(CHECK_BUFFER() >= audio_buffer_size) // TODO: needs tuning
     sceKernelDelayThread((SAMPLE_COUNT * 1000) / SOUND_FREQUENCY);
 }

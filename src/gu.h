@@ -133,14 +133,14 @@ typedef struct
 
 typedef struct
 {
-  VIDEO_OUT_PARAMETER video_out;  /* pspDveMgrSetVideoOut のパラメータ */
-  int filter[2];                  /* MENU表示時のフィルタ */
-  TEXTURE_SIZE texture_size;      /* テクスチャサイズ */
-  TEXTURE_BIT texture_bit;        /* テクスチャの縦横のビット数 */
-  SCREEN_SIZE screen_size;        /* 表示バッファのサイズ */
-  VIEW_PORT view;                 /* 表示範囲 */
-  SPRITE screen_setting_1;        /* スプライトデータ 1 */
-  SPRITE screen_setting_2;        /* スプライトデータ 1 */
+  VIDEO_OUT_PARAMETER video_out;  /* parameters for pspDveMgrSetVideoOut */
+  int filter[2];                  /* texture filter while the menu is shown */
+  TEXTURE_SIZE texture_size;
+  TEXTURE_BIT texture_bit;        /* texture width/height as powers of two */
+  SCREEN_SIZE screen_size;        /* display buffer size */
+  VIEW_PORT view;                 /* visible area */
+  SPRITE screen_setting_1;
+  SPRITE screen_setting_2;
 } SCREEN_PARAMETER;
 
 extern float *temp_vertex;

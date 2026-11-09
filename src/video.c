@@ -94,7 +94,7 @@ void render_scanline_conditional_bitmap(u32 start, u32 end, u16 *scanline,
 #define tile_lookup_palette(palette, source)                                  \
   current_pixel = palette[source];                                            \
 
-// palette 0 に対応
+// palette index 0 is transparent
 #define tile_expand_base_normal_p0(index)                                     \
   if (current_pixel != 0)                                                     \
   {                                                                           \
@@ -1459,7 +1459,7 @@ bitmap_layer_render_struct bitmap_mode_renderers[3] =
   tile_layer_render_struct *layer_renderers =                                 \
    tile_mode_renderers[dispcnt & 0x07]                                        \
 
-// layer_renderersをVIDEO MODEより設定
+// Select layer_renderers by video mode
 #define render_scanline_layer_functions_bitmap()                              \
   bitmap_layer_render_struct *layer_renderers =                               \
    bitmap_mode_renderers + ((dispcnt & 0x07) - 3)                             \
@@ -2006,9 +2006,8 @@ render_scanline_obj_builder(copy, copy_tile, 2D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
 
-// TODO 高速化
-// 前回のレジスタの内容と比較して、変更無し時は処理をスキップすれば高速化できるかも
-// オブジェクトを優先順位にあわせて並べ替える。
+// TODO: speed up by skipping when the registers have not changed since last time
+// Sort objects by priority.
 void order_obj(u32 video_mode)
 {
   s32 obj_num, row;
@@ -2100,7 +2099,6 @@ void order_obj(u32 video_mode)
 u32 layer_order[16];
 u32 layer_count;
 
-// レイヤーのソート
 void order_layers(u32 layer_flags)
 {
   s32 priority, layer_number;
@@ -2607,10 +2605,9 @@ void render_scanline_tile(u16 *scanline, u32 dispcnt)
    render_condition_alpha, render_condition_fade, 0, 240);
 }
 
-// VIDEO MODE 3,4,5/非ウィンドウモード時の描画
+// Render a line in video modes 3/4/5 without windows
 void render_scanline_bitmap(u16 *scanline, u32 dispcnt)
 {
-  // layer_renderersをVIDEO MODEより設定
   render_scanline_layer_functions_bitmap();
   u32 current_layer;
   u32 layer_order_pos;
@@ -3079,61 +3076,54 @@ void render_scanline_window_##type(u16 *scanline, u32 dispcnt)                \
 render_scanline_window_builder(tile);
 render_scanline_window_builder(bitmap);
 
-// VIDEO MODEごとの有効BG
+// Active BGs for each video mode
 u32 active_layers[6] = { 0x1F, 0x17, 0x1C, 0x14, 0x14, 0x14 };
 
 u32 small_resolution_width = 240;
 u32 small_resolution_height = 160;
 u32 resolution_width, resolution_height;
 
-// 1ラインの描画
+// Render one scanline
 void update_scanline()
 {
-  u32 pitch = screen_pitch;                               // フレームバッファの横幅(240/512)
+  u32 pitch = screen_pitch;                               // 240 or 512
   u32 dispcnt = io_registers[REG_DISPCNT];                // IO DISPCNT
-  u32 vcount = io_registers[REG_VCOUNT];                  // IO VCOUNT 現在のライン値(0~277)
-  u16 *screen_offset = screen_address + (vcount * pitch); // 左端ピクセルのアドレス
+  u32 vcount = io_registers[REG_VCOUNT];                  // current line (0-227)
+  u16 *screen_offset = screen_address + (vcount * pitch);
   u32 video_mode = dispcnt & 0x07;                        // VIDEO MODE(0~5)
 
-  // OAMに変更があった場合、オブジェクトを並べ替える
+  // Re-sort objects when OAM has changed
   if(oam_update)
   {
     order_obj(video_mode);
     oam_update = 0;
   }
 
-  // レイヤーの並べ替え
   order_layers((dispcnt >> 8) & active_layers[video_mode]);
 
   if(dispcnt & 0x80)
   {
-    // 強制ブランクモード時は白線を表示
+    // Forced blank: draw a white line
     fill_line_color16(0x7FFF, screen_offset, 0, 240);
   }
   else
   {
     if(video_mode < 3)
     {
-      // VIDEO MODE 0,1,2の時
       if(dispcnt >> 13)
       {
-        // ウィンドウモード時
         render_scanline_window_tile(screen_offset, dispcnt);
       }
       else
       {
-        // 非ウィンドウモード時
         render_scanline_tile(screen_offset, dispcnt);
       }
     }
     else
     {
-      // VIDEO MODE 3,4,5の時
       if(dispcnt >> 13)
-        // ウィンドウモード時
         render_scanline_window_bitmap(screen_offset, dispcnt);
       else
-        // 非ウィンドウモード時
         render_scanline_bitmap(screen_offset, dispcnt);
     }
   }

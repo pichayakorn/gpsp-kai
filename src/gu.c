@@ -33,17 +33,17 @@ void set_video_out();
 
 #define VIDEO_CONFIG_FILENAME "cfg/video.cfg"
 
-// VRAM メモリマップ(VRAM割当てのAPIを使用しないで全て自前で管理)
-// 0x000000～0x0BFFFF(0xC0000 768.0kb) 表示用フレームバッファ
-// 0x0C0000～0x0D2DFF(0x12E00  75.5kb) GBA用フレームバッファ 1
-// 0x0D2E00～0x0E5BFF(0x12E00  75.5kb) GBA用フレームバッファ 2
-// 0x0E5C00～0x125BFF(0x40000 256.0kb) MENU用フレームバッファ 1
-// 0x125C00～0x165BFF(0x40000 256.0kb) MENU用フレームバッファ 2
-// 0x165C00～0x1A5BFF(0x40000 256.0kb) MENU用スキンバッファ(将来用)
-// 0x1A5C00～0x1FBFFF(0x56400 345.0kb) 汎用データバッファ
-// 0x1FC000～0x1FC0FF(0x00100 256byte) フレームバッファ転送用GUコマンドバッファ
-// 0x1FC100～0x1FC1FF(0x00100 256byte) フレームバッファ転送用頂点データバッファ
-// 0x1FC200～0x1FFFFF(0x03E00  15.5kb) 汎用頂点データバッファ
+// VRAM memory map (managed manually, not through the VRAM allocation API)
+// 0x000000-0x0BFFFF (0xC0000 768.0kb) display frame buffer
+// 0x0C0000-0x0D2DFF (0x12E00  75.5kb) GBA frame buffer 1
+// 0x0D2E00-0x0E5BFF (0x12E00  75.5kb) GBA frame buffer 2
+// 0x0E5C00-0x125BFF (0x40000 256.0kb) menu frame buffer 1
+// 0x125C00-0x165BFF (0x40000 256.0kb) menu frame buffer 2
+// 0x165C00-0x1A5BFF (0x40000 256.0kb) menu skin buffer (reserved)
+// 0x1A5C00-0x1FBFFF (0x56400 345.0kb) general-purpose data buffer
+// 0x1FC000-0x1FC0FF (0x00100 256byte) GU command buffer for frame buffer transfer
+// 0x1FC100-0x1FC1FF (0x00100 256byte) vertex buffer for frame buffer transfer
+// 0x1FC200-0x1FFFFF (0x03E00  15.5kb) general-purpose vertex buffer
 static float *screen_vertex = (float *)0x441FC100;
 static u32 *ge_cmd = (u32 *)0x441FC000;
 static u16 *psp_gu_vram_base = (u16 *)(0x44000000);
@@ -54,8 +54,8 @@ u16 *vram_data = (u16 *)UNIVERSAL_VRAM_ADDR;
 
 u32 video_draw_frame = FRAME_GAME;
 
-#define GBA_BUFFER_SIZE (240*161*2)  /* インタレース用に1ライン多く確保 */
-#define MENU_BUFFER_SIZE (480*273*2) /* インタレース用に1ライン多く確保 */
+#define GBA_BUFFER_SIZE (240*161*2)  /* one extra line for interlaced output */
+#define MENU_BUFFER_SIZE (480*273*2) /* one extra line for interlaced output */
 #define PSP_DISPLAY_BUFFER_SIZE (768 * 512 * 2)
 u16 *screen_address = (u16 *)(0x04000000 + PSP_DISPLAY_BUFFER_SIZE);
 u16 *screen_offset_address = (u16 *)PSP_DISPLAY_BUFFER_SIZE;
@@ -146,7 +146,6 @@ void init_video()
   video_draw_frame = FRAME_GAME;
   static u32 first_load = 0;
 
-  // パラメータの初期化
   if(first_load == 0)
   {
     if(load_video_config() == 0)
@@ -157,7 +156,7 @@ void init_video()
   sceDisplaySetMode(0, PSP_SCREEN_WIDTH, PSP_SCREEN_HEIGHT);
 
   sceDisplayWaitVblankStart();
-  // パレットを5551(0BBBBBGGGGGRRRRR)にする GBAも0BBBBBGGGGGRRRRRなので変換の必要がない
+  // 5551 (0BBBBBGGGGGRRRRR) matches the GBA format, so no conversion is needed
   sceDisplaySetFrameBuf((void*)psp_gu_vram_base, FRAME_LINE_SIZE, PSP_DISPLAY_PIXEL_FORMAT_5551, PSP_DISPLAY_SETBUF_NEXTFRAME);
 
   sceGuInit();
@@ -265,7 +264,7 @@ void video_resolution(u32 frame)
   static u32 first_load = 0;
   static SCREEN_PARAMETER *old_parameter = NULL;
   float x, y, cx, cy, xx, yy;
-  SCREEN_PARAMETER sp; // TODO:変数名
+  SCREEN_PARAMETER sp; // TODO: rename
 
   if(first_load == 0)
   {
@@ -391,7 +390,7 @@ void clear_screen(u16 color)
   sceGuStart(GU_DIRECT, display_list);
   sceGuDrawBufferList(GU_PSM_5551, (void *)screen_offset_address, screen_pitch);
   sceGuScissor(0, 0, current_parameter->texture_size.width, current_parameter->texture_size.height);
-  // クリアする色の設定 ※パレット設定にかかわらず32bitで指定する
+  // The clear color is always 32-bit, regardless of the pixel format
   sceGuClearColor(color32);
   sceGuClear(GU_COLOR_BUFFER_BIT);
   sceGuDrawBufferList(GU_PSM_5551, (void *)0, FRAME_LINE_SIZE);
@@ -449,11 +448,9 @@ s32 load_video_config()
   float f[2][10];
   SCREEN_PARAMETER parameter[LOAD_PARAMETER_NUMBER];
 
-  // 設定の初期化
   memcpy(&screen_parameter_psp_menu, &screen_parameter_psp_menu_init, sizeof(SCREEN_PARAMETER));
   memcpy(&screen_parameter_psp_game, &screen_parameter_psp_game_init, sizeof(SCREEN_PARAMETER)*5);
 
-  // video configファイルのオープン
   video_file = fopen(VIDEO_CONFIG_FILENAME, "r");
 
   if(video_file)
@@ -485,7 +482,6 @@ s32 load_video_config()
       }
       if(i == 8)
       {
-        // パラメータの保存
         memcpy(&parameter[loop].video_out.u,         &p[0][0], sizeof(VIDEO_OUT_PARAMETER));
         memcpy(&parameter[loop].filter[0],           &p[1][0], sizeof(int) * 2);
         memcpy(&parameter[loop].texture_size.pitch,  &p[2][0], sizeof(TEXTURE_SIZE));
@@ -499,7 +495,6 @@ s32 load_video_config()
       }
       if(loop == LOAD_PARAMETER_NUMBER)
       {
-        // パラメータのセット
         memcpy(&screen_parameter_psp_menu,       &parameter[0],  sizeof(SCREEN_PARAMETER));
         memcpy(&screen_parameter_composite_menu, &parameter[1],  sizeof(SCREEN_PARAMETER)*2*2);
         memcpy(&screen_parameter_component_menu, &parameter[5],  sizeof(SCREEN_PARAMETER)*2*2);

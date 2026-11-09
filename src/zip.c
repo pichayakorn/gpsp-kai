@@ -43,10 +43,9 @@ struct SZIPFileHeader
   s16 ExtraFieldLength;
 }  __attribute__((packed));
 
-
-// ZIPで圧縮されたRONのロード
-// 返り値:-2=一時ファイルを作成/-1=エラー/その他=ROMのサイズ
-// もし、ROMのサイズ>ROMバッファのサイズ の場合は一時ファイルを作成
+// Load a ROM from a ZIP file.
+// Returns -2 if a temp file was created, -1 on error, else the ROM size.
+// A temp file is used when the ROM is larger than the ROM buffer.
 s32 load_file_zip(char *filename)
 {
   struct SZIPFileHeader data;
@@ -77,7 +76,7 @@ s32 load_file_zip(char *filename)
   {
     use_vram = YES;
     zip_buffer_size = ZIP_BUFFER_SIZE;
-    cbuffer = (u8 *)UNIVERSAL_VRAM_ADDR; // 汎用フレームバッファを使用
+    cbuffer = (u8 *)UNIVERSAL_VRAM_ADDR; // borrow the general-purpose VRAM buffer
   }
 
   chdir(rom_path);
@@ -115,7 +114,7 @@ s32 load_file_zip(char *filename)
     // file is too big
     if(data.DataDescriptor.UncompressedSize > gamepak_ram_buffer_size)
       {
-        write_tmp_flag = YES; // テンポラリを使用するフラグをONに
+        write_tmp_flag = YES;
         FILE_OPEN(tmp_fd, ZIP_TMP, WRITE);
       }
     else
@@ -128,23 +127,16 @@ s32 load_file_zip(char *filename)
       // ok, found
       switch(data.CompressionMethod)
       {
-        case 0: //無圧縮
+        case 0: // stored
           retval = data.DataDescriptor.UncompressedSize;
           FILE_READ(fd, buffer, retval);
 
           goto outcode;
 
-        case 8: //圧縮
+        case 8: // deflate
         {
           z_stream stream = {0};
           s32 err;
-
-          /*
-           *   z.next_in = 入力ポインタ;
-           *   z.avail_in = 入力データの残量;
-           *   z.next_out = 出力ポインタ;
-           *   z.avail_out = 出力バッファの残量;
-           */
 
           stream.next_in = (Bytef*)cbuffer;
           stream.avail_in = (u32)zip_buffer_size;
@@ -184,11 +176,11 @@ s32 load_file_zip(char *filename)
                 sceKernelDcacheWritebackAll();
               }
 
-              if((write_tmp_flag == YES) && (stream.avail_out == 0)) /* 出力バッファが尽きれば */
+              if((write_tmp_flag == YES) && (stream.avail_out == 0))
                 {
                   FILE_WRITE(tmp_fd, buffer, gamepak_ram_buffer_size);
-                  stream.next_out = buffer; /* 出力ポインタを元に戻す */
-                  stream.avail_out = gamepak_ram_buffer_size; /* 出力バッファ残量を元に戻す */
+                  stream.next_out = buffer;
+                  stream.avail_out = gamepak_ram_buffer_size;
                 }
             }
 

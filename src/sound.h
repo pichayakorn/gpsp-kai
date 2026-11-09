@@ -19,16 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * sound.h
- * サウンド周りの処理
- ******************************************************************************/
 #ifndef SOUND_H
 #define SOUND_H
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
 typedef enum
 {
   DIRECT_SOUND_INACTIVE,
@@ -96,7 +89,7 @@ typedef struct
   s8 *sample_data;
 } GBC_SOUND_STRUCT;
 
-#define BUFFER_SIZE (0xffff)                        // バッファのバイト数。変更しないこと
+#define BUFFER_SIZE (0xffff)                        // in bytes; do not change
 
 #define SOUND_FREQUENCY (44100)
 
@@ -286,9 +279,6 @@ typedef struct
   timer[timer_number].frequency_step =                                        \
    FLOAT_TO_FP16_16(SYS_CLOCK / (timer_reload * SOUND_FREQUENCY))             \
 
-/******************************************************************************
- * グローバル変数の宣言
- ******************************************************************************/
 extern DIRECT_SOUND_STRUCT direct_sound_channel[2];
 extern GBC_SOUND_STRUCT gbc_sound_channel[4];
 extern s8 square_pattern_duty[4][8];
