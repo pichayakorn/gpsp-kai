@@ -150,7 +150,7 @@ eboot/          EBOOT Makefile
 data/           files for the Memory Stick: cfg/, font/, game_config.txt
 image/          XMB icon and background
 docs/           original and Japanese documentation, changelog, licenses/
-tools/fonts/    font conversion tools and BDF sources of the shipped fonts
+tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
 ```
 
 ## Credits
@@ -181,12 +181,20 @@ own terms or none stated:
 | Part | Terms |
 |---|---|
 | `src/fbm_print.c`, `src/fbm_print.h` | Based on mok's FBM print library (modified for gpSP); free to use in PSP freeware (`docs/licenses/fbm_print/fbm_print.txt`) |
-| `prx/homehookprx`, `prx/systembuttons_prx`, `src/homehook.*`, `src/SystemButtons.*` | Based on NJ's homehook.prx; no license stated |
+| `prx/homehookprx`, `src/homehook.*` | Based on NJ's homehook.prx (per takka's changelog); no license stated |
+| `prx/systembuttons_prx`, `src/SystemButtons.*` | Origin not documented; no license stated |
 | `prx/dvemgr`, `src/pspDveManager.S`, `src/dvemgr.h` | Based on Dark_Alex's dvemgr.prx; no license stated |
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
 | `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
-| `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
+| `data/font/batang10.fbm`, `tools/fonts/bdf/batang10.bdf` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
 | `data/font/gpsp10.fbm`, `tools/fonts/bdf/gpsp10.bdf` | Public domain: glyphs from the X11 misc-fixed 6x10 and 6x9 fonts ("Public domain font. Share and enjoy."), plus four digits drawn for this project and released into the public domain |
 | `tools/fonts/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
+| `tools/fonts/ucs_tool/any2ucs.pl` | Based on Markus Kuhn's ucs2any.pl (per its header); no license stated |
+| `tools/fonts/ucs_tool/sjis.map` | Shift_JIS to Unicode mapping table; no source or license stated |
+| `tools/fonts/bdf2fbm.py` | GPL-2.0-or-later (see its header) |
+
+The Naga10 BDF sources are not included: Naga10's terms allow the original
+files to be distributed only as the unchanged original archive. To rebuild the
+Naga10 FBM fonts, get the official Naga10 archive.
 
 Do not add the GBA BIOS or game ROMs to this repository.
