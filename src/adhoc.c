@@ -18,19 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/******************************************************************************
- * adhoc.c
- * PSPアドホック通信制御
- ******************************************************************************/
+/* PSP ad-hoc wireless multiplayer (link cable emulation) */
 
-/******************************************************************************
- * ヘッダファイルの読込み
- ******************************************************************************/
 #include "common.h"
 
-/******************************************************************************
- * マクロ等の定義
- ******************************************************************************/
 #define NUM_ENTRIES 16
 
 #define MODE_LOBBY      0
@@ -51,9 +42,6 @@
 
 #define PRODUCT "UOgpSPkai"
 
-/*--------------------------------------------------------
-  関数パラメータの定義
---------------------------------------------------------*/
 #define MATCHING_CREATE_PARAMS  \
   3,                            \
   0xa,                          \
@@ -79,11 +67,6 @@ u32 g_adhoc_transfer_flag;
 u32 g_adhoc_link_flag;
 
 static u32 s_multi_mode;
-
-
-/***************************************************************************
- 静的広域変数
- ***************************************************************************/
 
 static int s_mode;
 static int server;
@@ -114,41 +97,27 @@ static unsigned char adhoc_buffer[ADHOC_BUFFER_SIZE];
 static unsigned char adhoc_work[ADHOC_BUFFER_SIZE];
 
 static SceUID network_thread;
-volatile static u32 s_net_thread_exit_flag; // netスレッドの終了フラグ。
+volatile static u32 s_net_thread_exit_flag;
 
-/***************************************************************************
- ローカル関数
- ***************************************************************************/
 static int net_thread(SceSize args, void *argp);
 void adhoc_multi();
 
-/*--------------------------------------------------------
- プログレスバー初期化
- --------------------------------------------------------*/
 static void adhoc_init_progress(u32 total, char *text)
   {
     char buf[MAX_FILE];
 
-    // 画面の設定
 //    load_background(WP_LOGO);
 //    video_copy_rect(work_frame, draw_frame, &full_rect, &full_rect);
 
-    // アイコンの表示
 //    small_icon(6, 3, UI_COLOR(UI_PAL_TITLE), ICON_SYSTEM);
     sprintf(buf, "AdHoc - %s", gamepak_title);
-    // 文字の表示
 //    uifont_print(32, 5, UI_COLOR(UI_PAL_TITLE), buf);
 
-    // 画面の設定
 //    video_copy_rect(draw_frame, work_frame, &full_rect, &full_rect);
 
-    // プログレスバーの表示
     init_progress(total, text);
   }
 
-/*--------------------------------------------------------
- リスト消去
- --------------------------------------------------------*/
 static void clear_psp_list(void)
 {
   max = 0;
@@ -156,9 +125,6 @@ static void clear_psp_list(void)
   memset(&psplist, 0, sizeof(psplist));
 }
 
-/*--------------------------------------------------------
- リストに追加
- --------------------------------------------------------*/
 static u32 add_psp(unsigned char *l_mac, char *name, u32 length)
 {
   u32 i;
@@ -191,9 +157,6 @@ static u32 add_psp(unsigned char *l_mac, char *name, u32 length)
   return 1;
 }
 
-/*--------------------------------------------------------
- リストから削除
- --------------------------------------------------------*/
 static u32 del_psp(unsigned char *l_mac)
 {
   u32 i, j;
@@ -222,14 +185,10 @@ static u32 del_psp(unsigned char *l_mac)
   return -1;
 }
 
-/*--------------------------------------------------------
- リストを表示
- --------------------------------------------------------*/
 static void display_psp_list(u32 top, u32 rows)
   {
     if (max == 0)
       {
-        // 文字表示
         msg_printf("WAITING_FOR_ANOTHER_PSP_TO_JOIN\n");
       }
     else
@@ -237,7 +196,6 @@ static void display_psp_list(u32 top, u32 rows)
         u32 i;
         char temp[20];
 
-        // 画面表示
         msg_screen_draw();
 
         scrollbar(470, 26, 479, 270, max, rows, pos);
@@ -251,26 +209,20 @@ static void display_psp_list(u32 top, u32 rows)
 
             if ((top + i) == pos)
             {
-              // 文字表示
               PRINT_STRING(temp, COLOR16(31,0,0), 24, 40 + (i + 2) *17);
               PRINT_STRING(psplist[top + i].name, COLOR16(31,0,0), 190, 40 + (i + 2) *17);
             }
             else
             {
-              // 文字表示
               PRINT_STRING(temp, COLOR16(31,0,0), 24, 40 + (i + 2) *17);
               PRINT_STRING(psplist[top + i].name, COLOR16(31,0,0), 190, 40 + (i + 2) *17);
             }
           }
 
-        // 画面切替
         flip_screen();
       }
   }
 
-/*--------------------------------------------------------
- 選択中のPSPの情報を取得
- --------------------------------------------------------*/
 static u32 GetPspEntry(unsigned char *l_mac, char *name)
   {
     if (max == 0)
@@ -308,13 +260,6 @@ static void matching_callback(int unk1, int event, unsigned char *l_mac, int opt
       }
   }
 
-/***************************************************************************
- AdHocインタフェース関数
- ***************************************************************************/
-
-/*--------------------------------------------------------
- モジュールのロード
- --------------------------------------------------------*/
 u32 load_adhoc_modules(void)
 {
   g_adhoc_link_flag = 0;
@@ -335,9 +280,6 @@ u32 load_adhoc_modules(void)
   return -1;
 }
 
-/*--------------------------------------------------------
- 初期化
- --------------------------------------------------------*/
 u32 adhoc_init(const char *l_matching_data)
 {
   struct productStruct product;
@@ -348,14 +290,12 @@ u32 adhoc_init(const char *l_matching_data)
 
   g_adhoc_link_flag = 0;
 
-  // 通信 スレッドの作成
   network_thread = sceKernelCreateThread("Net thread", net_thread, 0x13, 0x2000, 0, NULL);
   if (network_thread < 0)
   {
     quit(0);
   }
 
-  //スレッドの開始
   sceKernelStartThread(network_thread, 0, 0);
 
   s_mode = MODE_LOBBY;
@@ -449,9 +389,6 @@ u32 adhoc_init(const char *l_matching_data)
     return -1;
   }
 
-/*--------------------------------------------------------
- 切断
- --------------------------------------------------------*/
 u32 adhoc_term(void)
 {
   if (adhoc_initialized > 0)
@@ -487,9 +424,6 @@ u32 adhoc_term(void)
   return 0;
 }
 
-/*--------------------------------------------------------
- ロビーから切断
- --------------------------------------------------------*/
 static void adhoc_disconnect(void)
 {
   char message[256];
@@ -526,7 +460,7 @@ static void adhoc_disconnect(void)
 }
 
 /*--------------------------------------------------------
-  ロビーから切断し、P2P開始
+ Leave the lobby and start a P2P connection
 --------------------------------------------------------*/
 static int adhoc_start_p2p(void)
 {
@@ -633,7 +567,7 @@ static int adhoc_start_p2p(void)
 }
 
 /*--------------------------------------------------------
-  接続先の選択
+ Choose the peer to connect to
 --------------------------------------------------------*/
 u32 adhoc_select(void)
 {
@@ -826,10 +760,6 @@ u32 adhoc_select(void)
   return adhoc_start_p2p();
 }
 
-
-/*--------------------------------------------------------
-  データを送信
---------------------------------------------------------*/
 u32 adhocSend(void *buffer, u32 length, u32 type)
 {
   int error;
@@ -845,9 +775,6 @@ u32 adhocSend(void *buffer, u32 length, u32 type)
   return length;
 }
 
-/*--------------------------------------------------------
-  データを受信
---------------------------------------------------------*/
 u32 adhocRecv(void *buffer, u32 timeout, u32 type)
 {
   int error;
@@ -869,9 +796,8 @@ u32 adhocRecv(void *buffer, u32 timeout, u32 type)
   return -1;
 }
 
-
 /*--------------------------------------------------------
-  データを送信し、ackを受信するまで待つ
+ Send data and wait until the ack is received
 --------------------------------------------------------*/
 int adhocSendRecvAck(void *buffer, int length, int timeout, int type)
 {
@@ -902,9 +828,8 @@ int adhocSendRecvAck(void *buffer, int length, int timeout, int type)
   return sent_length;
 }
 
-
 /*--------------------------------------------------------
-  データの受信を待ち、ackを送信する
+ Wait for data to arrive, then send an ack
 --------------------------------------------------------*/
 int adhocRecvSendAck(void *buffer, int length, int timeout, int type)
 {
@@ -933,9 +858,8 @@ int adhocRecvSendAck(void *buffer, int length, int timeout, int type)
   return rcvd_length;
 }
 
-
 /*--------------------------------------------------------
-  相手との同期を待つ
+ Wait until both sides are in sync
 --------------------------------------------------------*/
 int adhoc_sync(void)
 {
@@ -975,7 +899,7 @@ check_packet:
 
     if (sceNetAdhocGetPdpStat(&size, &pdpStat) >= 0)
     {
-      // 余分なパケットを破棄
+      // Discard leftover packets
       if (pdpStat.rcvdData == ADHOC_DATASIZE_SYNC)
         adhocRecv(adhoc_work, 10, ADHOC_DATATYPE_SYNC);
       else
@@ -991,8 +915,8 @@ check_packet:
 }
 
 /*--------------------------------------------------------
-  指定サイズのデータを受信するか、バッファが空に
-  なるまで待つ
+  Wait until data of the given size has been received,
+  or until the receive buffer is empty
 --------------------------------------------------------*/
 void adhoc_wait(int data_size)
 {
@@ -1020,58 +944,55 @@ void adhoc_wait(int data_size)
 
 #define MAX_MULTI_ID 2
 
-/*--------------------------------------------------------
- 通信 スレッド
- --------------------------------------------------------*/
-// 通信データはmulti_id + コマンド + word data の4バイト
+// Each packet is 4 bytes: multi_id + command + 16-bit data word.
 
-// g_multi_mode = 0x00 NOP 非通信時はこのモード
-//  親機は子機にNOPを送信、最終子機からACKを受け取った後、再度NOPモードに移行する
-//  最大３回送信を行う
+// g_multi_mode = 0x00 NOP: idle mode while not transferring
+//  Parent sends NOP to children, returns to NOP after the ACK from the last child
+//  Sends at most 3 times
 //
-//  子機はNOPを受取り後、ACKを返し、再度NOPモードに移行する
-//  １回受信を行う
+//  Child replies ACK on receiving NOP and returns to NOP mode
+//  Receives once
 //
-// g_multi_mode = 0x01 START マルチ通信開始時のモード
-//  親機は子機にSTARTを送信、受信データをすべて0xFFFFに設定、最終子機からACKを受け取った後、SNEDモードに移行する
-//  最大３回送信を行う
+// g_multi_mode = 0x01 START: start of a multiplayer transfer
+//  Parent sends START, sets all receive data to 0xFFFF, enters SEND after the ACK from the last child
+//  Sends at most 3 times
 //
-//  子機はSTARTを受け取り後、ACKを返し、受信データをすべて0xFFFFに設定、RECVモードに移行する
-//  １回受信を行う
+//  Child replies ACK on START, sets all receive data to 0xFFFF, enters RECV mode
+//  Receives once
 //
-// g_multi_mode = 0x02 END マルチ通信終了
-//  親機は子機にENDを送信、最終子機からACKを受け取った後、通信ビットを０にして、NOPモードに移行する
-//  最大３回送信を行う
+// g_multi_mode = 0x02 END: end of a multiplayer transfer
+//  Parent sends END, clears the transfer bit after the ACK from the last child, enters NOP
+//  Sends at most 3 times
 //
-//  子機はENDを受け取り後、ACKを返し、NOPモードに移行する
-//  １回受信を行う
+//  Child replies ACK on END and enters NOP mode
+//  Receives once
 //
-// g_multi_mode = 0x1? SEND マルチデータ送信
-//  親機は子機に実データを送信、子機からACKを受け取った後、RECVモードに移行する
+// g_multi_mode = 0x1? SEND: send multiplayer data
+//  Parent sends its data to children, enters RECV after the children ACK
 //
-//  子機は他の機に実データを送信、ACKを受信したあと、RECVモードに移行
-//  自信が最終idの場合はENDモードに移行する
+//  Child sends its data to the others, enters RECV after the ACK
+//  If it has the last id, it enters END instead
 //
-// recv_multi = 0x2? RECV マルチデータ受信
-//  親機は子機から実データを受信、ACKを送信したあと、下８ビットが最終idと同じ場合ENDモードに移行、
-//  そのほかは再度RECVモード
+// recv_multi = 0x2? RECV: receive multiplayer data
+//  Parent receives a child's data and sends ACK; if the low 8 bits equal the last id it enters END,
+//  otherwise stays in RECV
 //
-//  子機は親機から実データを受信、ACKを送信したあと、下８ビットが最終idと同じ場合ENDモードに移行、
-//  そのほかは再度RECVモードに移行
+//  Child receives the parent's data and sends ACK; if the low 8 bits equal the last id it enters END,
+//  otherwise stays in RECV
 
-//  送信関数と受信関数を作成
-//  メインルーチン内で親子のフラグとidにてswitchで振り分け
+//  Separate send and receive functions;
+//  the main routine dispatches with a switch on parent/child flag and id
 //
-//データの送受信について
+// Data send/receive:
 //
-//　送信
-//　　必ず(通信台数-1)回送信を行う
-//　　エラーの場合はOKになるまで送信を行う
-//　　※ACKにエラーコードを持たせる様に修正必要
-//　　ただし、合計バイト数程度のチェックしか行わない
+//  Send:
+//    always send (number of units - 1) times
+//    on error, resend until OK
+//    TODO: ACK should carry an error code
+//    only a rough total-byte-count check is done
 //
-//　受信
-//　　必ず(通信台数-1)回受信を行う
+//  Receive:
+//    always receive (number of units - 1) times
 //
 
 u32 multi_send(u32 id, u32 command, u8 data1, u8 data2);
@@ -1082,14 +1003,13 @@ static int net_thread(SceSize args, void *argp)
   s_net_thread_exit_flag = 0;
   g_multi_mode = MULTI_NOP;
 
-  // メインループ
   while(s_net_thread_exit_flag == 0)
   {
-    if(g_adhoc_link_flag == 1) // 通信が確立されている
+    if(g_adhoc_link_flag == 1)
     {
       adhoc_multi();
     }
-    sceKernelDelayThread(100); // TODO ウェイト値の調整
+    sceKernelDelayThread(100); // TODO: tune the wait value
   }
 
   sceKernelExitThread(0);
@@ -1110,95 +1030,33 @@ void adhoc_multi()
   u8 work[ADHOC_BUFFER_SIZE];
   switch(g_multi_id)
   {
-    case 0:  // 親機の場合 能動的に処理を行なう
+    case 0:  // parent: drives the exchange
       switch(g_multi_mode)
       {
-        case MULTI_NOP: // 基本的にNOPモードでループ
+        case MULTI_NOP:
           multi_send(g_multi_id, MULTI_NOP, 0x00, 0x00);
           g_multi_mode = MULTI_NOP;
           break;
 
-        case MULTI_START:// 通信レジスタのビット操作によりSTARTモードに移行
+        case MULTI_START:
           multi_send(g_multi_id, MULTI_START, 0x00, 0x00);
-          // 転送フラグを1に
           g_adhoc_transfer_flag = 1;
-          // 通信データレジスタをすべて0xFFFFに設定
+          // Set all multiplayer data registers to 0xFFFF
           ADDRESS16(io_registers, MULTI_REG_0) = 0xffff;
           ADDRESS16(io_registers, MULTI_REG_1) = 0xffff;
           ADDRESS16(io_registers, MULTI_REG_2) = 0xffff;
           ADDRESS16(io_registers, MULTI_REG_3) = 0xffff;
-          // SENDモードに移行
           g_multi_mode = MULTI_SEND;
           break;
 
-        case MULTI_END: // 後処理をした後、NOPモードへ
+        case MULTI_END:
           multi_send(g_multi_id, MULTI_END, 0x00, 0x00);
-          // 転送フラグを0に
           g_adhoc_transfer_flag = 0;
-          // 通信ビットを0にする
+          // Clear the transfer bit
           value = ADDRESS16(io_registers, 0x128);
           value &= 0xff7f;
           ADDRESS16(io_registers, 0x128) = value;
-          // NOPモードに移行
           g_multi_mode = MULTI_NOP;
-          break;
-
-        case MULTI_SEND: // 子機にデータを送る
-          value = ADDRESS16(io_registers, MULTI_DATA);
-          data2 = value & 0xff;
-          data1 = (value >> 8) & 0xff;
-          multi_send(g_multi_id, MULTI_RECV, data1, data2);
-          // 通信データレジスタに自分の値を書き込む TODO
-          ADDRESS16(io_registers, MULTI_REG_0) = value;
-          g_multi_mode = MULTI_RECV; // RECVモードで子機のデータを受け取る
-          break;
-
-        case MULTI_RECV:
-          multi_recv(work);
-          value = (work[3] << 8) & work[4];
-          // 通信データレジスタに子機の値を書き込む
-          ADDRESS16(io_registers, MULTI_REG_1) = value;
-          g_multi_mode = MULTI_END; // ENDモードへ移行
-          break;
-
-        case MULTI_KILL: // 物理的な通信切断時に、子機に終了サインを送る
-          multi_send(g_multi_id, MULTI_KILL, 0x00, 0x00);
-          g_adhoc_link_flag = 0; // フラグをOFFにし、スレッドを終了させる
-          g_multi_mode = MULTI_NOP; // 一応NOPモードへ
-          break;
-      }
-      break;
-
-    case 1 ... 3:  // 子機の場合 受動的に処理を行なう
-      if(g_multi_mode != MULTI_SEND) // SENDモード以外はデータを受信
-      {
-        multi_recv(work);
-        g_multi_mode = work[1]; // コマンドを取り出す
-      }
-
-      // 受け取ったコマンドにより処理を振り分け
-      switch(g_multi_mode)
-      {
-        case MULTI_NOP:
-          break;
-
-        case MULTI_START:
-          // 通信データレジスタをすべて0xFFFFに設定
-          ADDRESS16(io_registers, MULTI_REG_0) = 0xffff;
-          ADDRESS16(io_registers, MULTI_REG_1) = 0xffff;
-          ADDRESS16(io_registers, MULTI_REG_2) = 0xffff;
-          ADDRESS16(io_registers, MULTI_REG_3) = 0xffff;
-          break;
-
-        case MULTI_RECV:
-          // 通信データレジスタに親機の値を書き込む
-          value = (work[3] << 8) & work[4];
-          ADDRESS16(io_registers, MULTI_REG_0) = value;
-          break;
-
-        case MULTI_KILL:
-          g_adhoc_link_flag = 0; // フラグをOFFにし、スレッドを終了させる
-          g_multi_mode = MULTI_NOP; // 一応NOPモードへ
           break;
 
         case MULTI_SEND:
@@ -1206,16 +1064,70 @@ void adhoc_multi()
           data2 = value & 0xff;
           data1 = (value >> 8) & 0xff;
           multi_send(g_multi_id, MULTI_RECV, data1, data2);
-          // 通信データレジスタに自分の値を書き込む
+          // Write our own value to the data register (TODO)
+          ADDRESS16(io_registers, MULTI_REG_0) = value;
+          g_multi_mode = MULTI_RECV; // receive the children's data in RECV mode
+          break;
+
+        case MULTI_RECV:
+          multi_recv(work);
+          value = (work[3] << 8) & work[4];
           ADDRESS16(io_registers, MULTI_REG_1) = value;
-          g_multi_mode = MULTI_NOP; // 一時的にNOPモードにする
+          g_multi_mode = MULTI_END;
+          break;
+
+        case MULTI_KILL: // physical link lost: tell children to stop
+          multi_send(g_multi_id, MULTI_KILL, 0x00, 0x00);
+          g_adhoc_link_flag = 0;
+          g_multi_mode = MULTI_NOP;
+          break;
+      }
+      break;
+
+    case 1 ... 3:  // child: responds passively
+      if(g_multi_mode != MULTI_SEND)
+      {
+        multi_recv(work);
+        g_multi_mode = work[1];
+      }
+
+      switch(g_multi_mode)
+      {
+        case MULTI_NOP:
+          break;
+
+        case MULTI_START:
+          // Set all multiplayer data registers to 0xFFFF
+          ADDRESS16(io_registers, MULTI_REG_0) = 0xffff;
+          ADDRESS16(io_registers, MULTI_REG_1) = 0xffff;
+          ADDRESS16(io_registers, MULTI_REG_2) = 0xffff;
+          ADDRESS16(io_registers, MULTI_REG_3) = 0xffff;
+          break;
+
+        case MULTI_RECV:
+          value = (work[3] << 8) & work[4];
+          ADDRESS16(io_registers, MULTI_REG_0) = value;
+          break;
+
+        case MULTI_KILL:
+          g_adhoc_link_flag = 0;
+          g_multi_mode = MULTI_NOP;
+          break;
+
+        case MULTI_SEND:
+          value = ADDRESS16(io_registers, MULTI_DATA);
+          data2 = value & 0xff;
+          data1 = (value >> 8) & 0xff;
+          multi_send(g_multi_id, MULTI_RECV, data1, data2);
+          ADDRESS16(io_registers, MULTI_REG_1) = value;
+          g_multi_mode = MULTI_NOP; // temporarily back to NOP
           break;
       }
       break;
   }
 }
 
-// commandは子機へのモード指定
+// command is the mode to put the child in
 u32 multi_send(u32 id, u32 command, u8 data1, u8 data2)
 {
   u32 length;

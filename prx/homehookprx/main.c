@@ -50,7 +50,7 @@ static int home_button_thread(SceSize args, void *argp)
 		if (__sceCtrlPeekBufferPositive)
 		{
 			(*__sceCtrlPeekBufferPositive)(&paddata, 1);
-			//HOMEボタン以外の特殊ボタンも読込む(将来の拡張用)
+			// Also read special buttons other than HOME (for future use)
 			home_button = paddata.Buttons & CTRL_MASK;
 		}
 
@@ -95,9 +95,8 @@ int module_start(SceSize args, void *argp)
 		sceKernelStartThread(home_thread, 0, 0);
 
 #if 0
-	// user mode用のモジュールをアンロードする。
-	// Homeボタンのダイアログは表示されなくなるが、
-	// AdHocのモジュールが読み込めなくなる等、問題あり。
+	// Unload the user-mode modules. This hides the HOME dialog,
+	// but breaks things such as loading the AdHoc modules.
 	SceUID modIDs[16];
 	int count;
 

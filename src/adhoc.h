@@ -31,9 +31,9 @@
 #define ADHOC_DATATYPE_USER3  0x40
 #define ADHOC_DATATYPE_USER4  0x80
 
-// データの最小単位
-// 各データのサイズは異なるサイズになるように設定した方が安全
-// データサイズが0x400を超える場合は0x400に設定
+// Minimum data unit sizes.
+// Safer to give each data type a distinct size.
+// Sizes above 0x400 are clamped to 0x400.
 #define ADHOC_DATASIZE_ACK    (1 + sizeof(int))
 #define ADHOC_DATASIZE_SYNC   (1 + sizeof(unsigned char))
 #define ADHOC_DATASIZE_INPUT  (1 + sizeof(ADHOC_DATA))
@@ -51,9 +51,6 @@
 #define MULTI_RECV  0x20
 #define MULTI_KILL  0xFF
 
-/******************************************************************************
- * グローバル関数の宣言
- ******************************************************************************/
 u32 load_adhoc_modules(void);
 
 u32 adhoc_init(const char *matchingData);
