@@ -100,9 +100,9 @@ Copy these into a folder under `PSP/GAME/` on the Memory Stick:
 ```
 EBOOT.PBP
 homehook.prx  dvemgr.prx  SystemButtons.prx
-cfg/          (from this repo)
-font/         eureka.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
-game_config.txt
+cfg/          (data/cfg)
+font/         (data/font) eureka.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
+game_config.txt (data/game_config.txt)
 gba_bios.bin  (your own dump of the GBA BIOS; not included)
 GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty folders)
 ```
@@ -146,9 +146,9 @@ own terms or none stated:
 | `prx/homehookprx`, `prx/systembuttons_prx`, `src/homehook.*`, `src/SystemButtons.*` | Based on NJ's homehook.prx; no license stated |
 | `prx/dvemgr`, `src/pspDveManager.S`, `src/dvemgr.h` | Based on Dark_Alex's dvemgr.prx; no license stated |
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
-| `font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
-| `font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
-| `font/eureka.fbm` | From the b225 release; no license stated |
+| `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
+| `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
+| `data/font/eureka.fbm` | From the b225 release; no license stated |
 | `tool/font_tools/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
 Do not add the GBA BIOS or game ROMs to this repository.
