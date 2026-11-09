@@ -144,7 +144,7 @@ endif
 	@$(AR) -r $@ $^
 
 all:
-	rm ./PARAM.SFO
-	rm ./gui.o
-	cp ./*.prx ../obj/
-	cp ./*.PBP ../obj/
+	rm -f ./PARAM.SFO
+	rm -f ./gui.o
+	mkdir -p ../out
+	cp ./EBOOT.PBP ../out/

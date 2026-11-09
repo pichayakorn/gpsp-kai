@@ -1,0 +1,8 @@
+# build output
+out/
+*.o
+*.elf
+gpsp/EBOOT.PBP
+gpsp/PARAM.SFO
+prx/dvemgr/dvemgr.prx
+prx/dvemgr/exports.o

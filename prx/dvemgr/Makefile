@@ -22,5 +22,6 @@ PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
 
 all:
-	@cp $(TARGET).prx ../../gpsp
+	@mkdir -p ../../out
+	@cp $(TARGET).prx ../../out/
 
