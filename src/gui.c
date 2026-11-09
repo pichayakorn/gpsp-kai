@@ -1294,7 +1294,7 @@ u32 menu(u16 *original_screen)
     /* 11 */
     /* 12 */ ACTION_OPTION(menu_save_ss, NULL, msg[MSG_SCREEN_SHOT], msg[MSG_G_S_MENU_HELP_7], 12),
     /* 13 */
-    /* 14 */NUMERIC_SELECTION_OPTION(NULL, "scale %d", &g_gpsp_config.screen_scale, 201, "scale", 14),
+    /* 14 */NUMERIC_SELECTION_OPTION(NULL, msg[MSG_DISPLAY_SCALE], &g_gpsp_config.screen_scale, 201, msg[MSG_G_S_MENU_HELP_10], 14),
     /* 15 */
     /* 16 */ SUBMENU_OPTION(NULL, msg[MSG_MENU_RETURN_MAIN], msg[MSG_G_S_MENU_HELP_8], 16)
   };
@@ -1337,18 +1337,18 @@ u32 menu(u16 *original_screen)
     STRING_SELECTION_OPTION(home_mode, msg[MSG_CHEAT_MENU_6], yes_no_options, &g_gpsp_config.enable_home, 2, msg[MSG_CHEAT_MENU_HELP_6], 2),
 
 #ifdef USE_C_CORE
-    STRING_SELECTION_OPTION(NULL, "Emulate Core : %s", emulate_core_options, &g_gpsp_config.emulate_core , 2, "Emulate Core", 3),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_0], emulate_core_options, &g_gpsp_config.emulate_core , 2, msg[MSG_MISC_MENU_HELP_0], 3),
 #endif
 
 #ifdef USE_DEBUG
-    STRING_SELECTION_OPTION(NULL, "Debug mode : %s", yes_no_options, &g_gpsp_config.debug_flag, 2, "Debug mode", 4),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_1], yes_no_options, &g_gpsp_config.debug_flag, 2, msg[MSG_MISC_MENU_HELP_1], 4),
 #endif
 
-    STRING_SELECTION_OPTION(NULL, "言語 : %s", language_options, &g_gpsp_config.language, 12, "言語", 5), /* TODO */
-    STRING_SELECTION_OPTION(NULL, "Fake Fat : %s", yes_no_options, &g_gpsp_config.fake_fat, 2, "Fake Fat", 6), /* TODO */
-    STRING_SELECTION_OPTION(NULL, "Boot Mode : %s", boot_mode_options, &g_gpsp_config.boot_mode, 2, "Boot Mode", 8), /* TODO */
+    STRING_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_2], language_options, &g_gpsp_config.language, 12, msg[MSG_MISC_MENU_HELP_2], 5),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_3], yes_no_options, &g_gpsp_config.fake_fat, 2, msg[MSG_MISC_MENU_HELP_3], 6),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_4], boot_mode_options, &g_gpsp_config.boot_mode, 2, msg[MSG_MISC_MENU_HELP_4], 8),
 #if 0
-    NUMERIC_SELECTION_OPTION(NULL, "周囲の明るさ : %d", &g_gpsp_config.solar_level, 25, "周囲の明るさ", 8), /* TODO */
+    NUMERIC_SELECTION_OPTION(NULL, msg[MSG_MISC_MENU_5], &g_gpsp_config.solar_level, 25, msg[MSG_MISC_MENU_HELP_5], 8),
 #endif
     SUBMENU_OPTION(NULL, msg[MSG_CHEAT_MENU_4], msg[MSG_CHEAT_MENU_HELP_4], 16)
   };
@@ -1413,7 +1413,7 @@ u32 menu(u16 *original_screen)
 
     STRING_SELECTION_OPTION(NULL, msg[MSG_A_PAD_MENU_4], yes_no_options, &g_gpsp_config.enable_analog, 2, msg[MSG_A_PAD_MENU_HELP_0], 7),
     NUMERIC_SELECTION_OPTION(NULL, msg[MSG_A_PAD_MENU_5], &g_gpsp_config.analog_sensitivity_level, 10, msg[MSG_A_PAD_MENU_HELP_1], 8),
-    STRING_SELECTION_OPTION(NULL, "tilt sensor : %s", yes_no_options, &g_game_config.allocate_sensor, 2, "tilt sensor", 9), /* TODO */
+    STRING_SELECTION_OPTION(NULL, msg[MSG_A_PAD_MENU_6], yes_no_options, &g_game_config.allocate_sensor, 2, msg[MSG_A_PAD_MENU_HELP_2], 9),
     STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_12], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_12], 10),
 
 
@@ -1468,7 +1468,7 @@ u32 menu(u16 *original_screen)
     SUBMENU_OPTION(&adhoc_menu, "adhoc", "adhoc", 8),                                                                                 /*  8行目 */
 #endif
     SUBMENU_OPTION(&cheats_menu, msg[MSG_MAIN_MENU_6], msg[MSG_MAIN_MENU_HELP_6], 9),                                            /*  9行目 */
-    SUBMENU_OPTION(&misc_menu, "misc", "misc", 10),                                                                                   /* 10行目 */
+    SUBMENU_OPTION(&misc_menu, msg[MSG_MAIN_MENU_11], msg[MSG_MAIN_MENU_HELP_11], 10),                                                                                   /* 10行目 */
     ACTION_OPTION(menu_load, NULL, msg[MSG_MAIN_MENU_7], msg[MSG_MAIN_MENU_HELP_7], 11),                                              /* 11行目 */
     ACTION_OPTION(menu_restart, NULL, msg[MSG_MAIN_MENU_8], msg[MSG_MAIN_MENU_HELP_8], 12),                                           /* 12行目 */
     ACTION_OPTION(menu_exit, NULL, msg[MSG_MAIN_MENU_9], msg[MSG_MAIN_MENU_HELP_9], 13),                                              /* 13行目 */
