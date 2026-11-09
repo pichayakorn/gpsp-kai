@@ -6,7 +6,7 @@
 
 all: systembuttons_prx dvemgr homehookprx main
 
-.PHONY: all clean main dvemgr homehookprx systembuttons_prx bump_build package
+.PHONY: all clean main dvemgr homehookprx systembuttons_prx package check release
 
 # Ready-to-copy Memory Stick folder: copy $(PACKAGE_DIR) to PSP/GAME/ and add
 # your own gba_bios.bin. PACKAGE_PRX=prebuilt ships the hardware-tested modules
@@ -36,10 +36,17 @@ dvemgr:
 main:
 	make -C ./eboot/
 
-# Increment BUILD_COUNT in build_count.inc (run explicitly, not on every build)
-bump_build:
-	awk '{ print $$1, $$2 + 1 }' build_count.inc > build_count.inc.tmp
-	mv build_count.inc.tmp build_count.inc
+# Check the UI message files against the code (entry order, printf codes)
+check:
+	python3 tools/check_messages.py
+
+# Package plus a zip named after the version, e.g. out/gpSP-kai-3.5.0.zip
+RELEASE_ZIP = out/gpSP-kai-$(strip $(shell cat version.txt)).zip
+
+release: check package
+	rm -f $(RELEASE_ZIP)
+	cd out && zip -qr $(notdir $(RELEASE_ZIP)) gpSP
+	@echo "Release zip: $(RELEASE_ZIP)"
 
 homehookprx:
 	make -C ./prx/homehookprx/

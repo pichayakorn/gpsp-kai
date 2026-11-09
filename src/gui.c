@@ -43,12 +43,6 @@ gpsp_config_t g_gpsp_config;
 const u32 game_config_ver = 0x00010000;
 game_config_t g_game_config;
 
-#ifdef TEST_MODE
-#define VER_RELEASE "test"
-#else
-#define VER_RELEASE "release"
-#endif
-
 #define MAKE_MENU(name, init_function, passive_function)                      \
   MENU_TYPE name##_menu =                                                     \
   {                                                                           \
@@ -2092,8 +2086,8 @@ static void print_status(u32 mode)
   sprintf(print_buffer_1, msg[MSG_MENU_BATTERY], scePowerGetBatteryLifePercent(), scePowerGetBatteryLifeTime());
   PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 0);
 
-  sprintf(print_buffer_1, "MAX ROM BUF: %02d MB Ver: %d.%d %s %d Build %d",
-      (int)(gamepak_ram_buffer_size/1024/1024), VERSION_MAJOR, VERSION_MINOR, VER_RELEASE, VERSION_BUILD, BUILD_COUNT);
+  sprintf(print_buffer_1, "MAX ROM BUF: %02d MB Ver: %s",
+      (int)(gamepak_ram_buffer_size/1024/1024), VERSION_STRING);
   PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 10);
 
   if (mode == 0)
