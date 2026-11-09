@@ -2026,7 +2026,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     static u64 savestate_time_flat;
     u64 local_time;
     int wday;
-    pspTime current_time;
+    ScePspDateTime current_time;
     static u32 valid_flag;
 
     if (g_default_save_dir != NULL) {
@@ -2084,7 +2084,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
         sceRtcSetTick(&current_time, &local_time);
         wday = sceRtcGetDayOfWeek(current_time.year, current_time.month, current_time.day);
         get_timestamp_string(savestate_timestamp_string, MSG_STATE_MENU_DATE_FMT_0, current_time.year, current_time.month, current_time.day,
-            wday, current_time.hour, current_time.minutes, current_time.seconds, 0);
+            wday, current_time.hour, current_time.minute, current_time.second, 0);
 
         savestate_timestamp_string[40] = 0;
 
@@ -2153,13 +2153,13 @@ static void print_status(u32 mode)
   char print_buffer_1[256];
   char print_buffer_2[256];
   char utf8[2048];
-  pspTime current_time;
+  ScePspDateTime current_time;
 
   sceRtcGetCurrentClockLocalTime(&current_time);
   int wday = sceRtcGetDayOfWeek(current_time.year, current_time.month , current_time.day);
 
   get_timestamp_string(print_buffer_1, MSG_MENU_DATE_FMT_0, current_time.year, current_time.month , current_time.day, wday,
-    current_time.hour, current_time.minutes, current_time.seconds, 0);
+    current_time.hour, current_time.minute, current_time.second, 0);
   sprintf(print_buffer_2,"%s%s", msg[MSG_MENU_DATE], print_buffer_1);
   PRINT_STRING_BG(print_buffer_2, COLOR_HELP_TEXT, COLOR_BG, 0, 0);
 
@@ -2211,7 +2211,7 @@ static void save_ss_bmp(u16 *image)
   char ss_filename[MAX_FILE];
   char timestamp[MAX_FILE];
   char save_ss_path[MAX_PATH];
-  pspTime current_time;
+  ScePspDateTime current_time;
   u8 *rgb_data = (u8 *)UNIVERSAL_VRAM_ADDR;
   u8 x,y;
   u16 col;
@@ -2222,7 +2222,7 @@ static void save_ss_bmp(u16 *image)
   change_ext(gamepak_filename, ss_filename, "_");
 
   get_timestamp_string(timestamp, MSG_SS_FMT_0, current_time.year, current_time.month , current_time.day, 7,
-    current_time.hour, current_time.minutes, current_time.seconds, current_time.microseconds);
+    current_time.hour, current_time.minute, current_time.second, current_time.microsecond);
 
   if (g_default_ss_dir != NULL) {
     sprintf(save_ss_path, "%s/%s%s.bmp", g_default_ss_dir, ss_filename, timestamp);
