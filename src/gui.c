@@ -1283,7 +1283,7 @@ u32 menu(u16 *original_screen)
     /* 00 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SCALE], scale_options, &g_gpsp_config.screen_mode, 5, msg[MSG_G_S_MENU_HELP_0], 0),
     /* 01 */ STRING_SELECTION_OPTION(NULL, msg[MSG_FILTER], yes_no_options, &g_gpsp_config.screen_filter, 2, msg[MSG_G_S_MENU_HELP_1], 1),
     /* 02 */ STRING_SELECTION_OPTION(NULL, msg[MSG_RATIO], ratio_options, &g_gpsp_config.screen_ratio, 2, msg[MSG_G_S_MENU_HELP_9], 2),
-    /* 03 */ STRING_SELECTION_OPTION(NULL, msg[MSG_INTERLACE], interlace_options, &g_gpsp_config.screen_interlace, 2, msg[MSG_G_S_MENU_HELP_10], 3),
+    /* 03 */ STRING_SELECTION_OPTION(NULL, msg[MSG_INTERLACE], interlace_options, &g_gpsp_config.screen_interlace, 2, msg[MSG_G_S_MENU_HELP_11], 3),
     /* 04 */
     /* 05 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SKIP_TYPE], frameskip_options, &g_game_config.frameskip_type, 3, msg[MSG_G_S_MENU_HELP_2], 5),
     /* 06 */ NUMERIC_SELECTION_OPTION(NULL, msg[MSG_SKIP_VALUE], &g_game_config.frameskip_value, 100, msg[MSG_G_S_MENU_HELP_3], 6),
@@ -1392,9 +1392,9 @@ u32 menu(u16 *original_screen)
     GAMEPAD_CONFIG_OPTION(msg[MSG_PAD_MENU_10], 10),
     GAMEPAD_CONFIG_OPTION(msg[MSG_PAD_MENU_11], 11),
 
-    STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_13], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_13], 13),
+    STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_12], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_12], 13),
 
-    SUBMENU_OPTION(NULL, msg[MSG_PAD_MENU_12], msg[MSG_PAD_MENU_HELP_12], 15)
+    SUBMENU_OPTION(NULL, msg[MSG_PAD_MENU_13], msg[MSG_PAD_MENU_HELP_13], 15)
   };
 
   MAKE_MENU(gamepad_config, submenu_gamepad, NULL);
@@ -1414,11 +1414,11 @@ u32 menu(u16 *original_screen)
     STRING_SELECTION_OPTION(NULL, msg[MSG_A_PAD_MENU_4], yes_no_options, &g_gpsp_config.enable_analog, 2, msg[MSG_A_PAD_MENU_HELP_0], 7),
     NUMERIC_SELECTION_OPTION(NULL, msg[MSG_A_PAD_MENU_5], &g_gpsp_config.analog_sensitivity_level, 10, msg[MSG_A_PAD_MENU_HELP_1], 8),
     STRING_SELECTION_OPTION(NULL, "tilt sensor : %s", yes_no_options, &g_game_config.allocate_sensor, 2, "tilt sensor", 9), /* TODO */
-    STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_13], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_13], 10),
+    STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_12], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_12], 10),
 
 
 
-    SUBMENU_OPTION(NULL, msg[MSG_A_PAD_MENU_6], msg[MSG_A_PAD_MENU_HELP_2], 15)
+    SUBMENU_OPTION(NULL, msg[MSG_A_PAD_MENU_7], msg[MSG_A_PAD_MENU_HELP_3], 15)
   };
 
   MAKE_MENU(analog_config, submenu_analog, NULL);
