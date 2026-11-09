@@ -40,7 +40,7 @@
 
 # MSG_MAIN_MENU_2
 #Save state to slot: %d
-!Salva  stato in slot : %d
+!Salva  $$stato in slot $$: %d
 
 # MSG_MAIN_MENU_3
 #Savestate options
@@ -155,39 +155,39 @@
 
 # MSG_SCALE
 #Display scaling: %s
-!Proporzioni Video     : %s
+!Proporzioni Video     $$$: %s
 
 # MSG_FILTER
 #Screen filtering:  %s
-!Filtri Grafici           $$: %s
+!Filtri Grafici           $: %s
 
 # MSG_RATIO
 #TV output ratio: %s
-!TV output ratio       : %s
+!TV output ratio        $: %s
 
 # MSG_INTERLACE
 #TV output interlace: %s
-!TV output interlace : %s
+!TV output interlace  $$$: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type:    %s
-!Modalita salto frame : %s
+!Modalita salto frame $$$: %s
 
 # MSG_SKIP_VALUE
 #Frameskip value:   %d
-!N. frame da saltare  $: %d
+!N. frame da saltare   $: %d
 
 # MSG_SKIP_RANDOM
 #Frameskip variation:  %s
-!Modalita salto frame : %s
+!Modalita salto frame $$$: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
-!Output Audio : %s
+!Output Audio  $$$: %s
 
 # MSG_AUDIO_BUFFER
 #Audio buffer: %s
-!Buffer Audio  $: %s
+!Buffer Audio  $$$: %s
 
 # MSG_SCREEN_SHOT
 #Screen shot
@@ -209,8 +209,8 @@
 !\n
 !Determina come ridimensionare il video del GBA rispetto allo schermo PSP\n
 !unscaled 3:2 - mantiene la risoluzione originale del GBA,\n
-!scaled 3:2     - altezza schermo GBA uguale a quella del video della PSP,\n
-!fullscreen    - riempie tutto lo schermo della PSP.
+!scaled 3:2     $- altezza schermo GBA uguale a quella del video della PSP,\n
+!fullscreen    $$$- riempie tutto lo schermo della PSP.
 
 # MSG_G_S_MENU_HELP_1
 #Determines whether or not bilinear filtering should be used when\n
@@ -330,7 +330,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----  ----------  --:--:--          
+!--.--.----$$----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.
@@ -355,7 +355,7 @@
 
 # MSG_STATE_MENU_3
 #Current savestate slot: %d
-!Savestate slot corrente : %d
+!Savestate slot corrente  : %d
 
 # MSG_STATE_MENU_4
 #Back
@@ -394,15 +394,15 @@
 
 # MSG_PAD_MENU_0
 #D-pad up: %s
-!D-pad su         : %s
+!D-pad su         $$: %s
 
 # MSG_PAD_MENU_1
 #D-pad down: %s
-!D-pad giu'       $: %s
+!D-pad giu'        : %s
 
 # MSG_PAD_MENU_2
 #D-pad left: %s
-!D-pad sinistra : %s
+!D-pad sinistra $$: %s
 
 # MSG_PAD_MENU_3
 #D-pad right: %s
@@ -414,23 +414,23 @@
 
 # MSG_PAD_MENU_5
 #Circle: %s
-!Cerchio          $$: %s
+!Cerchio           : %s
 
 # MSG_PAD_MENU_6
 #Square: %s
-!Quadrato        $$: %s
+!Quadrato         : %s
 
 # MSG_PAD_MENU_7
 #Triangle: %s
-!Triangolo        : %s
+!Triangolo        $$: %s
 
 # MSG_PAD_MENU_8
 #Left Trigger: %s
-!L-Trigger        $: %s
+!L-Trigger        : %s
 
 # MSG_PAD_MENU_9
 #Right Trigger: %s
-!R-Trigger        $: %s
+!R-Trigger        : %s
 
 # MSG_PAD_MENU_10
 #Start: %s
@@ -442,7 +442,7 @@
 
 # MSG_PAD_MENU_12
 #Use default map: %s
-!Use default map : %s
+!Use default map  $$: %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -660,31 +660,31 @@
 
 # MSG_A_PAD_MENU_0
 #Analog up: %s
-!Analogico SU  $$: %s
+!Analogico SU   : %s
 
 # MSG_A_PAD_MENU_1
 #Analog down: %s
-!Analogico Giu : %s
+!Analogico Giu  : %s
 
 # MSG_A_PAD_MENU_2
 #Analog left: %s
-!Analog SX      $$: %s
+!Analog SX       : %s
 
 # MSG_A_PAD_MENU_3
 #Analog right: %s
-!Analog DX      $$: %s
+!Analog DX       : %s
 
 # MSG_A_PAD_MENU_4
 #Enable analog: %s
-!Attiva analog        $$: %s
+!Attiva analog         $$: %s
 
 # MSG_A_PAD_MENU_5
 #Analog sensitivity: %d
-!Analog sensitivity : %d
+!Analog sensitivity   : %d
 
 # MSG_A_PAD_MENU_6
 #Tilt sensor : %s
-!Tilt sensor            : %s
+!Tilt sensor            $$: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -726,11 +726,11 @@
 
 # MSG_CHEAT_MENU_2
 #Clock speed: %s
-!Velocita' processore  : %s
+!Velocita' processore  $$: %s
 
 # MSG_CHEAT_MENU_3
 #Update backup: %s
-!Aggiorna Salvataggio : %s
+!Aggiorna Salvataggio  : %s
 
 # MSG_CHEAT_MENU_4
 #Back
@@ -773,15 +773,15 @@
 
 # MSG_MISC_MENU_0
 #Emulate Core : %s
-!Emulate Core : %s
+!Emulate Core  $$: %s
 
 # MSG_MISC_MENU_1
 #Debug mode : %s
-!Debug mode : %s
+!Debug mode  $$: %s
 
 # MSG_MISC_MENU_2
 #Language : %s
-!Lingua : %s
+!Lingua  : %s
 
 # MSG_MISC_MENU_3
 #Fake Fat : %s
@@ -789,11 +789,11 @@
 
 # MSG_MISC_MENU_4
 #Boot Mode : %s
-!Modalità di avvio : %s
+!Modalità di avvio  : %s
 
 # MSG_MISC_MENU_5
 #Brightness : %d
-!Brightness : %d
+!Brightness  : %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -1117,7 +1117,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Cheat page : %d
+!Cheat page $$$: %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page
@@ -1126,7 +1126,7 @@
 
 # MSG_CHEAT_MENU_6
 #Enable HOME: %s
-!Enable HOME              : %s
+!Enable HOME              $$: %s
 
 # MSG_CHEAT_MENU_HELP_6
 #Enable HOME

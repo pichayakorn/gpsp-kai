@@ -45,11 +45,15 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
   yes/no prompt and the ROM/state progress texts.
 - The menus use the b230 order and layout, including the b225 header layout
   (date, battery, version and ROM info lines) and colors.
-- New UI font `eureka.fbm` (from b225): proportional, covering ASCII, the
-  Latin-1 accented letters, Greek and Russian Cyrillic. In the message files,
-  `$` is a 1-pixel space used to line up columns. Its source is
-  `tools/fonts/bdf/eureka.bdf`. `knj10.fbm` is the version shipped in the b230
-  release, which has small glyph fixes over takka's.
+- UI font `gpsp10.fbm`: proportional, covering ASCII, the Latin-1 accented
+  letters, Greek and Russian Cyrillic. It replaces b225's `eureka.fbm`, whose
+  rights are unclear. Its glyphs come from the public-domain X11 misc-fixed
+  6x10 font. In the message files, `$` is a 1-pixel space used to line up
+  columns. The padding was recomputed for gpsp10, so every column stays where
+  it was with eureka. The source is `tools/fonts/bdf/gpsp10.bdf`; rebuild it
+  with `tools/fonts/bdf2fbm.py`.
+- `knj10.fbm` is the version shipped in the b230 release, which has small glyph
+  fixes over takka's.
 - The b225 menu and savestate date formats put the weekday after the date, and
   the code now passes its arguments in that order. Without this fix, the menu
   crashed when the PSP was set to MM/DD/YYYY or DD/MM/YYYY.
@@ -116,7 +120,7 @@ games in `GBA/ROM/`. The folder contains:
 EBOOT.PBP
 homehook.prx  dvemgr.prx  SystemButtons.prx
 cfg/          message, font and directory settings (from data/cfg)
-font/         eureka.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
+font/         gpsp10.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
 game_config.txt
 licenses/     COPYING and the font/library license notices
 GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty)
@@ -154,12 +158,12 @@ tools/fonts/    font conversion tools and BDF sources of the shipped fonts
 - **Dark_Alex**: dvemgr.prx (TV output)
 - **mok**: the FBM font printer (`fbm_print.c`)
 - **pochi**, **frmb0001**: icons and images
-- **ErikPshat**: build 225, with its translations and the `eureka.fbm` font
-  (partly based on Naga10)
+- **ErikPshat**: build 225, with its translations
 - **Oldvic**: build 230
 - Fonts:
   - **NAGAO Sadakazu**: Naga10 (`knj10`, `knj10B`, `maru10`, `min10`, `5x10*`)
   - **Kim Jeong-Hwan**: Baekmuk; the 10px bitmap `batang10.fbm` was made by Won-kyu Park
+  - **Markus Kuhn** and the X11 misc-fixed contributors: the glyphs of `gpsp10.fbm`
 - **ITOU Hiroki**: bdf2bmp/bmp2bdf font tools (`tools/fonts/bdf_tool`)
 
 ## License
@@ -177,7 +181,7 @@ own terms or none stated:
 | `prx/dvemgr/lib/*.a` | Import-stub libraries for the sceDve, sceHprm and sceImpose kernel drivers; no license stated |
 | `data/font/knj10.fbm`, `knj10B.fbm`, `maru10.fbm`, `min10.fbm`, `5x10*.fbm` (Naga10) | Free for non-commercial use; for commercial use, consult the author. Converted copies must ship with the original README (`docs/licenses/knj10/README`) and keep its terms |
 | `data/font/batang10.fbm` | Baekmuk license; keep `docs/licenses/batang/COPYRIGHT` and `docs/licenses/batang/COPYRIGHT.ks` with it. Baekmuk Batang, Baekmuk Dotum, Baekmuk Gulim, and Baekmuk Headline are registered trademarks owned by Kim Jeong-Hwan |
-| `data/font/eureka.fbm`, `tools/fonts/bdf/eureka.bdf` | By ErikPshat, partly derived from Naga10: its Greek letters, symbols and most Cyrillic letters are identical to Naga10 glyphs. The ASCII and Latin-1 glyphs are of unknown origin. The file is marked "Copyright 2016 (c) ErikPshat. All rights reserved." The Naga10 terms (see the Naga10 row) apply to the derived glyphs; no license is stated for the rest, which is redistributed as in the b225/b230 releases |
+| `data/font/gpsp10.fbm`, `tools/fonts/bdf/gpsp10.bdf` | Public domain: glyphs from the X11 misc-fixed 6x10 font ("Public domain font. Share and enjoy.") |
 | `tools/fonts/bdf_tool/*.zip` | bdf2bmp/bmp2bdf by ITOU Hiroki, BSD-style license (inside the archives) |
 
 Do not add the GBA BIOS or game ROMs to this repository.

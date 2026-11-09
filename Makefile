@@ -13,7 +13,7 @@ all: systembuttons_prx dvemgr homehookprx main
 # from prx/prebuilt/; PACKAGE_PRX=built ships the ones just built in out/.
 PACKAGE_DIR   = out/gpSP
 PACKAGE_PRX  ?= prebuilt
-PACKAGE_FONTS = eureka.fbm knj10.fbm batang10.fbm
+PACKAGE_FONTS = gpsp10.fbm knj10.fbm batang10.fbm
 
 package: all
 	rm -rf $(PACKAGE_DIR)

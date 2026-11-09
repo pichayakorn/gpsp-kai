@@ -36,11 +36,11 @@
 
 # MSG_MAIN_MENU_1
 #Load state from slot: %d
-!Загрузить из слота : %d
+!Загрузить из слота    $: %d
 
 # MSG_MAIN_MENU_2
 #Save state to slot: %d
-!Сохранить в слот    : %d
+!Сохранить в слот       : %d
 
 # MSG_MAIN_MENU_3
 #Savestate options
@@ -153,39 +153,39 @@
 
 # MSG_SCALE
 #Display scaling    : %s
-!Вывод графики          $: %s
+!Вывод графики              : %s
 
 # MSG_FILTER
 #Screen filtering  : %s
-!Фильтрация              $$$: %s
+!Фильтрация                  : %s
 
 # MSG_RATIO
 #TV output ratio    : %s
-!Аспект ТВ-выхода     $$$: %s
+!Аспект ТВ-выхода         $: %s
 
 # MSG_INTERLACE
 #TV output interlace : %s
-!Развёртка ТВ-выхода : %s
+!Развёртка ТВ-выхода    $$$: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type    : %s
-!Пропуск кадров    : %s
+!Пропуск кадров       $: %s
 
 # MSG_SKIP_VALUE
 #Frameskip value   : %d
-!Частота пропуска : %d
+!Частота пропуска    $: %d
 
 # MSG_SKIP_RANDOM
 #Framskip variation: %s
-!Тип пропуска      $$: %s
+!Тип пропуска          $: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
-!Аудио вывод : %s
+!Аудио вывод    : %s
 
 # MSG_AUDIO_BUFFER
 #Audio buffer: %s
-!Аудио буфер : %s
+!Аудио буфер    : %s
 
 # MSG_SCREEN_SHOT
 #Screen shot
@@ -193,7 +193,7 @@
 
 # MSG_DISPLAY_SCALE
 #Scale : %d
-!Масштаб : %d
+!Масштаб   $$: %d
 
 # MSG_MENU_RETURN_MAIN
 #Back
@@ -207,8 +207,8 @@
 !\n
 !Настройка растягиваня картинки GBA под экран PSP.\n
 !unscaled 3:2 - оригинальное разрешения GBA,\n
-!scaled 3:2     - растягивание с сохранением пропорций,\n
-!fullscreen    - полноэкранное изображение.
+!scaled 3:2     $- растягивание с сохранением пропорций,\n
+!fullscreen    $$$- полноэкранное изображение.
 
 # MSG_G_S_MENU_HELP_1
 #Determines whether or not bilinear filtering should be used when\n
@@ -322,7 +322,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----  ----------  --:--:--          
+!--.--.----$$----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.
@@ -347,7 +347,7 @@
 
 # MSG_STATE_MENU_3
 #Current savestate slot : %d
-!Текущий слот : %d
+!Текущий слот    $$: %d
 
 # MSG_STATE_MENU_4
 #Back
@@ -385,43 +385,43 @@
 
 # MSG_PAD_MENU_0
 #D-pad up     : %s
-!D-pad вверх   : %s
+!D-pad вверх    $: %s
 
 # MSG_PAD_MENU_1
 #D-pad down   : %s
-!D-pad вниз    $$: %s
+!D-pad вниз     $$$: %s
 
 # MSG_PAD_MENU_2
 #D-pad left   : %s
-!D-pad влево   $$: %s
+!D-pad влево    $: %s
 
 # MSG_PAD_MENU_3
 #D-pad right  : %s
-!D-pad вправо $: %s
+!D-pad вправо  $$$: %s
 
 # MSG_PAD_MENU_4
 #Cross        : %s
-!Крест            : %s
+!Крест            $$$: %s
 
 # MSG_PAD_MENU_5
 #Circle       : %s
-!Круг             : %s
+!Круг              $$: %s
 
 # MSG_PAD_MENU_6
 #Square       : %s
-!Квадрат        : %s
+!Квадрат         $$$: %s
 
 # MSG_PAD_MENU_7
 #Triangle     : %s
-!Треугольник : %s
+!Треугольник    $: %s
 
 # MSG_PAD_MENU_8
 #Left Trigger : %s
-!L-триггер      : %s
+!L-триггер       $: %s
 
 # MSG_PAD_MENU_9
 #Right Trigger: %s
-!R-триггер      : %s
+!R-триггер       $: %s
 
 # MSG_PAD_MENU_10
 #Start        : %s
@@ -433,7 +433,7 @@
 
 # MSG_PAD_MENU_12
 #Use default map : %s
-!Стандартная раскладка : %s
+!Стандартная раскладка     $$$: %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -651,31 +651,31 @@
 
 # MSG_A_PAD_MENU_0
 #Analog up   : %s
-!Аналог вверх  $$$: %s
+!Аналог вверх     $$$: %s
 
 # MSG_A_PAD_MENU_1
 #Analog down : %s
-!Аналог вниз    $: %s
+!Аналог вниз       $: %s
 
 # MSG_A_PAD_MENU_2
 #Analog left : %s
-!Аналог влево   $: %s
+!Аналог влево     $$$: %s
 
 # MSG_A_PAD_MENU_3
 #Analog right: %s
-!Аналог вправо : %s
+!Аналог вправо    $: %s
 
 # MSG_A_PAD_MENU_4
 #Enable analog: %s
-!Аналог включён   $$$: %s
+!Аналог включён       $$: %s
 
 # MSG_A_PAD_MENU_5
 #Analog sensitivity: %d
-!Чувствительность : %d
+!Чувствительность    $: %d
 
 # MSG_A_PAD_MENU_6
 #Tilt sensor : %s
-!Датчик наклона   $$: %s
+!Датчик наклона       $: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -717,11 +717,11 @@
 
 # MSG_CHEAT_MENU_2
 #Clock speed: %s
-!Частота ЦП         $$: %s
+!Частота ЦП           $$: %s
 
 # MSG_CHEAT_MENU_3
 #Update backup: %s
-!Сохранять бэкап : %s
+!Сохранять бэкап    $: %s
 
 # MSG_CHEAT_MENU_4
 #Back
@@ -762,27 +762,27 @@
 
 # MSG_MISC_MENU_0
 #Emulate Core : %s
-!Эмуляция ядра   : %s
+!Эмуляция ядра       : %s
 
 # MSG_MISC_MENU_1
 #Debug mode : %s
-!Дебаг режим       $$$: %s
+!Дебаг режим          $: %s
 
 # MSG_MISC_MENU_2
 #Language : %s
-!Язык : %s
+!Язык  : %s
 
 # MSG_MISC_MENU_3
 #Fake Fat : %s
-!Ложная ФАТ       : %s
+!Ложная ФАТ          $$: %s
 
 # MSG_MISC_MENU_4
 #Boot Mode : %s
-!Режим загрузки : %s
+!Режим загрузки    $$$: %s
 
 # MSG_MISC_MENU_5
 #Brightness : %d
-!Яркость : %d
+!Яркость  : %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -1105,7 +1105,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Страница читов : %d
+!Страница читов    $$$: %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page
@@ -1114,7 +1114,7 @@
 
 # MSG_CHEAT_MENU_6
 #Enable HOME: %s
-!Включить "HOME"  $$: %s
+!Включить "HOME"     $: %s
 
 # MSG_CHEAT_MENU_HELP_6
 #Enable HOME

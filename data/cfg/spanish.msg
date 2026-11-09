@@ -36,11 +36,11 @@
 
 # MSG_MAIN_MENU_1
 #Load state from slot: %d
-!Cargar partida de Slot   $$: %d
+!Cargar partida de Slot   $$$: %d
 
 # MSG_MAIN_MENU_2
 #Save state to slot: %d
-!Guardar partida en Slot : %d
+!Guardar partida en Slot  $: %d
 
 # MSG_MAIN_MENU_3
 #Savestate options
@@ -154,11 +154,11 @@
 
 # MSG_SCALE
 #Display scaling: %s
-!Escalado Pantalla      $$: %s
+!Escalado Pantalla       : %s
 
 # MSG_FILTER
 #Screen filtering: %s
-!Filtrado Pantalla       : %s
+!Filtrado Pantalla       $$: %s
 
 # MSG_RATIO
 #TV output ratio: %s
@@ -166,27 +166,27 @@
 
 # MSG_INTERLACE
 #TV output interlace: %s
-!Entrelazado salida TV : %s
+!Entrelazado salida TV $$: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type: %s
-!Tipo Frameskip        $: %s
+!Tipo Frameskip          $: %s
 
 # MSG_SKIP_VALUE
 #Frameskip value: %d
-!Valor Frameskip       : %d
+!Valor Frameskip        $$$: %d
 
 # MSG_SKIP_RANDOM
 #Framskip variation: %s
-!Variacion Frameskip : %s
+!Variacion Frameskip   $: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
-!Salida Audio  : %s
+!Salida Audio  $$: %s
 
 # MSG_AUDIO_BUFFER
 #Audio buffer: %s
-!Buffer Audio : %s
+!Buffer Audio $$: %s
 
 # MSG_SCREEN_SHOT
 #Screen shot
@@ -327,7 +327,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----  ----------  --:--:--          
+!--.--.----$$----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.
@@ -352,7 +352,7 @@
 
 # MSG_STATE_MENU_3
 #Current savestate slot: %d
-!Slot actual : %d
+!Slot actual $$: %d
 
 # MSG_STATE_MENU_4
 #Back
@@ -399,35 +399,35 @@
 
 # MSG_PAD_MENU_2
 #D-pad left: %s
-!D-pad izqda    $$$: %s
+!D-pad izqda     : %s
 
 # MSG_PAD_MENU_3
 #D-pad right: %s
-!D-pad derecha : %s
+!D-pad derecha $$: %s
 
 # MSG_PAD_MENU_4
 #Cross: %s
-!Cruzar           : %s
+!Cruzar           $$: %s
 
 # MSG_PAD_MENU_5
 #Circle: %s
-!Circulo          $$: %s
+!Circulo           : %s
 
 # MSG_PAD_MENU_6
 #Square: %s
-!Cuadrado        : %s
+!Cuadrado        $$: %s
 
 # MSG_PAD_MENU_7
 #Triangle: %s
-!Triangulo       : %s
+!Triangulo        : %s
 
 # MSG_PAD_MENU_8
 #Left Trigger: %s
-!L-Trigger       $$$: %s
+!L-Trigger       $$: %s
 
 # MSG_PAD_MENU_9
 #Right Trigger: %s
-!R-Trigger       $$$: %s
+!R-Trigger       $$: %s
 
 # MSG_PAD_MENU_10
 #Start: %s
@@ -439,7 +439,7 @@
 
 # MSG_PAD_MENU_12
 #Use default map: %s
-!Usar controles por defecto : %s
+!Usar controles por defecto $$: %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -657,31 +657,31 @@
 
 # MSG_A_PAD_MENU_0
 #Analog up: %s
-!Analog arrib  : %s
+!Analog arrib  $$: %s
 
 # MSG_A_PAD_MENU_1
 #Analog down: %s
-!Analog abajo $$$: %s
+!Analog abajo  $: %s
 
 # MSG_A_PAD_MENU_2
 #Analog left: %s
-!Analog izqda $$$: %s
+!Analog izqda  $$: %s
 
 # MSG_A_PAD_MENU_3
 #Analog right: %s
-!Analog drcha : %s
+!Analog drcha  : %s
 
 # MSG_A_PAD_MENU_4
 #Enable analog: %s
-!Habilita el Analogico        $$: %s
+!Habilita el Analogico         : %s
 
 # MSG_A_PAD_MENU_5
 #Analog sensitivity: %d
-!Sensibilidad del Analogico : %d
+!Sensibilidad del Analogico  : %d
 
 # MSG_A_PAD_MENU_6
 #Tilt sensor : %s
-!Tilt sensor                     : %s
+!Tilt sensor                     $$: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -727,7 +727,7 @@
 
 # MSG_CHEAT_MENU_3
 #Update backup: %s
-!Actualizar ROM : %s
+!Actualizar ROM $$: %s
 
 # MSG_CHEAT_MENU_4
 #Back
@@ -769,15 +769,15 @@
 
 # MSG_MISC_MENU_0
 #Emulate Core: %s
-!Emulate Core : %s
+!Emulate Core  $$: %s
 
 # MSG_MISC_MENU_1
 #Debug mode: %s
-!Debug mode : %s
+!Debug mode  $$: %s
 
 # MSG_MISC_MENU_2
 #Language: %s
-!Idioma : %s
+!Idioma  : %s
 
 # MSG_MISC_MENU_3
 #Fake Fat: %s
@@ -789,7 +789,7 @@
 
 # MSG_MISC_MENU_5
 #Brightness: %d
-!Brightness : %d
+!Brightness  : %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -1112,7 +1112,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Pagina de trucos : %d
+!Pagina de trucos  : %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page

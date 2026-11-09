@@ -162,11 +162,11 @@
 
 # MSG_RATIO
 #TV output ratio: %s
-!TV output ratio       : %s
+!TV output ratio        $: %s
 
 # MSG_INTERLACE
 #TV output interlace: %s
-!TV output interlace   : %s
+!TV output interlace    $$$: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type: %s
@@ -326,7 +326,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----  ----------  --:--:--          
+!--.--.----$$----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot.
@@ -437,7 +437,7 @@
 
 # MSG_PAD_MENU_12
 #Use default map: %s
-!Use default map : %s
+!Use default map  $$: %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -679,7 +679,7 @@
 
 # MSG_A_PAD_MENU_6
 #Tilt sensor : %s
-!Tilt sensor : %s
+!Tilt sensor $$: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -767,19 +767,19 @@
 
 # MSG_MISC_MENU_0
 #Emulate Core : %s
-!Emulate Core : %s
+!Emulate Core  $$: %s
 
 # MSG_MISC_MENU_1
 #Debug mode : %s
-!Debug mode : %s
+!Debug mode  $$: %s
 
 # MSG_MISC_MENU_2
 #Language : %s
-!Language : %s
+!Language  : %s
 
 # MSG_MISC_MENU_3
 #Fake Fat : %s
-!Fake Fat : %s
+!Fake Fat $$: %s
 
 # MSG_MISC_MENU_4
 #Boot Mode : %s
@@ -787,7 +787,7 @@
 
 # MSG_MISC_MENU_5
 #Brightness : %d
-!Brightness : %d
+!Brightness  : %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -1110,7 +1110,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Cheat page : %d
+!Cheat page $$$: %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page
@@ -1119,7 +1119,7 @@
 
 # MSG_CHEAT_MENU_6
 #Enable HOME: %s
-!Enable "HOME"   : %s
+!Enable "HOME"    : %s
 
 # MSG_CHEAT_MENU_HELP_6
 #Enable HOME

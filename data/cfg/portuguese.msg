@@ -36,11 +36,11 @@
 
 # MSG_MAIN_MENU_1
 #Load state from slot: %d
-!Carregar jogo salvo na entrada : %d
+!Carregar jogo salvo na entrada  $$: %d
 
 # MSG_MAIN_MENU_2
 #Save state to slot: %d
-!Salvar jogo na entrada            $$: %d
+!Salvar jogo na entrada              : %d
 
 # MSG_MAIN_MENU_3
 #Savestate options
@@ -157,39 +157,39 @@
 
 # MSG_SCALE
 #Display scaling: %s
-!Exibição de escala  $$$: %s
+!Exibição de escala   : %s
 
 # MSG_FILTER
 #Screen filtering: %s
-!Filtragem de tela   $$: %s
+!Filtragem de tela    $$: %s
 
 # MSG_RATIO
 #TV output ratio: %s
-!Tipo de tela da TV   $: %s
+!Tipo de tela da TV   $$: %s
 
 # MSG_INTERLACE
 #TV output interlace: %s
-!Modo de video da TV : %s
+!Modo de video da TV $$: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type: %s
-!Tipo frameskip     $$: %s
+!Tipo frameskip       $: %s
 
 # MSG_SKIP_VALUE
 #Frameskip value: %d
-!Valor skip quadro $$$: %d
+!Valor skip quadro   $: %d
 
 # MSG_SKIP_RANDOM
 #Framskip variation: %s
-!Variação Framskip : %s
+!Variação Framskip  $$$: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
-!Saida de audio   : %s
+!Saida de audio   $$: %s
 
 # MSG_AUDIO_BUFFER
 #Audio buffer: %s
-!Buffer de áudio : %s
+!Buffer de áudio $$: %s
 
 # MSG_SCREEN_SHOT
 #Screen shot
@@ -330,7 +330,7 @@
 # MSG_STATE_MENU_DATE_NONE_2
 # for PSP_SYSTEMPARAM_DATE_FORMAT_DDMMYYYY
 #--.--.----  ----------  --:--:--          
-!--.--.----  ----------  --:--:--          
+!--.--.----$$----------  --:--:--          
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot
@@ -354,7 +354,7 @@
 
 # MSG_STATE_MENU_3
 #Current savestate slot: %d
-!Ranhura atual : %d
+!Ranhura atual   : %d
 
 # MSG_STATE_MENU_4
 #Back
@@ -397,15 +397,15 @@
 
 # MSG_PAD_MENU_0
 #D-pad up: %s
-!D-pad cima       $: %s
+!D-pad cima        $: %s
 
 # MSG_PAD_MENU_1
 #D-pad down: %s
-!D-pad baixo      $$: %s
+!D-pad baixo      $$$: %s
 
 # MSG_PAD_MENU_2
 #D-pad left: %s
-!D-pad esquerda : %s
+!D-pad esquerda $$$: %s
 
 # MSG_PAD_MENU_3
 #D-pad right: %s
@@ -413,27 +413,27 @@
 
 # MSG_PAD_MENU_4
 #Cross: %s
-!Cruz               $$$: %s
+!Cruz                $: %s
 
 # MSG_PAD_MENU_5
 #Circle: %s
-!Circulo            $: %s
+!Circulo            $$$: %s
 
 # MSG_PAD_MENU_6
 #Square: %s
-!Quadrado         $$$: %s
+!Quadrado          $: %s
 
 # MSG_PAD_MENU_7
 #Triangle: %s
-!Triangulo        $$$: %s
+!Triangulo         $$$: %s
 
 # MSG_PAD_MENU_8
 #Left Trigger: %s
-!L-Trigger         $$: %s
+!L-Trigger         $: %s
 
 # MSG_PAD_MENU_9
 #Right Trigger: %s
-!R-Trigger         $$: %s
+!R-Trigger         $: %s
 
 # MSG_PAD_MENU_10
 #Start: %s
@@ -445,7 +445,7 @@
 
 # MSG_PAD_MENU_12
 #Use default map: %s
-!Padrao de layout : %s
+!Padrao de layout  : %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -663,31 +663,31 @@
 
 # MSG_A_PAD_MENU_0
 #Analog up: %s
-!Analógico para cima       $: %s
+!Analógico para cima         : %s
 
 # MSG_A_PAD_MENU_1
 #Analog down: %s
-!Analógico para baixo      $$: %s
+!Analógico para baixo       $$: %s
 
 # MSG_A_PAD_MENU_2
 #Analog left: %s
-!Analógico para esquerda : %s
+!Analógico para esquerda  $$: %s
 
 # MSG_A_PAD_MENU_3
 #Analog right: %s
-!Analógico para direita    $: %s
+!Analógico para direita     : %s
 
 # MSG_A_PAD_MENU_4
 #Enable analog: %s
-!Habilitar analógico           : %s
+!Habilitar analógico           $$: %s
 
 # MSG_A_PAD_MENU_5
 #Analog sensitivity: %d
-!Sensibilidade do analógico : %d
+!Sensibilidade do analógico  : %d
 
 # MSG_A_PAD_MENU_6
 #Tilt sensor : %s
-!Sensor de inclinação        : %s
+!Sensor de inclinação         $$: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -733,7 +733,7 @@
 
 # MSG_CHEAT_MENU_3
 #Update backup: %s
-!Salvar atualização    : %s
+!Salvar atualização     : %s
 
 # MSG_CHEAT_MENU_4
 #Back
@@ -776,27 +776,27 @@
 
 # MSG_MISC_MENU_0
 #Emulate Core : %s
-!Emulate Core : %s
+!Emulate Core  $$: %s
 
 # MSG_MISC_MENU_1
 #Debug mode : %s
-!Debug mode : %s
+!Debug mode  $$: %s
 
 # MSG_MISC_MENU_2
 #Language : %s
-!Língua : %s
+!Língua  : %s
 
 # MSG_MISC_MENU_3
 #Fake Fat : %s
-!Falsificação Fat       $$$: %s
+!Falsificação Fat       $$: %s
 
 # MSG_MISC_MENU_4
 #Boot Mode : %s
-!Modo de inicialização : %s
+!Modo de inicialização $$: %s
 
 # MSG_MISC_MENU_5
 #Brightness : %d
-!Brilho : %d
+!Brilho $$: %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -1119,7 +1119,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Pagina do cheat : %d
+!Pagina do cheat  : %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page
@@ -1128,7 +1128,7 @@
 
 # MSG_CHEAT_MENU_6
 #Enable HOME: %s
-!Habilitar "HOME"        $$: %s
+!Habilitar "HOME"         : %s
 
 # MSG_CHEAT_MENU_HELP_6
 #Enable HOME
