@@ -1,25 +1,24 @@
-# -x assembler-with-cpp
-# gpSP makefile
-
-# Global definitions
+# Build settings for gpSP kai, included by eboot/Makefile.
 
 VERSION_MAJOR = 3
 VERSION_MINOR = 4
 VERSION_BUILD = 4
 
-# コンパイル条件の設定
-# バージョン表記にtestとBUILD番号を含めるかどうかの設定
+# 1: show "test" and the build number in the version string and title
 TEST_MODE = 1
 
+# 1: enable debug logging and the Debug mode menu option
 USE_DEBUG = 0
 
-# WLANのON/OFF
+# 1: build the ad-hoc WLAN (link cable) code
 USE_ADHOC = 0
 
-#強制的に追加された32MBのメモリを使用する
+# 1: set MEMSIZE=1 so PSP-2000 and later can use the extra 32 MB of memory.
+# 0: use takka's old USE_EXT_MEM code, which accesses that memory directly.
 PSP_LARGE_MEMORY = 1
 
-#CPUコアのARMエミュレータを使用する
+# 1: also build the C interpreter ARM core, selectable as "Emulate Core" in
+# the menu (the MIPS dynarec stays the default)
 USE_C_CORE = 0
 
 # Text appended to the XMB title, to tell this build apart from the
