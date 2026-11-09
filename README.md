@@ -31,8 +31,11 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
 - Version 3.4 test 4 build 230, built like the release: `USE_DEBUG` off (this
   hides the Debug mode option) and `PSP_LARGE_MEMORY` on (`MEMSIZE=1`).
 - **Update backup** now defaults to **Automatic**; it is still set per game.
-- New configs start in **fullscreen** with **analog input off**, as in b225 and
-  b230. Turn analog on in Configure analog.
+- New configs start with **analog input off**, as in b225 and b230. Turn
+  analog on in Configure analog.
+- New configs start in **scaled 3:2**, the GBA's own aspect ratio, as in
+  takka's source. b225 and b230 default to fullscreen 16:9, which stretches
+  the picture; it is still available in Graphics and Sound options.
 - The pad config menu lists Cross before Circle, as in b225, with the button
   tables swapped to match. The default mapping is unchanged: Circle = GBA A,
   Cross = GBA B, and the analog nub mapped separately from the D-pad, as in
