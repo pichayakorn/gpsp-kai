@@ -243,7 +243,8 @@
 // Audio buffer option n (0-10) holds the emulator back once more than
 // SAMPLE_SIZE * (5 + n) entries are queued, i.e. 1024 * (5 + n) bytes or
 // 29-87 ms at 44.1 kHz. pause_sound() re-reads it when leaving the menu.
-// The MSG_SB_* names are the old wrong sizes; the English labels are right.
+// The MSG_SB_* names are the old wrong byte sizes; the English labels
+// show the delay in ms instead.
 #define SET_AUDIO_BUFFER_SIZE()                                               \
     audio_buffer_size = SAMPLE_SIZE * (5 + g_game_config.audio_buffer_size_number) \
 

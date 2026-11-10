@@ -265,14 +265,14 @@
 !significant change in performance.
 
 # MSG_G_S_MENU_HELP_6
-#Set the size (in bytes) of the audio buffer. Larger values may reduce\n
-#crackling at the cost of latency; the lowest value will give the\n
-#most responsive audio.\n
+#Sound delay buffer. Higher values reduce crackling but add sound\n
+#delay; lower values keep the sound closer to the picture.\n
+#The default (41 ms) suits most games.\n
 #Takes effect when you return to the game.
 !\n
-!Set the size (in bytes) of the audio buffer. Larger values may reduce\n
-!crackling at the cost of latency; the lowest value will give the\n
-!most responsive audio.\n
+!Sound delay buffer. Higher values reduce crackling but add sound\n
+!delay; lower values keep the sound closer to the picture.\n
+!The default (41 ms) suits most games.\n
 !Takes effect when you return to the game.
 
 # MSG_G_S_MENU_HELP_7
@@ -915,48 +915,48 @@
 !random
 
 # MSG_SB_2048
-#5120 bytes
-!5120 bytes
+#29 ms
+!29 ms
 
 # MSG_SB_3072
-#6144 bytes
-!6144 bytes
+#35 ms
+!35 ms
 
 # MSG_SB_4096
-#7168 bytes
-!7168 bytes
+#41 ms
+!41 ms
 
 # MSG_SB_5120
-#8192 bytes
-!8192 bytes
+#46 ms
+!46 ms
 
 # MSG_SB_6144
-#9216 bytes
-!9216 bytes
+#52 ms
+!52 ms
 
 # MSG_SB_7168
-#10240 bytes
-!10240 bytes
+#58 ms
+!58 ms
 
 # MSG_SB_8192
-#11264 bytes
-!11264 bytes
+#64 ms
+!64 ms
 
 # MSG_SB_9216
-#12288 bytes
-!12288 bytes
+#70 ms
+!70 ms
 
 # MSG_SB_10240
-#13312 bytes
-!13312 bytes
+#75 ms
+!75 ms
 
 # MSG_SB_11264
-#14336 bytes
-!14336 bytes
+#81 ms
+!81 ms
 
 # MSG_SB_12288
-#15360 bytes
-!15360 bytes
+#87 ms
+!87 ms
 
 # MSG_BK_EXITONLY
 #Exit only
