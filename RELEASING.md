@@ -62,18 +62,15 @@ make release   # checks messages, builds, writes out/gpSP-kai-<version>.zip
 
 ## First release (3.5.0)
 
-The first release is tagged by hand when the repository is first pushed:
+The first release was tagged by hand. GitHub only runs workflows once the
+repository has a default branch, so `main` is pushed before the tag:
 
 ```sh
-git tag -a v3.5.0 -m "gpSP kai 3.5.0"
-git push origin v3.5.0     # 1. the tag first
-# 2. wait until the Release workflow has finished (Actions tab)
-git push -u origin main    # 3. then main
+git push -u origin main    # 1. creates the default branch and the workflows
+git push origin v3.5.0     # 2. the tag: the Release workflow builds 3.5.0
 ```
 
-Pushing the tag runs the Release workflow, which creates the 3.5.0 release
-and attaches the zip. Push `main` only after that: the release bot then knows
-3.5.0 is the last release and starts its changelog from there (pushed the
-other way round, it would treat the whole history as unreleased). Finally,
-edit the 3.5.0 release on GitHub and paste the 3.5.0 section of CHANGELOG.md
-as its description.
+`release-please-config.json` sets `bootstrap-sha` to the v3.5.0 commit, so
+the release bot only looks at commits after 3.5.0 and never treats the older
+history as unreleased. Finally, edit the 3.5.0 release on GitHub and paste
+the 3.5.0 section of CHANGELOG.md as its description.
