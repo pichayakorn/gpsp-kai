@@ -32,6 +32,7 @@ GPSP_VERSION    := $(strip $(shell cat ../version.txt))
 GPSP_VER_WORDS  := $(subst ., ,$(GPSP_VERSION))
 GPSP_VER_MAJOR  := $(word 1,$(GPSP_VER_WORDS))
 GPSP_VER_MINOR  := $(word 2,$(GPSP_VER_WORDS))
+GPSP_VER_PATCH  := $(word 3,$(GPSP_VER_WORDS))
 GIT_RELEASE_TAG := $(shell git describe --tags --exact-match --match 'v$(GPSP_VERSION)' 2>/dev/null)
 GIT_COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null)
 ifeq ($(GIT_RELEASE_TAG)$(GIT_COMMIT),$(GIT_COMMIT))
@@ -42,9 +43,18 @@ endif
 GPSP_VERSION_STRING ?= $(GPSP_VERSION)
 
 PSP_EBOOT_TITLE = UO gpSP kai $(GPSP_VERSION_STRING)
-# PARAM.SFO version shown in the XMB information (at most 8 characters,
-# so the plain version without the -dev suffix)
-SFOFLAGS        = -s DISC_VERSION=$(GPSP_VERSION)
+# The XMB information screen shows APP_VER, and only in Sony's XX.YY
+# format: 3.5.1 is written as 03.51 and shown as 3.51. Minor and patch get
+# one digit each, so stop the build rather than write an ambiguous value.
+ifneq ($(words $(GPSP_VER_WORDS)),3)
+  $(error version.txt must be MAJOR.MINOR.PATCH, got "$(GPSP_VERSION)")
+endif
+ifneq ($(filter-out 0 1 2 3 4 5 6 7 8 9,$(GPSP_VER_MINOR) $(GPSP_VER_PATCH)),)
+  $(error minor and patch must be 0-9 for the XMB APP_VER, got "$(GPSP_VERSION)")
+endif
+GPSP_APP_VER    := $(shell printf '%02d' $(GPSP_VER_MAJOR)).$(GPSP_VER_MINOR)$(GPSP_VER_PATCH)
+# DISC_VERSION is not shown by the XMB; it keeps the full version for tools.
+SFOFLAGS        = -s APP_VER=$(GPSP_APP_VER) -s DISC_VERSION=$(GPSP_VERSION)
 
 VPATH           += ..
 CFLAGS          += -O3 -DPSP_BUILD -G0 -funsigned-char
