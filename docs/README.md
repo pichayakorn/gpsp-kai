@@ -1,7 +1,8 @@
 # Documentation
 
-Building, installing and the changes made in this repository are described in
-the [main README](../README.md). The files here are the original
+Building and installing are described in the [main README](../README.md).
+[changes-from-takka.md](changes-from-takka.md) lists what this continuation
+changed in takka's source. The other files here are the original
 documentation. Most are takka's Japanese notes, kept for reference; some
 details describe older versions.
 
