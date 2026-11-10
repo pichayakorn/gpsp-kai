@@ -68,13 +68,7 @@ void add_cheats(char *cheats_filename)
 
   g_cheats_num = 0;
 
-  if (g_default_cheat_dir != NULL) {
-    path_printf(cheat_path, sizeof(cheat_path), "%s/%s", g_default_cheat_dir, cheats_filename);
-  }
-  else
-  {
-    strcpy(cheat_path, cheats_filename);
-  }
+  path_printf(cheat_path, sizeof(cheat_path), "%s/%s", g_default_cheat_dir, cheats_filename);
 
   cheats_file = fopen(cheat_path, "rb");
 
