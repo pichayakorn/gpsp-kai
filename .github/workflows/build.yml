@@ -5,7 +5,7 @@ name: Build
 
 on:
   push:
-    branches: ['**']
+    branches: [main]   # other branches are built through their pull request
   pull_request:
   workflow_call:
     inputs:
@@ -42,7 +42,7 @@ jobs:
             -x 'usr/local/pspdev/psp/sdk/include/systemctrl_adrenaline.h'
 
       - name: Check messages, build and package
-        run: make release
+        run: make -j"$(nproc)" release
 
       - uses: actions/upload-artifact@v7
         with:

@@ -99,6 +99,9 @@ make check      # checks the message files in data/cfg against the code
 make release    # check + package + out/gpSP-kai-<version>.zip
 ```
 
+Add `-j4` (or your number of CPU cores) to build in parallel, e.g.
+`make -j4 release`.
+
 On GitHub, every push is built by the Build workflow, which also offers the
 PSP folder as a download; see [RELEASING.md](RELEASING.md).
 
