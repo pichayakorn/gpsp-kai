@@ -42,6 +42,9 @@ endif
 GPSP_VERSION_STRING ?= $(GPSP_VERSION)
 
 PSP_EBOOT_TITLE = UO gpSP kai $(GPSP_VERSION_STRING)
+# PARAM.SFO version shown in the XMB information (at most 8 characters,
+# so the plain version without the -dev suffix)
+SFOFLAGS        = -s DISC_VERSION=$(GPSP_VERSION)
 
 VPATH           += ..
 CFLAGS          += -O3 -DPSP_BUILD -G0 -funsigned-char
