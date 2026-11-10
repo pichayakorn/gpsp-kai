@@ -12,9 +12,10 @@ The b225 changes follow ErikPshat's published source, archived in
 (branch `erikpshat-mod`). No b230 source is known, so the b230 changes were
 reconstructed from the release binary.
 
-The PSP game list shows it as **UO gpSP kai 3.4 test 4 Build 230 (src)**. The
-`(src)` suffix tells it apart from the official binary release; see
-[Building](#building).
+This continuation has its own version numbers, starting at **3.5.0**; the
+PSP game list shows **UO gpSP kai 3.5.0**. See [CHANGELOG.md](CHANGELOG.md)
+for the changes in each release and [RELEASING.md](RELEASING.md) for how
+development and releases work.
 
 ## Status
 
@@ -76,9 +77,9 @@ Custom firmware is required; the EBOOT is not signed for official firmware.
   a GCC 15 build turned the PSP off when the in-game menu opened.
 - `EBOOT.PBP` and the PRX modules now go to `out/` instead of overwriting
   committed binaries. The PRX builds still regenerate the `src/homehook.S` and
-  `src/SystemButtons.*` stubs, normally with the same content. The perl build
-  counter is replaced by `make bump_build`, which you run on purpose.
-- The game list title can carry a suffix (`TITLE_SUFFIX`, default `(src)`).
+  `src/SystemButtons.*` stubs, normally with the same content.
+- The version comes from `version.txt` (semantic versioning, starting at
+  3.5.0) and replaces takka's build counter.
 
 ## Building
 
@@ -94,22 +95,27 @@ Unzip psp-cfw-sdk over the toolchain; its paths start at `usr/local/pspdev/`.
 export PSPDEV=/path/to/pspdev
 export PATH="$PSPDEV/bin:$PATH"
 make            # builds the three PRX modules and the EBOOT into out/
+make check      # checks the message files in data/cfg against the code
+make release    # check + package + out/gpSP-kai-<version>.zip
 ```
+
+On GitHub, every push is built by the Build workflow, which also offers the
+PSP folder as a download; see [RELEASING.md](RELEASING.md).
 
 Instead of a local toolchain, the `pspdev/pspdev` Docker image works too, with
 psp-cfw-sdk unzipped into the container.
 
 Options are in `Makefile.set`:
-- `VERSION_*`, `TEST_MODE`, `USE_DEBUG`, `USE_ADHOC`, `USE_C_CORE`
+- `USE_DEBUG`, `USE_ADHOC`, `USE_C_CORE`
 - `PSP_LARGE_MEMORY`:
   - `1` (default) makes pspsdk set `MEMSIZE=1` in PARAM.SFO, so the extra
     memory of the PSP-2000 and later can be used;
   - `0` instead builds takka's old `USE_EXT_MEM` code, which reaches the extra
     memory directly.
-- `TITLE_SUFFIX`: text appended to the game list title; leave it empty for the
-  plain release title.
 
-`make bump_build` increases `BUILD_COUNT` in `build_count.inc`.
+The version number is in `version.txt`. A build of the commit tagged
+`v<version>` shows that version on the XMB; any other build adds
+`-dev+<commit>`, so test builds are easy to tell apart.
 
 ## Installing
 

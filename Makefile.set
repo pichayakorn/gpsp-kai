@@ -1,11 +1,5 @@
 # Build settings for gpSP kai, included by eboot/Makefile.
-
-VERSION_MAJOR = 3
-VERSION_MINOR = 4
-VERSION_BUILD = 4
-
-# 1: show "test" and the build number in the version string and title
-TEST_MODE = 1
+# The version number is in version.txt (updated by the release workflow).
 
 # 1: enable debug logging and the Debug mode menu option
 USE_DEBUG = 0
@@ -20,7 +14,3 @@ PSP_LARGE_MEMORY = 1
 # 1: also build the C interpreter ARM core, selectable as "Emulate Core" in
 # the menu (the MIPS dynarec stays the default)
 USE_C_CORE = 0
-
-# Text appended to the XMB title, to tell this build apart from the
-# official release. Leave empty for the plain release title.
-TITLE_SUFFIX = (src)

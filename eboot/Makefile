@@ -5,7 +5,6 @@
 # Global definitions
 
 include ../Makefile.set
-include ../build_count.inc
 
 PSPSDK          = ${shell psp-config --pspsdk-path}
 PREFIX          = ${shell psp-config --psp-prefix}
@@ -27,13 +26,25 @@ TARGET          = UO_gpSP_kai
 PSP_FW_VERSION=300
 VERSION_MODE = user
 
-ifeq ($(TEST_MODE), 1)
-VERSION_RELEASE = test
+# Version from version.txt. A build of the commit tagged v<version> is a
+# release; any other build gets "-dev+<commit>" so it can be told apart.
+GPSP_VERSION    := $(strip $(shell cat ../version.txt))
+GPSP_VER_WORDS  := $(subst ., ,$(GPSP_VERSION))
+GPSP_VER_MAJOR  := $(word 1,$(GPSP_VER_WORDS))
+GPSP_VER_MINOR  := $(word 2,$(GPSP_VER_WORDS))
+GIT_RELEASE_TAG := $(shell git describe --tags --exact-match --match 'v$(GPSP_VERSION)' 2>/dev/null)
+GIT_COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null)
+ifeq ($(GIT_RELEASE_TAG)$(GIT_COMMIT),$(GIT_COMMIT))
+  ifneq ($(GIT_COMMIT),)
+    GPSP_VERSION_STRING := $(GPSP_VERSION)-dev+$(GIT_COMMIT)
+  endif
 endif
+GPSP_VERSION_STRING ?= $(GPSP_VERSION)
 
-VERSION_OPT = ${VERSION_RELEASE} ${VERSION_BUILD}
-
-PSP_EBOOT_TITLE = UO gpSP kai ${VERSION_MAJOR}.${VERSION_MINOR} ${VERSION_OPT} Build ${BUILD_COUNT}$(if $(TITLE_SUFFIX), $(TITLE_SUFFIX))
+PSP_EBOOT_TITLE = UO gpSP kai $(GPSP_VERSION_STRING)
+# PARAM.SFO version shown in the XMB information (at most 8 characters,
+# so the plain version without the -dev suffix)
+SFOFLAGS        = -s DISC_VERSION=$(GPSP_VERSION)
 
 VPATH           += ..
 CFLAGS          += -O3 -DPSP_BUILD -G0 -funsigned-char
@@ -42,14 +53,9 @@ CFLAGS          += -Wall
 #CFLAGS          += -Wshadow -Wbad-function-cast -Wconversion -Wstrict-prototypes -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes -Wnested-externs -Wredundant-decls 
 CFLAGS          +=  -funsigned-char -ffast-math -fmerge-all-constants -funsafe-loop-optimizations
 
-CFLAGS          += -DVERSION_MAJOR=${VERSION_MAJOR}
-CFLAGS          += -DVERSION_MINOR=${VERSION_MINOR}
-CFLAGS          += -DVERSION_BUILD=${VERSION_BUILD}
-CFLAGS          += -DBUILD_COUNT=${BUILD_COUNT}
-
-ifeq ($(TEST_MODE), 1)
-CFLAGS          += -DTEST_MODE
-endif
+CFLAGS          += -DVERSION_MAJOR=$(GPSP_VER_MAJOR)
+CFLAGS          += -DVERSION_MINOR=$(GPSP_VER_MINOR)
+CFLAGS          += -DVERSION_STRING='"$(GPSP_VERSION_STRING)"'
 
 ifeq ($(USE_DEBUG), 1)
 CFLAGS          += -DUSE_DEBUG

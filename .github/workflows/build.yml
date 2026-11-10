@@ -1,0 +1,57 @@
+# Builds gpSP kai on every push and pull request, checks the message files
+# and offers the ready-to-copy PSP folder as a downloadable artifact.
+# The release workflow also calls it to attach the zip to a GitHub release.
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: Tag of the GitHub release to attach the zip to
+        type: string
+        default: ''
+
+permissions:
+  contents: write   # only used to attach the zip to a release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: pspdev/pspdev:latest
+    steps:
+      - name: Install build tools
+        run: apk add --no-cache zip python3 curl
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # tags are needed to tell release builds from dev builds
+          ref: ${{ inputs.release-tag || github.ref }}
+
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install psp-cfw-sdk (kubridge, systemctrl)
+        run: |
+          curl -sSL -o /tmp/psp-cfw-sdk.zip \
+            https://github.com/pspdev/psp-cfw-sdk/releases/download/latest/psp-cfw-sdk.zip
+          # systemctrl_adrenaline.h is a symlink in the image; keep it.
+          unzip -qo /tmp/psp-cfw-sdk.zip -d / \
+            -x 'usr/local/pspdev/psp/sdk/include/systemctrl_adrenaline.h'
+
+      - name: Check messages, build and package
+        run: make release
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gpSP-kai-${{ inputs.release-tag || github.sha }}
+          path: out/gpSP
+
+      - name: Attach the zip to the release
+        if: inputs.release-tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.release-tag }}
+          files: out/gpSP-kai-*.zip
