@@ -4,9 +4,9 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "package-name": "gpSP kai",
       "changelog-path": "CHANGELOG.md",
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "include-component-in-tag": false
     }
   }
 }
