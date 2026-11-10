@@ -55,7 +55,7 @@ s32 load_file_zip(char *filename)
   u8 *cbuffer;
   char *ext;
   FILE_ID fd;
-  FILE_ID tmp_fd;
+  FILE_ID tmp_fd = -1;
   u32 zip_buffer_size;
   u32 write_tmp_flag = NO;
   u32 use_vram;
