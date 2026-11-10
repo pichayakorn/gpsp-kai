@@ -244,9 +244,9 @@ void scrollbar(u32 sx, u32 sy, u32 ex, u32 ey, u32 all,u32 view,u32 now)
   else
     scrollbar_ey = len + sy + 1;
 
-    box(sx, sy, ex, ey, COLOR_BLACK);
-    boxfill(sx + 1, sy + 1, ex - 1, ey - 1, SCROLLBAR_COLOR1);
-    boxfill(sx + 1, scrollbar_sy, ex - 1, scrollbar_ey, SCROLLBAR_COLOR2);
+  box(sx, sy, ex, ey, COLOR_BLACK);
+  boxfill(sx + 1, sy + 1, ex - 1, ey - 1, SCROLLBAR_COLOR1);
+  boxfill(sx + 1, scrollbar_sy, ex - 1, scrollbar_ey, SCROLLBAR_COLOR2);
 }
 
 /*------------------------------------------------------
