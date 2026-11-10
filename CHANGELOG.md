@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.5.1](https://github.com/pichayakorn/gpsp-kai/compare/v3.5.0...v3.5.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* build file paths with a bounded helper instead of sprintf ([#21](https://github.com/pichayakorn/gpsp-kai/issues/21)) ([f41373c](https://github.com/pichayakorn/gpsp-kai/commit/f41373cc97428a2b65746894b2d965be1a9524f7)), closes [#3](https://github.com/pichayakorn/gpsp-kai/issues/3)
+* **build:** rebuild all objects when version.txt or Makefile.set change ([9e79cde](https://github.com/pichayakorn/gpsp-kai/commit/9e79cde074d4e66befafbefeed7b41e652c72776)), closes [#1](https://github.com/pichayakorn/gpsp-kai/issues/1)
+* **ui:** show the audio buffer as sound delay ([#24](https://github.com/pichayakorn/gpsp-kai/issues/24)) ([75d08b6](https://github.com/pichayakorn/gpsp-kai/commit/75d08b6bfbc49fc49ee071c2a065ccab48718dba)), closes [#4](https://github.com/pichayakorn/gpsp-kai/issues/4)
+
+### Notes
+
+* Savestates are tied to the build that saved them. States from older builds (including b230) may load with wrong sound; when updating, make an in-game save and create new states with this version.
+
 ## 3.5.0 (2026-11-10)
 
 First release of this continuation. It brings takka's gpSP kai source
