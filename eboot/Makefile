@@ -130,6 +130,10 @@ ifdef USE_ADHOC
 adhoc.o					: ${COMMON_FILE} ${SRC_DIR}adhoc.c ${SRC_DIR}adhoc.h
 endif
 
+# version.txt and Makefile.set set compiler flags for every object (version
+# numbers, USE_* options), so a change to either must recompile everything.
+$(OBJS): ../version.txt ../Makefile.set
+
 %.o: ../src/%.c
 	@echo Compiling $<...
 	@$(CC) $(CDEFS) $(CFLAGS) -c $< -o$@
