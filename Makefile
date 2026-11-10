@@ -31,10 +31,12 @@ package: all
 clean: systembuttons_prx_clean  dvemgr_clean homehookprx_clean main_clean
 
 dvemgr:
-	make -C ./prx/dvemgr/
+	$(MAKE) -C ./prx/dvemgr/
 
-main:
-	make -C ./eboot/
+# The PRX builds regenerate src/homehook.S and src/SystemButtons.*, which the
+# EBOOT build uses, so with make -j the EBOOT has to wait for them.
+main: systembuttons_prx homehookprx
+	$(MAKE) -C ./eboot/
 
 # Check the UI message files against the code (entry order, printf codes)
 check:
@@ -49,20 +51,20 @@ release: check package
 	@echo "Release zip: $(RELEASE_ZIP)"
 
 homehookprx:
-	make -C ./prx/homehookprx/
+	$(MAKE) -C ./prx/homehookprx/
 
 systembuttons_prx:
-	make -C ./prx/systembuttons_prx/
+	$(MAKE) -C ./prx/systembuttons_prx/
 
 dvemgr_clean:
-	make -C ./prx/dvemgr/ clean
+	$(MAKE) -C ./prx/dvemgr/ clean
 
 main_clean:
-	make -C ./eboot/ clean
+	$(MAKE) -C ./eboot/ clean
 
 homehookprx_clean:
-	make -C ./prx/homehookprx/ clean
+	$(MAKE) -C ./prx/homehookprx/ clean
 
 systembuttons_prx_clean:
-	make -C ./prx/systembuttons_prx/ clean
+	$(MAKE) -C ./prx/systembuttons_prx/ clean
 	
