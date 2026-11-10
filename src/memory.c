@@ -2257,7 +2257,7 @@ u32 load_backup(char *name)
   FILE_ID backup_file;
 
   if (g_default_save_dir[0] != '\0') {
-    sprintf(backup_path, "%s/%s", g_default_save_dir, name);
+    path_printf(backup_path, sizeof(backup_path), "%s/%s", g_default_save_dir, name);
   }
   else
   {
@@ -2452,7 +2452,7 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
   backup_type = BACKUP_NONE;
 
 
-  sprintf(config_path, "%s/%s", main_path, CONFIG_FILENAME);
+  path_printf(config_path, sizeof(config_path), "%s/%s", main_path, CONFIG_FILENAME);
 
   config_file = fopen(config_path, "rb");
 
@@ -2583,7 +2583,7 @@ s32 load_gamepak_raw(char *name)
       // Use the full path: the file list may have changed the current directory
       char temp_path[MAX_PATH];
       getcwd(temp_path, MAX_PATH);
-      sprintf(gamepak_filename_full_path, "%s/%s", temp_path, name);
+      path_printf(gamepak_filename_full_path, sizeof(gamepak_filename_full_path), "%s/%s", temp_path, name);
     }
 
     chdir(main_path);
@@ -3706,7 +3706,7 @@ u32 load_state(char *savestate_filename, u32 slot_num)
   if (slot_num != MEM_STATE_NUM)
   {
     if (g_default_save_dir[0] != '\0') {
-      sprintf(savestate_path, "%s/%s", g_default_save_dir, savestate_filename);
+      path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, savestate_filename);
     }
     else
     {
@@ -3832,7 +3832,7 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
     return 0;
 
   if (g_default_save_dir[0] != '\0') {
-    sprintf(savestate_path, "%s/%s", g_default_save_dir, savestate_filename);
+    path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, savestate_filename);
   }
   else
   {

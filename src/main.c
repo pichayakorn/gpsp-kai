@@ -20,6 +20,7 @@
  */
 
 #include "common.h"
+#include <stdarg.h>
 
 PSP_MODULE_INFO("gpSP", PSP_MODULE_USER, VERSION_MAJOR, VERSION_MINOR);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU);
@@ -803,6 +804,21 @@ u32 file_length(const char *filename)
   SceIoStat stats;
   sceIoGetstat(filename, &stats);
   return stats.st_size;
+}
+
+// snprintf for building file paths: the result always fits and is
+// NUL-terminated. Returns 0, or -1 if the path was too long and was cut
+// short (opening it will then fail instead of overrunning the buffer).
+int path_printf(char *dst, size_t size, const char *fmt, ...)
+{
+  va_list ap;
+  int len;
+
+  va_start(ap, fmt);
+  len = vsnprintf(dst, size, fmt, ap);
+  va_end(ap);
+
+  return (len < 0 || (size_t)len >= size) ? -1 : 0;
 }
 
 void change_ext(char *src, char *buffer, char *extension)

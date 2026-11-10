@@ -789,7 +789,7 @@ void load_game_config_file(void)
   change_ext(gamepak_filename, game_config_filename, ".cfg");
 
   if (g_default_cfg_dir != NULL)
-    sprintf(game_config_path, "%s/%s", g_default_cfg_dir, game_config_filename);
+    path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
   else
     strcpy(game_config_path, game_config_filename);
 
@@ -826,7 +826,7 @@ s32 load_config_file()
   u32 header, ver;
 
   init_gpsp_config();
-  sprintf(gpsp_config_path, "%s/%s", main_path, GPSP_CONFIG_FILENAME);
+  path_printf(gpsp_config_path, sizeof(gpsp_config_path), "%s/%s", main_path, GPSP_CONFIG_FILENAME);
 
   FILE_OPEN(gpsp_config_file, gpsp_config_path, READ);
 
@@ -1652,7 +1652,7 @@ u32 load_dircfg(char *file_name)  // TODO: rewrite more cleanly
   FILE *msg_file;
   char msg_path[MAX_PATH];
 
-  sprintf(msg_path, "%s/%s", main_path, file_name);
+  path_printf(msg_path, sizeof(msg_path), "%s/%s", main_path, file_name);
 
   msg_file = fopen(msg_path, "r");
 
@@ -1767,7 +1767,7 @@ u32 load_fontcfg(char *file_name)  // TODO: rewrite more cleanly
   FILE *msg_file;
   char msg_path[MAX_PATH];
 
-  sprintf(msg_path, "%s/%s", main_path, file_name);
+  path_printf(msg_path, sizeof(msg_path), "%s/%s", main_path, file_name);
 
   m_font[0] = '\0';
   s_font[0] = '\0';
@@ -1816,7 +1816,7 @@ u32 load_msgcfg(char *file_name)
   char msg_path[MAX_PATH];
   u32 offset;
 
-  sprintf(msg_path, "%s/%s", main_path, file_name);
+  path_printf(msg_path, sizeof(msg_path), "%s/%s", main_path, file_name);
 
   msg_file = fopen(msg_path, "rb");
 
@@ -1888,7 +1888,7 @@ s32 save_game_config_file()
   change_ext(gamepak_filename, game_config_filename, ".cfg");
 
   if (g_default_cfg_dir != NULL)
-    sprintf(game_config_path, "%s/%s", g_default_cfg_dir, game_config_filename);
+    path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
   else
     strcpy(game_config_path, game_config_filename);
 
@@ -1916,7 +1916,7 @@ s32 save_config_file()
   char gpsp_config_path[MAX_PATH];
   FILE_ID gpsp_config_file;
 
-  sprintf(gpsp_config_path, "%s/%s", main_path, GPSP_CONFIG_FILENAME);
+  path_printf(gpsp_config_path, sizeof(gpsp_config_path), "%s/%s", main_path, GPSP_CONFIG_FILENAME);
 
   save_game_config_file();
 
@@ -1950,7 +1950,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     static u32 valid_flag;
 
     if (g_default_save_dir != NULL) {
-      sprintf(savestate_path, "%s/%s", g_default_save_dir, savestate_filename);
+      path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, savestate_filename);
     }
     else
       {
@@ -2092,7 +2092,7 @@ static void print_status(u32 mode)
 
   if (mode == 0)
   {
-    strncpy(print_buffer_1, gamepak_filename, 80);
+    snprintf(print_buffer_1, sizeof(print_buffer_1), "%.80s", gamepak_filename);  /* show at most 80 characters */
     PRINT_STRING_BG_SJIS(utf8, print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 20);
     sprintf(print_buffer_1, "%s  %s  %s  %0X", gamepak_title, gamepak_code, gamepak_maker, (unsigned int)gamepak_crc32);
     PRINT_STRING_BG(print_buffer_1, COLOR_ROM_INFO, COLOR_BG, 10, 10);
@@ -2156,7 +2156,7 @@ static void save_ss_bmp(u16 *image)
     current_time.hour, current_time.minute, current_time.second, current_time.microsecond);
 
   if (g_default_ss_dir != NULL) {
-    sprintf(save_ss_path, "%s/%s%s.bmp", g_default_ss_dir, ss_filename, timestamp);
+    path_printf(save_ss_path, sizeof(save_ss_path), "%s/%s%s.bmp", g_default_ss_dir, ss_filename, timestamp);
   }
   else
   {
