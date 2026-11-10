@@ -42,8 +42,10 @@ endif
 GPSP_VERSION_STRING ?= $(GPSP_VERSION)
 
 PSP_EBOOT_TITLE = UO gpSP kai $(GPSP_VERSION_STRING)
-# PARAM.SFO version shown in the XMB information (at most 8 characters,
-# so the plain version without the -dev suffix)
+# The XMB information screen shows only APP_VER, in Sony's XX.YY format,
+# which cannot express MAJOR.MINOR.PATCH (3.5.1 would read as 3.51), so
+# APP_VER is left out and the XMB shows "-". DISC_VERSION is not shown by
+# the XMB; it keeps the full version for tools that read PARAM.SFO.
 SFOFLAGS        = -s DISC_VERSION=$(GPSP_VERSION)
 
 VPATH           += ..

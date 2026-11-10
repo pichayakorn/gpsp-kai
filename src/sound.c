@@ -21,7 +21,6 @@
 
 #include "common.h"
 
-// TODO: parameters need tuning (the sound buffer setting is currently ignored)
 #define SAMPLE_COUNT        PSP_AUDIO_SAMPLE_ALIGN(256)
 //#define SAMPLE_COUNT        256
 #define SAMPLE_SIZE         (SAMPLE_COUNT * 2)          // buffer entries per sample block (stereo)
@@ -241,6 +240,11 @@
 #define CHECK_BUFFER()                                                        \
   ((gbc_sound_buffer_index - sound_read_offset) % BUFFER_SIZE)                \
 
+// Audio buffer option n (0-10) holds the emulator back once more than
+// SAMPLE_SIZE * (5 + n) entries are queued, i.e. 1024 * (5 + n) bytes or
+// 29-87 ms at 44.1 kHz. pause_sound() re-reads it when leaving the menu.
+// The MSG_SB_* names are the old wrong byte sizes; the English labels
+// show the delay in ms instead.
 #define SET_AUDIO_BUFFER_SIZE()                                               \
     audio_buffer_size = SAMPLE_SIZE * (5 + g_game_config.audio_buffer_size_number) \
 
