@@ -719,12 +719,12 @@
 !Return to the main menu.
 
 # MSG_CHEAT_MENU_NON_LOAD
-#cheat %d (none loaded)
-!cheat %d (none loaded)
+#   %2d  (none loaded)
+!   %2d  (none loaded)
 
 # MSG_CHEAT_MENU_0
-#cheat %d (%s): %%s
-!cheat %d (%s): %%s
+#%%s %2d  %s
+!%%s %2d  %s
 
 # MSG_CHEAT_MENU_1
 #Load Cheat File
@@ -876,12 +876,12 @@
 !Yes - X / No - O
 
 # MSG_ENABLED
-#enabled
-!enabled
+#ON
+!ON
 
 # MSG_DISABLED
-#disabled
-!disabled
+#--
+!--
 
 # MSG_SCALE_UNSCALED
 #unscaled 3:2

@@ -92,7 +92,7 @@ game_config_t g_game_config;
   2,                                                                          \
   msg[MSG_CHEAT_MENU_HELP_0],                                                 \
   (number) % 10,                                                              \
-  STRING_SELECTION_TYPE                                                     \
+  STRING_SELECTION_TYPE | VERBATIM_TYPE                                       \
 }                                                                             \
 
 #define ACTION_OPTION(action_function, passive_function, display_string,      \
@@ -189,7 +189,10 @@ typedef enum
   NUMBER_SELECTION_TYPE = 0x01,
   STRING_SELECTION_TYPE = 0x02,
   SUBMENU_TYPE          = 0x04,
-  ACTION_TYPE           = 0x08
+  ACTION_TYPE           = 0x08,
+  // Drawn as is, without lining up a ':' with the other options. Cheat
+  // lines use it because a cheat name may contain ':'.
+  VERBATIM_TYPE         = 0x10
 } MENU_OPTION_TYPE_ENUM;
 
 struct _MENU_OPTION_TYPE
@@ -1529,7 +1532,8 @@ u32 menu(u16 *original_screen)
       int label_length;
 
       format_menu_option(display_option, line_buffer);
-      label_length = menu_label_length(line_buffer);
+      label_length = (display_option->option_type & VERBATIM_TYPE) ? -1 :
+       menu_label_length(line_buffer);
 
       if(label_length >= 0)
       {
@@ -1554,7 +1558,8 @@ u32 menu(u16 *original_screen)
       item_color = (display_option == current_option) ?
        COLOR_ACTIVE_ITEM : COLOR_INACTIVE_ITEM;
       item_y = (display_option->line_number * 10) + 40;
-      label_length = menu_label_length(line_buffer);
+      label_length = (display_option->option_type & VERBATIM_TYPE) ? -1 :
+       menu_label_length(line_buffer);
 
       if(label_length >= 0)
       {
