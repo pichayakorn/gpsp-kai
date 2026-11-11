@@ -55,7 +55,15 @@ export PATH="$PSPDEV/bin:$PATH"
 make            # builds the three PRX modules and the EBOOT into out/
 make check      # checks the message files in data/cfg against the code
 make release    # check + package + out/gpSP-kai-<version>.zip (dev builds: <version>-dev+<commit>)
+make testpkg    # check + package + out/test/gpSP-kai-<version>.zip for testing on a PSP
 ```
+
+`make testpkg` makes a zip that unzips to a folder named after the build,
+e.g. `gpSP-kai-3.5.1-dev+5b7190b/`, to paste into `PSP/GAME/` next to other
+builds. It adds your own test files from `testdata/` (git-ignored, never
+committed): `gba_bios.bin` next to the EBOOT, and the folders `ROM/`, `SAV/`,
+`CFG/`, `CHT/` and `SS/` into the build's `GBA/`. Each test build starts from
+the same clean saves.
 
 Add `-j4` (or your number of CPU cores) to build in parallel, e.g.
 `make -j4 release`.
