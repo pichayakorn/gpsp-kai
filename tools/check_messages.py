@@ -15,7 +15,11 @@ number of entries. Message strings are also used as printf formats, so a
 
   1. every .msg file has exactly one entry per name in src/message.h, and the
      "# MSG_..." label above each entry matches the name at that position;
-  2. the printf codes of each message fit the arguments the code passes.
+  2. the printf codes of each message fit the arguments the code passes;
+  3. no line is longer than the loader's line buffer (load_msgcfg reads
+     lines with fgets into 256 bytes, so a longer line is split and the
+     entries shift), and the file ends with a newline (the loader drops
+     a last line without one).
 
 Usage: tools/check_messages.py [REPO_ROOT]   (exit status 1 on problems)
 """
@@ -36,6 +40,9 @@ LABEL_ALIASES = {
     "MSG_LOAD_STATE_No": "MSG_LOAD_STATE_NUM",
     "MSG_SAVE_STATE_No": "MSG_SAVE_STATE_NUM",
 }
+
+# Size of the line buffer in load_msgcfg (src/gui.c).
+MAX_LINE_BYTES = 256
 
 # Argument types passed by code that formats messages directly
 # (src/gui.c get_timestamp_string, print_status, cheat menu; src/memory.c).
@@ -126,6 +133,16 @@ def main():
     files = sorted(glob.glob(os.path.join(root, "data", "cfg", "*.msg")))
     for path in files:
         lang = os.path.basename(path)
+        for number, line in enumerate(open(path, "rb").read().split(b"\n"), 1):
+            # fgets keeps the "\n" and needs a byte for the terminating NUL.
+            if len(line) + 1 > MAX_LINE_BYTES - 1:
+                print(f"{lang}:{number}: line is {len(line)} bytes, "
+                      f"the loader reads at most {MAX_LINE_BYTES - 2}")
+                problems += 1
+        if not open(path, "rb").read().endswith(b"\n"):
+            # parse_line ignores a line without "\n", so the last entry is lost.
+            print(f"{lang}: the file does not end with a newline")
+            problems += 1
         entries = read_messages(path)
         if len(entries) != len(names):
             print(f"{lang}: {len(entries)} entries, message.h has {len(names)}")

@@ -92,16 +92,28 @@
 !Select to set display, frameskip and sound options.
 
 # MSG_MAIN_MENU_HELP_1
-#Select to load the game state from the current slot for this game,\nif it exists (see the extended menu for more information)\nPress left + right to change the current slot.
-!Select to load the game state from the current slot for this game,\nif it exists (see the extended menu for more information)\nPress left + right to change the current slot.
+#Select to load the game state from the current slot for this game,\n
+#if it exists (see the extended menu for more information)\n
+#Press left + right to change the current slot.
+!Select to load the game state from the current slot for this game,\n
+!if it exists (see the extended menu for more information)\n
+!Press left + right to change the current slot.
 
 # MSG_MAIN_MENU_HELP_2
-#Select to save the game state to the current slot for this game.\nSee the extended menu for more information.\nPress left + right to change the current slot.
-!Select to save the game state to the current slot for this game.\nSee the extended menu for more information.\nPress left + right to change the current slot.
+#Select to save the game state to the current slot for this game.\n
+#See the extended menu for more information.\n
+#Press left + right to change the current slot.
+!Select to save the game state to the current slot for this game.\n
+!See the extended menu for more information.\n
+!Press left + right to change the current slot.
 
 # MSG_MAIN_MENU_HELP_3
-#Select to enter a menu for loading, saving, and viewing the\ncurrently active savestate for this game (or to load a savestate\nfile from another game)
-!Select to enter a menu for loading, saving, and viewing the\ncurrently active savestate for this game (or to load a savestate\nfile from another game)
+#Select to enter a menu for loading, saving, and viewing the\n
+#currently active savestate for this game (or to load a savestate\n
+#file from another game)
+!Select to enter a menu for loading, saving, and viewing the\n
+!currently active savestate for this game (or to load a savestate\n
+!file from another game)
 
 # MSG_MAIN_MENU_HELP_4
 #Select to change the in-game behavior of the PSP buttons and d-pad.
@@ -184,36 +196,78 @@
 !Back
 
 # MSG_G_S_MENU_HELP_0
-#Determines how the GBA screen is resized in relation to the entire\nscreen. Select unscaled 3:2 for GBA resolution, scaled 3:2 for GBA\naspect ratio scaled to fill the height of the PSP screen, and\nfullscreen to fill the entire PSP screen.
-!Determines how the GBA screen is resized in relation to the entire\nscreen. Select unscaled 3:2 for GBA resolution, scaled 3:2 for GBA\naspect ratio scaled to fill the height of the PSP screen, and\nfullscreen to fill the entire PSP screen.
+#Determines how the GBA screen is resized in relation to the entire\n
+#screen. Select unscaled 3:2 for GBA resolution, scaled 3:2 for GBA\n
+#aspect ratio scaled to fill the height of the PSP screen, and\n
+#fullscreen to fill the entire PSP screen.
+!Determines how the GBA screen is resized in relation to the entire\n
+!screen. Select unscaled 3:2 for GBA resolution, scaled 3:2 for GBA\n
+!aspect ratio scaled to fill the height of the PSP screen, and\n
+!fullscreen to fill the entire PSP screen.
 
 # MSG_G_S_MENU_HELP_1
-#Determines whether or not bilinear filtering should be used when\nscaling the screen. Selecting this will produce a more even and\nsmooth image, at the cost of being blurry and having less vibrant\ncolors.
-!Determines whether or not bilinear filtering should be used when\nscaling the screen. Selecting this will produce a more even and\nsmooth image, at the cost of being blurry and having less vibrant\ncolors.
+#Determines whether or not bilinear filtering should be used when\n
+#scaling the screen. Selecting this will produce a more even and\n
+#smooth image, at the cost of being blurry and having less vibrant\n
+#colors.
+!Determines whether or not bilinear filtering should be used when\n
+!scaling the screen. Selecting this will produce a more even and\n
+!smooth image, at the cost of being blurry and having less vibrant\n
+!colors.
 
 # MSG_G_S_MENU_HELP_2
-#Determines what kind of frameskipping should be employed.\nFrameskipping may improve emulation speed of many games.\nOff: Do not skip any frames.\nAuto: Skip up to N frames (see next option) as needed.\nManual: Always render only 1 out of N + 1 frames.
-!Determines what kind of frameskipping should be employed.\nFrameskipping may improve emulation speed of many games.\nOff: Do not skip any frames.\nAuto: Skip up to N frames (see next option) as needed.\nManual: Always render only 1 out of N + 1 frames.
+#Determines what kind of frameskipping should be employed.\n
+#Frameskipping may improve emulation speed of many games.\n
+#Off: Do not skip any frames.\n
+#Auto: Skip up to N frames (see next option) as needed.\n
+#Manual: Always render only 1 out of N + 1 frames.
+!Determines what kind of frameskipping should be employed.\n
+!Frameskipping may improve emulation speed of many games.\n
+!Off: Do not skip any frames.\n
+!Auto: Skip up to N frames (see next option) as needed.\n
+!Manual: Always render only 1 out of N + 1 frames.
 
 # MSG_G_S_MENU_HELP_3
-#For auto frameskip, determines the maximum number of frames that\nare allowed to be skipped consecutively.\nFor manual frameskip, determines the number of frames that will\nalways be skipped.
-!For auto frameskip, determines the maximum number of frames that\nare allowed to be skipped consecutively.\nFor manual frameskip, determines the number of frames that will\nalways be skipped.
+#For auto frameskip, determines the maximum number of frames that\n
+#are allowed to be skipped consecutively.\n
+#For manual frameskip, determines the number of frames that will\n
+#always be skipped.
+!For auto frameskip, determines the maximum number of frames that\n
+!are allowed to be skipped consecutively.\n
+!For manual frameskip, determines the number of frames that will\n
+!always be skipped.
 
 # MSG_G_S_MENU_HELP_4
-#If objects in the game flicker at a regular rate certain manual\nframeskip values may cause them to normally disappear. Change this\nvalue to 'random' to avoid this. Do not use otherwise, as it tends to\nmake the image quality worse, especially in high motion games.
-!If objects in the game flicker at a regular rate certain manual\nframeskip values may cause them to normally disappear. Change this\nvalue to 'random' to avoid this. Do not use otherwise, as it tends to\nmake the image quality worse, especially in high motion games.
+#If objects in the game flicker at a regular rate certain manual\n
+#frameskip values may cause them to normally disappear. Change this\n
+#value to 'random' to avoid this. Do not use otherwise, as it tends to\n
+#make the image quality worse, especially in high motion games.
+!If objects in the game flicker at a regular rate certain manual\n
+!frameskip values may cause them to normally disappear. Change this\n
+!value to 'random' to avoid this. Do not use otherwise, as it tends to\n
+!make the image quality worse, especially in high motion games.
 
 # MSG_G_S_MENU_HELP_5
-#Select 'no' to turn off all audio output. This will not result in a\nsignificant change in performance.
-!Select 'no' to turn off all audio output. This will not result in a\nsignificant change in performance.
+#Select 'no' to turn off all audio output. This will not result in a\n
+#significant change in performance.
+!Select 'no' to turn off all audio output. This will not result in a\n
+!significant change in performance.
 
 # MSG_G_S_MENU_HELP_6
-#Sound delay buffer. Higher values reduce crackling but add sound\ndelay; lower values keep the sound closer to the picture.\nThe default (41 ms) suits most games.\nTakes effect when you return to the game.
-!Sound delay buffer. Higher values reduce crackling but add sound\ndelay; lower values keep the sound closer to the picture.\nThe default (41 ms) suits most games.\nTakes effect when you return to the game.
+#Sound delay buffer. Higher values reduce crackling but add sound\n
+#delay; lower values keep the sound closer to the picture.\n
+#The default (41 ms) suits most games.\n
+#Takes effect when you return to the game.
+!Sound delay buffer. Higher values reduce crackling but add sound\n
+!delay; lower values keep the sound closer to the picture.\n
+!The default (41 ms) suits most games.\n
+!Takes effect when you return to the game.
 
 # MSG_G_S_MENU_HELP_7
-#Save the current game screen as a BMP file in the screenshot folder\n(GBA/SS).
-!Save the current game screen as a BMP file in the screenshot folder\n(GBA/SS).
+#Save the current game screen as a BMP file in the screenshot folder\n
+#(GBA/SS).
+!Save the current game screen as a BMP file in the screenshot folder\n
+!(GBA/SS).
 
 # MSG_G_S_MENU_HELP_8
 #Return to the main menu.
@@ -224,12 +278,16 @@
 !Shape of the picture on a TV: 4:3 or 16:9. TV output only.
 
 # MSG_G_S_MENU_HELP_10
-#Size of the game picture on the PSP screen, in percent.\n100 is the normal size for the selected display scaling.
-!Size of the game picture on the PSP screen, in percent.\n100 is the normal size for the selected display scaling.
+#Size of the game picture on the PSP screen, in percent.\n
+#100 is the normal size for the selected display scaling.
+!Size of the game picture on the PSP screen, in percent.\n
+!100 is the normal size for the selected display scaling.
 
 # MSG_G_S_MENU_HELP_11
-#Signal type for TV output: progressive or interlaced.\nUse the one your TV supports. TV output only.
-!Signal type for TV output: progressive or interlaced.\nUse the one your TV supports. TV output only.
+#Signal type for TV output: progressive or interlaced.\n
+#Use the one your TV supports. TV output only.
+!Signal type for TV output: progressive or interlaced.\n
+!Use the one your TV supports. TV output only.
 
 # MSG_STATE_MENU_DATE_FMT_0
 # for PSP_SYSTEMPARAM_DATE_FORMAT_YYYYMMDD
@@ -290,16 +348,22 @@
 !Back
 
 # MSG_STATE_MENU_HELP_0
-#Select to load the game state from the current slot for this game.\nPress left + right to change the current slot.
-!Select to load the game state from the current slot for this game.\nPress left + right to change the current slot.
+#Select to load the game state from the current slot for this game.\n
+#Press left + right to change the current slot.
+!Select to load the game state from the current slot for this game.\n
+!Press left + right to change the current slot.
 
 # MSG_STATE_MENU_HELP_1
-#Select to save the game state to the current slot for this game.\nPress left + right to change the current slot.
-!Select to save the game state to the current slot for this game.\nPress left + right to change the current slot.
+#Select to save the game state to the current slot for this game.\n
+#Press left + right to change the current slot.
+!Select to save the game state to the current slot for this game.\n
+!Press left + right to change the current slot.
 
 # MSG_STATE_MENU_HELP_2
-#Restore gameplay from a savestate file.\nNote: The same file used to save the state must be present.
-!Restore gameplay from a savestate file.\nNote: The same file used to save the state must be present.
+#Restore gameplay from a savestate file.\n
+#Note: The same file used to save the state must be present.
+!Restore gameplay from a savestate file.\n
+!Note: The same file used to save the state must be present.
 
 # MSG_STATE_MENU_HELP_3
 #Change the current savestate slot.
@@ -366,8 +430,10 @@
 !Back
 
 # MSG_PAD_MENU_HELP_12
-#Select 'yes' to use the button map shared by all games,\nor 'no' to give this game its own button map.
-!Select 'yes' to use the button map shared by all games,\nor 'no' to give this game its own button map.
+#Select 'yes' to use the button map shared by all games,\n
+#or 'no' to give this game its own button map.
+!Select 'yes' to use the button map shared by all games,\n
+!or 'no' to give this game its own button map.
 
 # MSG_PAD_MENU_HELP_13
 #Return to the main menu.
@@ -588,12 +654,16 @@
 !Select 'no' to block analog input entirely.
 
 # MSG_A_PAD_MENU_HELP_1
-#Determine sensitivity/responsiveness of the analog input.\nLower numbers are less sensitive.
-!Determine sensitivity/responsiveness of the analog input.\nLower numbers are less sensitive.
+#Determine sensitivity/responsiveness of the analog input.\n
+#Lower numbers are less sensitive.
+!Determine sensitivity/responsiveness of the analog input.\n
+!Lower numbers are less sensitive.
 
 # MSG_A_PAD_MENU_HELP_2
-#Select 'yes' to use the analog nub as the tilt sensor, for games that\nhave one. The nub then no longer works as the d-pad.
-!Select 'yes' to use the analog nub as the tilt sensor, for games that\nhave one. The nub then no longer works as the d-pad.
+#Select 'yes' to use the analog nub as the tilt sensor, for games that\n
+#have one. The nub then no longer works as the d-pad.
+!Select 'yes' to use the analog nub as the tilt sensor, for games that\n
+!have one. The nub then no longer works as the d-pad.
 
 # MSG_A_PAD_MENU_HELP_3
 #Return to the main menu.
@@ -632,12 +702,22 @@
 !Load a cheat file (.cht) from the cheat folder (GBA/CHT).
 
 # MSG_CHEAT_MENU_HELP_2
-#Change the clock speed of the device. Higher clock speed will yield\nbetter performance, but drains the battery faster.
-!Change the clock speed of the device. Higher clock speed will yield\nbetter performance, but drains the battery faster.
+#Change the clock speed of the device. Higher clock speed will yield\n
+#better performance, but drains the battery faster.
+!Change the clock speed of the device. Higher clock speed will yield\n
+!better performance, but drains the battery faster.
 
 # MSG_CHEAT_MENU_HELP_3
-#Determines when in-game save files should be written back to\nmemstick. If set to 'automatic' writebacks will occur shortly after\nthe game's backup is altered. On 'exit only' it will only be written\nback when you exit from this menu (NOT from using the home button).\nUse the latter with extreme care.
-!Determines when in-game save files should be written back to\nmemstick. If set to 'automatic' writebacks will occur shortly after\nthe game's backup is altered. On 'exit only' it will only be written\nback when you exit from this menu (NOT from using the home button).\nUse the latter with extreme care.
+#Determines when in-game save files should be written back to\n
+#memstick. If set to 'automatic' writebacks will occur shortly after\n
+#the game's backup is altered. On 'exit only' it will only be written\n
+#back when you exit from this menu (NOT from using the home button).\n
+#Use the latter with extreme care.
+!Determines when in-game save files should be written back to\n
+!memstick. If set to 'automatic' writebacks will occur shortly after\n
+!the game's backup is altered. On 'exit only' it will only be written\n
+!back when you exit from this menu (NOT from using the home button).\n
+!Use the latter with extreme care.
 
 # MSG_CHEAT_MENU_HELP_4
 #Return to the main menu.
@@ -680,12 +760,16 @@
 !Menu language. Takes effect the next time gpSP kai starts.
 
 # MSG_MISC_MENU_HELP_3
-#Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\nTakes effect the next time gpSP kai starts.
-!Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\nTakes effect the next time gpSP kai starts.
+#Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\n
+#Takes effect the next time gpSP kai starts.
+!Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\n
+!Takes effect the next time gpSP kai starts.
 
 # MSG_MISC_MENU_HELP_4
-#GAME CART starts the game directly. GBA BIOS shows the Game Boy Advance\nstart-up logo first. Takes effect when a game is loaded or reset.
-!GAME CART starts the game directly. GBA BIOS shows the Game Boy Advance\nstart-up logo first. Takes effect when a game is loaded or reset.
+#GAME CART starts the game directly. GBA BIOS shows the Game Boy Advance\n
+#start-up logo first. Takes effect when a game is loaded or reset.
+!GAME CART starts the game directly. GBA BIOS shows the Game Boy Advance\n
+!start-up logo first. Takes effect when a game is loaded or reset.
 
 # MSG_MISC_MENU_HELP_5
 #Brightness
