@@ -4,14 +4,17 @@
 
 # Global definitions
 
+include version.mk
+
 all: systembuttons_prx dvemgr homehookprx main
 
-.PHONY: all clean main dvemgr homehookprx systembuttons_prx package check release
+.PHONY: all clean main dvemgr homehookprx systembuttons_prx package check release version
 
 # Ready-to-copy Memory Stick folder: copy $(PACKAGE_DIR) to PSP/GAME/ and add
-# your own gba_bios.bin. PACKAGE_PRX=prebuilt ships the hardware-tested modules
+# your own gba_bios.bin. Its name has no version, so an update replaces the
+# old files and keeps the saves in GBA/. PACKAGE_PRX=prebuilt ships the hardware-tested modules
 # from prx/prebuilt/; PACKAGE_PRX=built ships the ones just built in out/.
-PACKAGE_DIR   = out/gpSP
+PACKAGE_DIR   = out/gpSP-kai
 PACKAGE_PRX  ?= prebuilt
 PACKAGE_FONTS = gpsp10.fbm knj10.fbm batang10.fbm
 
@@ -42,13 +45,18 @@ main: systembuttons_prx homehookprx
 check:
 	python3 tools/check_messages.py
 
-# Package plus a zip named after the version, e.g. out/gpSP-kai-3.5.0.zip
-RELEASE_ZIP = out/gpSP-kai-$(strip $(shell cat version.txt)).zip
+# Package plus a zip named after the version: out/gpSP-kai-3.5.2.zip for a
+# release, out/gpSP-kai-3.5.2-dev+<commit>.zip for any other build
+RELEASE_ZIP = out/gpSP-kai-$(GPSP_VERSION_STRING).zip
 
 release: check package
 	rm -f $(RELEASE_ZIP)
-	cd out && zip -qr $(notdir $(RELEASE_ZIP)) gpSP
+	cd out && zip -qr $(notdir $(RELEASE_ZIP)) $(notdir $(PACKAGE_DIR))
 	@echo "Release zip: $(RELEASE_ZIP)"
+
+# Print the version string, e.g. for naming the CI artifact
+version:
+	@echo $(GPSP_VERSION_STRING)
 
 homehookprx:
 	$(MAKE) -C ./prx/homehookprx/

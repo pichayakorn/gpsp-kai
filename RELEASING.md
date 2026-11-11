@@ -14,8 +14,8 @@ into it. Every change is made on its own short-lived branch:
 ```sh
 git switch -c fix/audio-buffer main   # start
 # ... commit ...
-make check package                    # test build in out/gpSP/
-# copy out/gpSP/ to the PSP and test, then merge:
+make check package                    # test build in out/gpSP-kai/
+# copy out/gpSP-kai/ to the PSP and test, then merge:
 git switch main && git merge --no-ff fix/audio-buffer
 git branch -d fix/audio-buffer
 ```
