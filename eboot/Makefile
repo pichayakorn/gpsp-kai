@@ -65,6 +65,13 @@ ifeq ($(PSP_LARGE_MEMORY), 0)
 CFLAGS          += -DUSE_EXT_MEM
 endif
 
+# Write each object's header dependencies to a .d file next to it. Every
+# source includes common.h, which includes almost every header, so a list
+# kept by hand misses some: a stale object built against an old message.h
+# shows the wrong messages.
+CFLAGS          += -MMD -MP
+EXTRA_CLEAN     += $(OBJS:.o=.d)
+
 ASFLAGS         = ${CFLAGS}
 EXTRA_TARGETS   = EBOOT.PBP
 
@@ -125,6 +132,8 @@ endif
 # version.txt and Makefile.set set compiler flags for every object (version
 # numbers, USE_* options), so a change to either must recompile everything.
 $(OBJS): ../version.txt ../version.mk ../Makefile.set
+
+-include $(OBJS:.o=.d)
 
 %.o: ../src/%.c
 	@echo Compiling $<...
