@@ -3593,3 +3593,6 @@ cpu_savestate_body(READ_MEM, ver);
 
 void cpu_write_mem_savestate(u32 ver)
 cpu_savestate_body(WRITE_MEM, ver);
+
+void cpu_get_size_savestate(u32 ver)
+cpu_savestate_body(GET_SIZE, ver);
