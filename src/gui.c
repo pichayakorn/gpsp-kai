@@ -906,6 +906,7 @@ u32 menu(u16 *original_screen)
   auto void menu_save_state();
   auto void menu_load_state();
   auto void menu_load_state_file();
+  auto void menu_delete_state();
   auto void menu_load_cheat_file();
   auto void menu_fix_gamepad_help();
   auto void submenu_graphics_sound();
@@ -1047,6 +1048,45 @@ u32 menu(u16 *original_screen)
         blit_to_screen(original_screen, 240, 160, 230, 40);
       }
     }
+  }
+
+  void menu_delete_state()
+  {
+    char buf[256];
+    char savestate_path[MAX_PATH];
+    SceIoStat stat;
+
+    menu_change_state();
+    if(first_load)
+      return;
+
+    if(g_savestate_slot_num == MEM_STATE_NUM)
+    {
+      // Slot 10 is only in memory
+      if(mem_save_flag == 0)
+        return;
+    }
+    else
+    {
+      get_savestate_filename_noshot(g_savestate_slot_num, current_savestate_filename);
+      path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, current_savestate_filename);
+      if(sceIoGetstat(savestate_path, &stat) < 0)
+        return;  // empty slot
+    }
+
+    // yesno_dialog() returns 0 for yes
+    sprintf(buf, msg[MSG_DELETE_STATE_NUM], (int)g_savestate_slot_num);
+    if(yesno_dialog(buf) == 0)
+    {
+      if(g_savestate_slot_num == MEM_STATE_NUM)
+        mem_save_flag = 0;
+      else
+        sceIoRemove(savestate_path);
+      forget_savestate_snapshot();
+    }
+
+    clear_screen(COLOR_BG);
+    blit_to_screen(original_screen, 240, 160, 230, 40);
   }
 
   void menu_load_state_file()
@@ -1350,8 +1390,9 @@ u32 menu(u16 *original_screen)
     NUMERIC_SELECTION_HIDE_OPTION(menu_save_state, menu_change_state, msg[MSG_STATE_MENU_1], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_1], 7),
 
     NUMERIC_SELECTION_HIDE_OPTION(menu_load_state_file, menu_change_state, msg[MSG_STATE_MENU_2], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_2], 9),
+    NUMERIC_SELECTION_HIDE_OPTION(menu_delete_state, menu_change_state, msg[MSG_STATE_MENU_5], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_5], 10),
 
-    NUMERIC_SELECTION_OPTION(menu_change_state, msg[MSG_STATE_MENU_3], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_3], 11),
+    NUMERIC_SELECTION_OPTION(menu_change_state, msg[MSG_STATE_MENU_3], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_3], 12),
 
 
 

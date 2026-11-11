@@ -1156,3 +1156,17 @@
 #Enable HOME
 !\n\n\n\n
 !Enable button "HOME"
+
+# MSG_STATE_MENU_5
+#Delete savestate in current slot
+!Delete savestate in current slot
+
+# MSG_STATE_MENU_HELP_5
+#Select to delete the savestate in the current slot for this game.\n
+#Press left + right to change the current slot.
+!Select to delete the savestate in the current slot for this game.\n
+!Press left + right to change the current slot.
+
+# MSG_DELETE_STATE_NUM
+#Delete savestate in slot %d?
+!Delete savestate in slot %d?

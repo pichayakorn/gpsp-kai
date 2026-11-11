@@ -48,7 +48,7 @@
   {                                                                           \
     RENDER_SAMPLE_##type();                                                   \
     fifo_fractional += frequency_step;                                        \
-    sound_write_offset = (sound_write_offset + 2) % BUFFER_SIZE;              \
+    sound_write_offset = (sound_write_offset + 2) & BUFFER_MASK;              \
   }                                                                           \
 
 #define UPDATE_VOLUME_CHANNEL_ENVELOPE(channel)                               \
@@ -168,7 +168,7 @@
     GBC_SOUND_RENDER_SAMPLE_##type();                                         \
                                                                               \
     sample_index += frequency_step;                                           \
-    sound_write_offset = (sound_write_offset + 2) % BUFFER_SIZE;              \
+    sound_write_offset = (sound_write_offset + 2) & BUFFER_MASK;              \
                                                                               \
     UPDATE_TONE_COUNTERS(envelope_op, sweep_op);                              \
   }                                                                           \
@@ -194,7 +194,7 @@
     if(sample_index >= U32_TO_FP16_16(GBC_NOISE_WRAP_##noise_type))           \
       sample_index -= U32_TO_FP16_16(GBC_NOISE_WRAP_##noise_type);            \
                                                                               \
-    sound_write_offset = (sound_write_offset + 2) % BUFFER_SIZE;              \
+    sound_write_offset = (sound_write_offset + 2) & BUFFER_MASK;              \
                                                                               \
     UPDATE_TONE_COUNTERS(envelope_op, sweep_op);                              \
   }                                                                           \
@@ -238,7 +238,7 @@
   }                                                                           \
 
 #define CHECK_BUFFER()                                                        \
-  ((gbc_sound_buffer_index - sound_read_offset) % BUFFER_SIZE)                \
+  ((gbc_sound_buffer_index - sound_read_offset) & BUFFER_MASK)                \
 
 // Audio buffer option n (0-10) holds the emulator back once more than
 // SAMPLE_SIZE * (5 + n) entries are queued, i.e. 1024 * (5 + n) bytes or
@@ -503,7 +503,7 @@ void update_gbc_sound(u32 cpu_ticks)
     ADDRESS16(io_registers, 0x84) = sound_status;
 
     gbc_sound_last_cpu_ticks = cpu_ticks;
-    gbc_sound_buffer_index =(gbc_sound_buffer_index + (buffer_ticks << 1)) % BUFFER_SIZE;
+    gbc_sound_buffer_index =(gbc_sound_buffer_index + (buffer_ticks << 1)) & BUFFER_MASK;
   }
 
 int audio_handle;
@@ -637,7 +637,7 @@ static int sound_update_thread(SceSize args, void *argp)
 //        if(sample < -4096) sample = -4096;
         buffer[1][loop] = sample << 4;
         sound_buffer[sound_read_offset] = 0;
-        sound_read_offset = (sound_read_offset + 1) & BUFFER_SIZE;
+        sound_read_offset = (sound_read_offset + 1) & BUFFER_MASK;
       }
     }
     else

@@ -3738,15 +3738,10 @@ u32 load_state(char *savestate_filename, u32 slot_num)
   u32 file_size = 0;
   char buf[256];
   u32 ver;
+  SceIoStat stat;
 
   ver = 0x00010000;
   pause_sound(1);
-
-  sprintf(buf, msg[MSG_LOAD_STATE_NUM], (int)slot_num);
-  if(yesno_dialog(buf) == 1)
-    return 0;
-
-  init_progress(9, msg[MSG_LOAD_STATE]);
 
   if (slot_num != MEM_STATE_NUM)
   {
@@ -3758,6 +3753,22 @@ u32 load_state(char *savestate_filename, u32 slot_num)
       strcpy(savestate_path, savestate_filename);
     }
 
+    // An empty slot has nothing to load, so don't ask.
+    if (sceIoGetstat(savestate_path, &stat) < 0)
+      return 0;
+  }
+  else
+    if (mem_save_flag == 0)
+      return 0;
+
+  sprintf(buf, msg[MSG_LOAD_STATE_NUM], (int)slot_num);
+  if(yesno_dialog(buf) == 1)
+    return 0;
+
+  init_progress(9, msg[MSG_LOAD_STATE]);
+
+  if (slot_num != MEM_STATE_NUM)
+  {
     FILE_OPEN(savestate_file, savestate_path, READ);
     if(FILE_CHECK_VALID(savestate_file))
     {
