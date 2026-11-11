@@ -13,7 +13,7 @@ The b225 changes follow ErikPshat's published source, archived in
 reconstructed from the release binary.
 
 This continuation has its own version numbers, starting at **3.5.0**; the
-PSP game list shows **UO gpSP kai** followed by the version. See [CHANGELOG.md](CHANGELOG.md)
+PSP game list shows **gpSP kai** followed by the version. See [CHANGELOG.md](CHANGELOG.md)
 for the changes in each release and [RELEASING.md](RELEASING.md) for how
 development and releases work.
 
@@ -124,7 +124,7 @@ src/            emulator source
 prx/            kernel PRX module sources; prx/prebuilt/ holds tested binaries
 eboot/          EBOOT Makefile
 data/           files for the Memory Stick: cfg/, font/, game_config.txt
-image/          XMB icon and background
+image/          XMB icon (ICON0.png, ICON0_dev.png for dev builds) and background (PIC1.png)
 docs/           changes from takka's source, original and Japanese docs, licenses/
 tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
 ```

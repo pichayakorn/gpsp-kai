@@ -53,8 +53,14 @@ Releases are automatic once the repository is on GitHub:
 keeps updating itself.
 
 The version comes only from `version.txt`. A build of the commit tagged
-`v<version>` shows `UO gpSP kai <version>` on the XMB; any other build shows
+`v<version>` shows `gpSP kai <version>` on the XMB; any other build shows
 `<version>-dev+<commit>`.
+
+A dev build also looks different on the XMB: it gets the gray icon with the
+amber DEV ribbon (`image/ICON0_dev.png`) and no background. On the PSP the XMB
+hides a game's title whenever it has a background, so only a dev build shows
+its full version there; a release shows the background, which carries the
+name, and its version is in gpSP's own menu.
 
 ## Local release build
 
