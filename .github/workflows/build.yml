@@ -42,12 +42,15 @@ jobs:
             -x 'usr/local/pspdev/psp/sdk/include/systemctrl_adrenaline.h'
 
       - name: Check messages, build and package
-        run: make -j"$(nproc)" release
+        id: build
+        run: |
+          make -j"$(nproc)" release
+          echo "version=$(make -s version)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: gpSP-kai-${{ inputs.release-tag || github.sha }}
-          path: out/gpSP
+          name: gpSP-kai-${{ steps.build.outputs.version }}
+          path: out/gpSP-kai
 
       - name: Attach the zip to the release
         if: inputs.release-tag != ''

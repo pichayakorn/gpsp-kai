@@ -1188,7 +1188,6 @@ void render_scanline_affine_##combine_op##_##alpha_op(u32 layer,              \
   u32 bg_control = io_registers[REG_BG0CNT + layer];                          \
   u32 current_pixel;                                                          \
   s32 source_x, source_y;                                                     \
-  u32 vcount = io_registers[REG_VCOUNT];                                      \
   u32 pixel_x, pixel_y;                                                       \
   u32 layer_offset = (layer - 2) * 8;                                         \
   s32 dx, dy;                                                                 \
@@ -2312,13 +2311,11 @@ void expand_darken(u16 *screen_src_ptr, u16 *screen_dest_ptr,
 {
   u32 pixel_top;
   s32 blend = 16 - (io_registers[REG_BLDY] & 0x1F);
-  u32 upper;
   u32 i;
 
   if(blend < 0)
     blend = 0;
 
-  upper = ((0x03E07C1F /*0x07E0F81F*/ * blend) >> 4) & 0x03E07C1F /*0x07E0F81F*/;
   expand_loop(darken, effect_condition_fade(pixel_top), pixel_top);
 }
 
@@ -2356,10 +2353,8 @@ void expand_darken_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_ptr,
   u32 bldalpha = io_registers[REG_BLDALPHA];
   u32 blend_a = bldalpha & 0x1F;
   u32 blend_b = (bldalpha >> 8) & 0x1F;
-  u32 upper;
   u32 i;
 
-  upper = ((0x03E07C1F /*0x07E0F81F*/ * blend) >> 4) & 0x03E07C1F /*0x07E0F81F*/;
 
   if(blend < 0)
     blend = 0;
@@ -2577,11 +2572,9 @@ void expand_brighten_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_ptr,
         if(color_combine_mask_a(5))                                           \
         {                                                                     \
           s32 blend = 16 - (io_registers[REG_BLDY] & 0x1F);                   \
-          u32 upper;                                                          \
                                                                               \
           if(blend < 0)                                                       \
             blend = 0;                                                        \
-            upper = ((0x03E07C1F /*0x07E0F81F*/ * blend) >> 4) & 0x03E07C1F /*0x07E0F81F*/;                   \
                                                                               \
           expand_pixel_no_dest(darken, pixel_top);                            \
         }                                                                     \

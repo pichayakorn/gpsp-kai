@@ -116,24 +116,24 @@ typedef struct
 } block_exit_type;
 
 #define arm_decode_data_proc_reg()                                            \
-  u32 rn = (opcode >> 16) & 0x0F;                                             \
-  u32 rd = (opcode >> 12) & 0x0F;                                             \
-  u32 rm = opcode & 0x0F                                                      \
+  u32 rn __attribute__((unused)) = (opcode >> 16) & 0x0F;                     \
+  u32 rd __attribute__((unused)) = (opcode >> 12) & 0x0F;                     \
+  u32 rm __attribute__((unused)) = opcode & 0x0F                              \
 
 #define arm_decode_data_proc_imm()                                            \
-  u32 rn = (opcode >> 16) & 0x0F;                                             \
-  u32 rd = (opcode >> 12) & 0x0F;                                             \
+  u32 rn __attribute__((unused)) = (opcode >> 16) & 0x0F;                     \
+  u32 rd __attribute__((unused)) = (opcode >> 12) & 0x0F;                     \
   u32 imm;                                                                    \
   ROR(imm, opcode & 0xFF, (opcode >> 7) & 0x1E)                               \
 
 #define arm_decode_psr_reg()                                                  \
-  u32 psr_field = (opcode >> 16) & 0x0F;                                      \
-  u32 rd = (opcode >> 12) & 0x0F;                                             \
-  u32 rm = opcode & 0x0F                                                      \
+  u32 psr_field __attribute__((unused)) = (opcode >> 16) & 0x0F;              \
+  u32 rd __attribute__((unused)) = (opcode >> 12) & 0x0F;                     \
+  u32 rm __attribute__((unused)) = opcode & 0x0F                              \
 
 #define arm_decode_psr_imm()                                                  \
   u32 psr_field = (opcode >> 16) & 0x0F;                                      \
-  u32 rd = (opcode >> 12) & 0x0F;                                             \
+  u32 rd __attribute__((unused)) = (opcode >> 12) & 0x0F;                     \
   u32 imm;                                                                    \
   ROR(imm, opcode & 0xFF, (opcode >> 7) & 0x1E)                               \
 
@@ -142,7 +142,7 @@ typedef struct
 
 #define arm_decode_multiply()                                                 \
   u32 rd = (opcode >> 16) & 0x0F;                                             \
-  u32 rn = (opcode >> 12) & 0x0F;                                             \
+  u32 rn __attribute__((unused)) = (opcode >> 12) & 0x0F;                     \
   u32 rs = (opcode >> 8) & 0x0F;                                              \
   u32 rm = opcode & 0x0F                                                      \
 
@@ -208,7 +208,7 @@ typedef struct
 
 #define thumb_decode_hireg_op()                                               \
   u32 rs = (opcode >> 3) & 0x0F;                                              \
-  u32 rd = ((opcode >> 4) & 0x08) | (opcode & 0x07)                           \
+  u32 rd __attribute__((unused)) = ((opcode >> 4) & 0x08) | (opcode & 0x07)   \
 
 #define thumb_decode_mem_reg()                                                \
   u32 ro = (opcode >> 6) & 0x07;                                              \
@@ -3177,7 +3177,7 @@ block_exit_type block_exits[MAX_EXITS];
                                                                               \
         /* Give the branch target macro somewhere to bail if it turns out to  \
            be an indirect branch (ala malformed Thumb bl) */                  \
-        no_direct_branch:;                                                    \
+        no_direct_branch: __attribute__((unused));                            \
       }                                                                       \
                                                                               \
       /* SWI branches to the BIOS, this will likely change when               \
@@ -3243,9 +3243,9 @@ s32 translate_block_##type(u32 pc, TRANSLATION_REGION_TYPE                    \
  translation_region, u32 smc_enable)                                          \
 {                                                                             \
   u32 opcode = 0;                                                             \
-  u32 last_opcode;                                                            \
-  u32 condition;                                                              \
-  u32 last_condition;                                                         \
+  u32 last_opcode __attribute__((unused));                                    \
+  u32 condition __attribute__((unused));                                      \
+  u32 last_condition __attribute__((unused));                                 \
   u32 pc_region = (pc >> 15);                                                 \
   u32 new_pc_region;                                                          \
   u8 *pc_address_block = memory_map_read[pc_region];                          \

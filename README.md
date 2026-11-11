@@ -54,7 +54,7 @@ export PSPDEV=/path/to/pspdev
 export PATH="$PSPDEV/bin:$PATH"
 make            # builds the three PRX modules and the EBOOT into out/
 make check      # checks the message files in data/cfg against the code
-make release    # check + package + out/gpSP-kai-<version>.zip
+make release    # check + package + out/gpSP-kai-<version>.zip (dev builds: <version>-dev+<commit>)
 ```
 
 Add `-j4` (or your number of CPU cores) to build in parallel, e.g.
@@ -81,12 +81,13 @@ The version number is in `version.txt`. A build of the commit tagged
 ## Installing
 
 ```sh
-make package    # builds, then assembles the Memory Stick folder in out/gpSP/
+make package    # builds, then assembles the Memory Stick folder in out/gpSP-kai/
 ```
 
-Copy `out/gpSP/` to `PSP/GAME/` on the Memory Stick, then add your own dump of
-the GBA BIOS as `gba_bios.bin` next to `EBOOT.PBP` (it is not included). Put
-games in `GBA/ROM/`. The folder contains:
+Copy `out/gpSP-kai/` to `PSP/GAME/` on the Memory Stick, then add your own
+dump of the GBA BIOS as `gba_bios.bin` next to `EBOOT.PBP` (it is not
+included). Put games in `GBA/ROM/`. To update, copy the new folder over the
+old one; saves, states and configs in `GBA/` are kept. The folder contains:
 
 ```
 EBOOT.PBP
