@@ -1223,20 +1223,22 @@ u32 menu(u16 *original_screen)
 
   char *interlace_options[] = { msg[MSG_I_NON], msg[MSG_I_ON] };
 
+  // Display names, in the order of lang[] (the message file names). They are
+  // in English because the menu font may not have the native scripts.
   char *language_options[] =
   {
-    lang[0],
-    lang[1],
-    lang[2],
-    lang[3],
-    lang[4],
-    lang[5],
-    lang[6],
-    lang[7],
-    lang[8],
-    lang[9],
-    lang[10],
-    lang[11]
+    "Japanese",
+    "English",
+    "French",
+    "Spanish",
+    "German",
+    "Italian",
+    "Dutch",
+    "Portuguese",
+    "Russian",
+    "Korean",
+    "Chinese (Traditional)",
+    "Chinese (Simplified)"
   };
 
   char *boot_mode_options[] =

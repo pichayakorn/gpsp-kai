@@ -812,9 +812,8 @@
 !Debug mode
 
 # MSG_MISC_MENU_HELP_2
-#Language
-!\n\n\n\n
-!Language
+#Menu language. Takes effect the next time gpSP kai starts.
+!Menu language. Takes effect the next time gpSP kai starts.
 
 # MSG_MISC_MENU_HELP_3
 #Fake Fat
