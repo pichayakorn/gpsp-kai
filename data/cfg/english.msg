@@ -1091,3 +1091,17 @@
 # MSG_CHEAT_MENU_HELP_6
 #Select 'yes' to also show the PSP's quit screen when HOME is pressed.
 !Select 'yes' to also show the PSP's quit screen when HOME is pressed.
+
+# MSG_STATE_MENU_5
+#Delete savestate in current slot
+!Delete savestate in current slot
+
+# MSG_STATE_MENU_HELP_5
+#Select to delete the savestate in the current slot for this game.\n
+#Press left + right to change the current slot.
+!Select to delete the savestate in the current slot for this game.\n
+!Press left + right to change the current slot.
+
+# MSG_DELETE_STATE_NUM
+#Delete savestate in slot %d?
+!Delete savestate in slot %d?
