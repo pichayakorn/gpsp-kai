@@ -67,7 +67,8 @@ static u32 zip_le32(const u8 *p)
 static s32 zip_central_sizes(FILE_ID fd, u32 method, u8 *work,
  struct SZIPFileDataDescriptor *desc)
 {
-  u8 *eocd = NULL;
+  u8 *eocd;
+  s32 eocd_pos = -1;
   u8 *hdr;
   s32 file_size;
   u32 tail_size;
@@ -90,21 +91,34 @@ static s32 zip_central_sizes(FILE_ID fd, u32 method, u8 *work,
     return -1;
 
   // Search backwards for "PK\5\6" whose comment length reaches exactly the
-  // end of the file, so a signature inside the comment is not taken
+  // end of the file, so a signature inside the comment is not taken. If
+  // there is none (bytes appended after the archive, as some downloads
+  // have), use the last one whose comment fits in the file and whose
+  // central directory ends right where the record starts.
   for(i = tail_size - ZIP_EOCD_SIZE; i >= 0; i--)
   {
     u8 *p = work + i;
+    u32 comment_space = tail_size - i - ZIP_EOCD_SIZE;
 
-    if((p[0] == 0x50) && (p[1] == 0x4B) && (p[2] == 0x05) && (p[3] == 0x06) &&
-     (zip_le16(p + 20) == tail_size - i - ZIP_EOCD_SIZE))
+    if((p[0] != 0x50) || (p[1] != 0x4B) || (p[2] != 0x05) || (p[3] != 0x06))
+      continue;
+
+    if(zip_le16(p + 20) == comment_space)
     {
-      eocd = p;
+      eocd_pos = i;
       break;
     }
+
+    if((eocd_pos < 0) && (zip_le16(p + 20) <= comment_space) &&
+     ((u64)zip_le32(p + 16) + zip_le32(p + 12) ==
+     (u64)file_size - tail_size + i))
+      eocd_pos = i;
   }
 
-  if(eocd == NULL)
+  if(eocd_pos < 0)
     return -1;
+  i = eocd_pos;
+  eocd = work + i;
 
   // Multi-disk archives are not supported. ZIP64 archives store all ones
   // in the offset, which fails the range check below.
