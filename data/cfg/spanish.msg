@@ -1110,6 +1110,10 @@
 #Load ROM OK.
 !Load ROM OK.
 
+# MSG_LOAD_ROM_ERROR
+#Could not load the ROM. Press any button.
+!Could not load the ROM. Press any button.
+
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
 !Pagina de trucos  : %d
