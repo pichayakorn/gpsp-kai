@@ -1,7 +1,8 @@
 # message file
 # English
 
-#To align text, use the following information: symbol "space" = 4 pixels; symbol "$" = 1 pixel.
+# Menu text is fixed-width and aligned by the program: an option's ":" and
+# value are lined up in a column, so do not pad labels with spaces or "$".
 
 # MSG_RETURN_MENU
 #Press O to return to the main menu.
@@ -36,11 +37,11 @@
 
 # MSG_MAIN_MENU_1
 #Load state from slot: %d
-!Load state from slot $$$: %d
+!Load state from slot: %d
 
 # MSG_MAIN_MENU_2
 #Save state to slot: %d
-!Save state to slot    $$$: %d
+!Save state to slot: %d
 
 # MSG_MAIN_MENU_3
 #Savestate options
@@ -154,39 +155,39 @@
 
 # MSG_SCALE
 #Display scaling: %s
-!Display scaling         $: %s
+!Display scaling: %s
 
 # MSG_FILTER
 #Screen filtering: %s
-!Screen filtering       $: %s
+!Screen filtering: %s
 
 # MSG_RATIO
 #TV output ratio: %s
-!TV output ratio        $: %s
+!TV output ratio: %s
 
 # MSG_INTERLACE
 #TV output interlace: %s
-!TV output interlace  $$$: %s
+!TV output interlace: %s
 
 # MSG_SKIP_TYPE
 #Frameskip type: %s
-!Frameskip type        $$$: %s
+!Frameskip type: %s
 
 # MSG_SKIP_VALUE
 #Frameskip value: %d
-!Frameskip value       $$$: %d
+!Frameskip value: %d
 
 # MSG_SKIP_RANDOM
 #Framskip variation: %s
-!Framskip variation   $$$: %s
+!Framskip variation: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
-!Audio output  $$$: %s
+!Audio output: %s
 
 # MSG_AUDIO_BUFFER
 #Audio buffer: %s
-!Audio buffer  $$$: %s
+!Audio buffer: %s
 
 # MSG_SCREEN_SHOT
 #Screen shot
@@ -194,7 +195,7 @@
 
 # MSG_DISPLAY_SCALE
 #Scale: %d
-!Scale : %d
+!Scale: %d
 
 # MSG_MENU_RETURN_MAIN
 #Back
@@ -332,7 +333,7 @@
 
 # MSG_STATE_MENU_STATE_NONE
 #No savestate exists for this slot
-!      $$$No savestate exists for this slot
+!No savestate exists for this slot
 
 # MSG_STATE_MENU_TITLE
 #Savestate options:
@@ -352,7 +353,7 @@
 
 # MSG_STATE_MENU_3
 #Current savestate slot: %d
-!Current savestate slot  $$: %d
+!Current savestate slot: %d
 
 # MSG_STATE_MENU_4
 #Back
@@ -391,55 +392,55 @@
 
 # MSG_PAD_MENU_0
 #D-pad up: %s
-!D-pad up     $$: %s
+!D-pad up: %s
 
 # MSG_PAD_MENU_1
 #D-pad down: %s
-!D-pad down  $$: %s
+!D-pad down: %s
 
 # MSG_PAD_MENU_2
 #D-pad left: %s
-!D-pad left   : %s
+!D-pad left: %s
 
 # MSG_PAD_MENU_3
 #D-pad right: %s
-!D-pad right $$: %s
+!D-pad right: %s
 
 # MSG_PAD_MENU_4
 #Cross: %s
-!Cross         $$: %s
+!Cross: %s
 
 # MSG_PAD_MENU_5
 #Circle: %s
-!Circle         : %s
+!Circle: %s
 
 # MSG_PAD_MENU_6
 #Square: %s
-!Square        : %s
+!Square: %s
 
 # MSG_PAD_MENU_7
 #Triangle: %s
-!Triangle      : %s
+!Triangle: %s
 
 # MSG_PAD_MENU_8
 #Left Trigger: %s
-!L-Trigger    : %s
+!L-Trigger: %s
 
 # MSG_PAD_MENU_9
 #Right Trigger: %s
-!R-Trigger    : %s
+!R-Trigger: %s
 
 # MSG_PAD_MENU_10
 #Start: %s
-!Start         $$: %s
+!Start: %s
 
 # MSG_PAD_MENU_11
 #Select: %s
-!Select        $$: %s
+!Select: %s
 
 # MSG_PAD_MENU_12
 #Use default map: %s
-!Use default map  $$: %s
+!Use default map: %s
 
 # MSG_PAD_MENU_13
 #Back
@@ -657,31 +658,31 @@
 
 # MSG_A_PAD_MENU_0
 #Analog up: %s
-!Analog up      : %s
+!Analog up: %s
 
 # MSG_A_PAD_MENU_1
 #Analog down: %s
-!Analog down   : %s
+!Analog down: %s
 
 # MSG_A_PAD_MENU_2
 #Analog left: %s
-!Analog left   $$: %s
+!Analog left: %s
 
 # MSG_A_PAD_MENU_3
 #Analog right: %s
-!Analog right  : %s
+!Analog right: %s
 
 # MSG_A_PAD_MENU_4
 #Enable analog: %s
-!Enable analog         $$: %s
+!Enable analog: %s
 
 # MSG_A_PAD_MENU_5
 #Analog sensitivity: %d
-!Analog sensitivity   : %d
+!Analog sensitivity: %d
 
 # MSG_A_PAD_MENU_6
-#Tilt sensor : %s
-!Tilt sensor            $$: %s
+#Tilt sensor: %s
+!Tilt sensor: %s
 
 # MSG_A_PAD_MENU_7
 #Back
@@ -723,11 +724,11 @@
 
 # MSG_CHEAT_MENU_2
 #Clock speed: %s
-!Clock speed      : %s
+!Clock speed: %s
 
 # MSG_CHEAT_MENU_3
 #Update backup: %s
-!Update backup  $$: %s
+!Update backup: %s
 
 # MSG_CHEAT_MENU_4
 #Back
@@ -769,28 +770,28 @@
 !Return to the main menu.
 
 # MSG_MISC_MENU_0
-#Emulate Core : %s
-!Emulate Core  $$: %s
+#Emulate Core: %s
+!Emulate Core: %s
 
 # MSG_MISC_MENU_1
-#Debug mode : %s
-!Debug mode  $$: %s
+#Debug mode: %s
+!Debug mode: %s
 
 # MSG_MISC_MENU_2
-#Language : %s
-!Language  : %s
+#Language: %s
+!Language: %s
 
 # MSG_MISC_MENU_3
-#Fake Fat : %s
-!Fake Fat  $$: %s
+#Fake Fat: %s
+!Fake Fat: %s
 
 # MSG_MISC_MENU_4
-#Boot Mode : %s
-!Boot Mode : %s
+#Boot Mode: %s
+!Boot Mode: %s
 
 # MSG_MISC_MENU_5
-#Brightness : %d
-!Brightness  : %d
+#Brightness: %d
+!Brightness: %d
 
 # MSG_MISC_MENU_HELP_0
 #Emulate Core
@@ -824,7 +825,7 @@
 
 # MSG_NON_LOAD_GAME
 #No game loaded yet
-!                $$$No game loaded yet
+!No game loaded yet
 
 # MSG_WDAY_0
 #Sunday
@@ -1117,7 +1118,7 @@
 
 # MSG_CHEAT_MENU_5
 #Cheat page: %d
-!Cheat page $$$: %d
+!Cheat page: %d
 
 # MSG_CHEAT_MENU_HELP_5
 #Cheat page
@@ -1126,7 +1127,7 @@
 
 # MSG_CHEAT_MENU_6
 #Enable HOME: %s
-!Enable "HOME"    : %s
+!Enable "HOME": %s
 
 # MSG_CHEAT_MENU_HELP_6
 #Enable HOME

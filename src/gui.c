@@ -249,6 +249,10 @@ static void get_savestate_filename(u32 slot, char *name_buffer);
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
 static u32 parse_line(char *current_line, char *current_str);
 static void print_status(u32 mode);
+static char *skip_padding(char *str);
+static int menu_label_length(const char *line);
+static int menu_label_width(const char *line, int length);
+static void print_centered_240(char *str, u32 y, u16 *dest);
 static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u16 day, u16 wday, u16 hour, u16 min, u16 sec, u32 msec);
 static void save_ss_bmp(u16 *image);
 void _flush_cache();
@@ -847,6 +851,24 @@ s32 load_config_file()
   return -1;
 }
 
+// Fill in an option's value, giving the line drawn in the menu.
+static void format_menu_option(MENU_OPTION_TYPE *option, char *buffer)
+{
+  if(option->option_type & NUMBER_SELECTION_TYPE)
+  {
+    sprintf(buffer, option->display_string, *(option->current_option));
+  }
+  else if(option->option_type & STRING_SELECTION_TYPE)
+  {
+    sprintf(buffer, option->display_string,
+     ((u32 *)option->options)[*(option->current_option)]);
+  }
+  else
+  {
+    strcpy(buffer, option->display_string);
+  }
+}
+
 u32 menu(u16 *original_screen)
 {
   gui_action_type gui_action;
@@ -856,6 +878,7 @@ u32 menu(u16 *original_screen)
   u32 first_load = 0;
   char current_savestate_filename[MAX_FILE];
   char line_buffer[256];
+  int value_x;
   char cheat_format_str[MAX_CHEATS][41*4];
 
   MENU_TYPE *current_menu;
@@ -954,7 +977,7 @@ u32 menu(u16 *original_screen)
       gamepak_filename[0] = 0;
       first_load = 1;
       memset(original_screen, 0x00, 240 * 160 * 2);
-      PRINT_STRING_EXT_BG(msg[MSG_NON_LOAD_GAME], 0xFFFF, 0x0000, 0, 75, original_screen, 240);
+      print_centered_240(msg[MSG_NON_LOAD_GAME], 75, original_screen);
       set_cpu_clock(10);
     }
 
@@ -1467,7 +1490,7 @@ u32 menu(u16 *original_screen)
   {
     first_load = 1;
     memset(original_screen, 0x00, 240 * 160 * 2);
-    PRINT_STRING_EXT_BG(msg[MSG_NON_LOAD_GAME], 0xFFFF, 0x0000, 0, 75, original_screen, 240);
+    print_centered_240(msg[MSG_NON_LOAD_GAME], 75, original_screen);
   }
 
   choose_menu(&main_menu);
@@ -1495,36 +1518,54 @@ u32 menu(u16 *original_screen)
     print_status(0);
     blit_to_screen(original_screen, 240, 160, 230, 40);
 
+    // Every option's ':' and value start at the same column, right after
+    // the widest label of this menu.
+    value_x = 0;
     display_option = current_menu->options;
 
     for(i = 0; i < current_menu->num_options; i++, display_option++)
     {
-      if(display_option->option_type & NUMBER_SELECTION_TYPE)
-      {
-        sprintf(line_buffer, display_option->display_string,
-         *(display_option->current_option));
-      }
-      else
+      int label_length;
 
-      if(display_option->option_type & STRING_SELECTION_TYPE)
-      {
-        sprintf(line_buffer, display_option->display_string,
-         ((u32 *)display_option->options)[*(display_option->current_option)]);
-      }
-      else
-      {
-        strcpy(line_buffer, display_option->display_string);
-      }
+      format_menu_option(display_option, line_buffer);
+      label_length = menu_label_length(line_buffer);
 
-      if(display_option == current_option)
+      if(label_length >= 0)
       {
-        PRINT_STRING_BG(line_buffer, COLOR_ACTIVE_ITEM, COLOR_BG, 10,
-         (display_option->line_number * 10) + 40);
+        int label_width = menu_label_width(line_buffer, label_length);
+
+        if(label_width > value_x)
+          value_x = label_width;
+      }
+    }
+    value_x += 10;
+
+    display_option = current_menu->options;
+
+    for(i = 0; i < current_menu->num_options; i++, display_option++)
+    {
+      u32 item_color;
+      u32 item_y;
+      int label_length;
+
+      format_menu_option(display_option, line_buffer);
+
+      item_color = (display_option == current_option) ?
+       COLOR_ACTIVE_ITEM : COLOR_INACTIVE_ITEM;
+      item_y = (display_option->line_number * 10) + 40;
+      label_length = menu_label_length(line_buffer);
+
+      if(label_length >= 0)
+      {
+        char *colon = strchr(line_buffer, ':');
+
+        PRINT_STRING_BG(colon, item_color, COLOR_BG, value_x, item_y);
+        line_buffer[label_length] = 0;
+        PRINT_STRING_BG(line_buffer, item_color, COLOR_BG, 10, item_y);
       }
       else
       {
-        PRINT_STRING_BG(line_buffer, COLOR_INACTIVE_ITEM, COLOR_BG, 10,
-         (display_option->line_number * 10) + 40);
+        PRINT_STRING_BG(line_buffer, item_color, COLOR_BG, 10, item_y);
       }
     }
 
@@ -2000,7 +2041,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     else
       {
         memset(snapshot_buffer, 0, 240 * 160 * 2);
-        PRINT_STRING_EXT_BG(msg[MSG_STATE_MENU_STATE_NONE], 0xFFFF, 0x0000, 0, 65, snapshot_buffer, 240);
+        print_centered_240(msg[MSG_STATE_MENU_STATE_NONE], 65, snapshot_buffer);
         get_timestamp_string(savestate_timestamp_string, MSG_STATE_MENU_DATE_NONE_0, 0, 0, 0, 0, 0, 0, 0, 0);
         PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, 10, 40);
       }
@@ -2053,6 +2094,67 @@ static u32 parse_line(char *current_line, char *current_str)
 
   strcpy(current_str, line_ptr);
   return 0;
+}
+
+/*------------------------------------------------------
+  Menu text alignment
+
+  The menu font used to be proportional, so the message files padded text
+  with spaces and '$' (a 1 px blank in gpsp10.fbm) to line up the ':' of
+  each option or to centre a line. Text is now drawn in fixed-width cells,
+  so that padding is ignored and the alignment is done here instead.
+------------------------------------------------------*/
+
+// Skip the leading padding of a message.
+static char *skip_padding(char *str)
+{
+  while ((*str == ' ') || (*str == '$'))
+    str++;
+
+  return str;
+}
+
+// Length of an option's label: the text before the first ':', without
+// trailing padding. -1 if the line has no ':'.
+static int menu_label_length(const char *line)
+{
+  const char *colon = strchr(line, ':');
+  int length;
+
+  if (colon == NULL)
+    return -1;
+
+  length = colon - line;
+  while ((length > 0) && ((line[length - 1] == ' ') || (line[length - 1] == '$')))
+    length--;
+
+  return length;
+}
+
+static int menu_label_width(const char *line, int length)
+{
+  char label[256];
+
+  if (length >= (int)sizeof(label))
+    length = sizeof(label) - 1;
+
+  memcpy(label, line, length);
+  label[length] = 0;
+
+  return fbm_getwidth(label);
+}
+
+// Centre a message in a 240 px wide image, such as the game preview.
+static void print_centered_240(char *str, u32 y, u16 *dest)
+{
+  int x;
+
+  str = skip_padding(str);
+  x = (240 - fbm_getwidth(str)) / 2;
+  if (x < 0)
+    x = 0;
+
+  PRINT_STRING_EXT_BG(str, 0xFFFF, 0x0000, x, y, dest, 240);
 }
 
 static void print_status(u32 mode)
