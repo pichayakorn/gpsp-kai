@@ -26,20 +26,10 @@ TARGET          = UO_gpSP_kai
 PSP_FW_VERSION=300
 VERSION_MODE = user
 
-# Version from version.txt. A build of the commit tagged v<version> is a
-# release; any other build gets "-dev+<commit>" so it can be told apart.
-GPSP_VERSION    := $(strip $(shell cat ../version.txt))
+include ../version.mk
 GPSP_VER_WORDS  := $(subst ., ,$(GPSP_VERSION))
 GPSP_VER_MAJOR  := $(word 1,$(GPSP_VER_WORDS))
 GPSP_VER_MINOR  := $(word 2,$(GPSP_VER_WORDS))
-GIT_RELEASE_TAG := $(shell git describe --tags --exact-match --match 'v$(GPSP_VERSION)' 2>/dev/null)
-GIT_COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null)
-ifeq ($(GIT_RELEASE_TAG)$(GIT_COMMIT),$(GIT_COMMIT))
-  ifneq ($(GIT_COMMIT),)
-    GPSP_VERSION_STRING := $(GPSP_VERSION)-dev+$(GIT_COMMIT)
-  endif
-endif
-GPSP_VERSION_STRING ?= $(GPSP_VERSION)
 
 PSP_EBOOT_TITLE = UO gpSP kai $(GPSP_VERSION_STRING)
 # The XMB information screen shows only APP_VER, in Sony's XX.YY format,
@@ -134,7 +124,7 @@ endif
 
 # version.txt and Makefile.set set compiler flags for every object (version
 # numbers, USE_* options), so a change to either must recompile everything.
-$(OBJS): ../version.txt ../Makefile.set
+$(OBJS): ../version.txt ../version.mk ../Makefile.set
 
 %.o: ../src/%.c
 	@echo Compiling $<...
