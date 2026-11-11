@@ -2732,9 +2732,14 @@ u32 bios_block_tag_top = 0x0101;
 // that overlaps the earlier one, although this should be relatively
 // uncommon)
 
+// ARM instructions take two tag slots; the second is marked as the middle
+// of a block. One statement, so fill_tag_dual's else covers both writes.
 #define fill_tag_arm(mem_type)                                                \
-  location[0] = mem_type##_block_tag_top;                                     \
-  location[1] = 0xFFFF                                                        \
+  do                                                                          \
+  {                                                                           \
+    location[0] = mem_type##_block_tag_top;                                   \
+    location[1] = 0xFFFF;                                                     \
+  } while(0)                                                                  \
 
 #define fill_tag_thumb(mem_type)                                              \
   *location = mem_type##_block_tag_top                                        \
