@@ -7,6 +7,13 @@ on:
   push:
     branches: [main]   # other branches are built through their pull request
   pull_request:
+    # The release-please PR only changes these files, and its code has already
+    # been built on main. Ignoring them means no run is started for it at all
+    # (a job-level "if" would still wait for approval, as the PR is a bot's).
+    paths-ignore:
+      - version.txt
+      - CHANGELOG.md
+      - .release-please-manifest.json
   workflow_call:
     inputs:
       release-tag:

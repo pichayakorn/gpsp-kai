@@ -41,7 +41,9 @@ Releases are automatic once the repository is on GitHub:
 
 1. Every push to `main` updates an open **release PR** that sets the next
    version in `version.txt` and adds the CHANGELOG entry, both generated from
-   the commits since the last release.
+   the commits since the last release. The release PR has no Build check:
+   it only changes those files, and the same code is already built on main.
+   To try it on a PSP first, check out its branch and run `make testpkg`.
 2. To release, merge that PR. The Release workflow tags the version (for
    example `v3.5.1`), creates the GitHub release with the changelog, and
    attaches `gpSP-kai-<version>.zip`.
