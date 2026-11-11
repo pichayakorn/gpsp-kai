@@ -43,11 +43,126 @@ struct SZIPFileHeader
   s16 ExtraFieldLength;
 }  __attribute__((packed));
 
+#define ZIP_EOCD_SIZE        22
+#define ZIP_CDIR_HEADER_SIZE 46
+#define ZIP_MAX_COMMENT      0xFFFF
+
+static u32 zip_le16(const u8 *p)
+{
+  return p[0] | (p[1] << 8);
+}
+
+static u32 zip_le32(const u8 *p)
+{
+  return p[0] | (p[1] << 8) | (p[2] << 16) | ((u32)p[3] << 24);
+}
+
+// For an entry whose general purpose flag has bit 3 set, the local header
+// holds zero for the CRC-32 and the sizes. Take them from the entry's
+// central directory record instead, which is found through the end of
+// central directory record at the end of the file. Only the entry whose
+// local header is at offset 0 is looked up, since that is the one loaded.
+// work must hold at least ZIP_EOCD_SIZE + ZIP_MAX_COMMENT bytes.
+// Returns 0 on success, -1 if the records are missing or inconsistent.
+static s32 zip_central_sizes(FILE_ID fd, u32 method, u8 *work,
+ struct SZIPFileDataDescriptor *desc)
+{
+  u8 *eocd = NULL;
+  u8 *hdr;
+  s32 file_size;
+  u32 tail_size;
+  u32 cdir_offset;
+  u32 cdir_end;
+  u32 entries;
+  u32 pos;
+  s32 i;
+
+  file_size = FILE_SEEK(fd, 0, SEEK_END);
+  if(file_size < ZIP_EOCD_SIZE)
+    return -1;
+
+  tail_size = ZIP_EOCD_SIZE + ZIP_MAX_COMMENT;
+  if(tail_size > (u32)file_size)
+    tail_size = file_size;
+
+  FILE_SEEK(fd, file_size - tail_size, SEEK_SET);
+  if(FILE_READ(fd, work, tail_size) != tail_size)
+    return -1;
+
+  // Search backwards for "PK\5\6" whose comment length reaches exactly the
+  // end of the file, so a signature inside the comment is not taken
+  for(i = tail_size - ZIP_EOCD_SIZE; i >= 0; i--)
+  {
+    u8 *p = work + i;
+
+    if((p[0] == 0x50) && (p[1] == 0x4B) && (p[2] == 0x05) && (p[3] == 0x06) &&
+     (zip_le16(p + 20) == tail_size - i - ZIP_EOCD_SIZE))
+    {
+      eocd = p;
+      break;
+    }
+  }
+
+  if(eocd == NULL)
+    return -1;
+
+  // Multi-disk archives are not supported. ZIP64 archives store all ones
+  // in the offset, which fails the range check below.
+  if((zip_le16(eocd + 4) != 0) || (zip_le16(eocd + 6) != 0))
+    return -1;
+
+  entries = zip_le16(eocd + 10);
+  cdir_offset = zip_le32(eocd + 16);
+  cdir_end = (u32)file_size - tail_size + i;
+  if((cdir_offset > cdir_end) || (zip_le32(eocd + 12) > cdir_end - cdir_offset))
+    return -1;
+  cdir_end = cdir_offset + zip_le32(eocd + 12);
+
+  hdr = work;
+  pos = cdir_offset;
+  while(entries > 0)
+  {
+    if(pos + ZIP_CDIR_HEADER_SIZE > cdir_end)
+      return -1;
+
+    FILE_SEEK(fd, pos, SEEK_SET);
+    if(FILE_READ(fd, hdr, ZIP_CDIR_HEADER_SIZE) != ZIP_CDIR_HEADER_SIZE)
+      return -1;
+
+    // Central directory file header signature "PK\1\2"
+    if((hdr[0] != 0x50) || (hdr[1] != 0x4B) ||
+     (hdr[2] != 0x01) || (hdr[3] != 0x02))
+      return -1;
+
+    if(zip_le32(hdr + 42) == 0)
+    {
+      // Same compression method as the local header, and stored data must
+      // not change size
+      if(zip_le16(hdr + 10) != method)
+        return -1;
+      if((method == 0) && (zip_le32(hdr + 20) != zip_le32(hdr + 24)))
+        return -1;
+
+      desc->CRC32 = zip_le32(hdr + 16);
+      desc->CompressedSize = zip_le32(hdr + 20);
+      desc->UncompressedSize = zip_le32(hdr + 24);
+      return 0;
+    }
+
+    pos += ZIP_CDIR_HEADER_SIZE + zip_le16(hdr + 28) + zip_le16(hdr + 30) +
+     zip_le16(hdr + 32);
+    entries--;
+  }
+
+  return -1;
+}
+
 // Load a ROM from a ZIP file. The first entry must be a .gba or .bin file.
 // Returns the ROM size, -2 if the ROM was written to ZIP_TMP because it is
 // larger than the ROM buffer, or -1 on any error: not a ZIP, an unsupported
-// entry (encrypted, sizes stored after the data, unknown compression), or
-// damaged or truncated data (checked against the entry's CRC-32).
+// entry (encrypted, unknown compression), a missing or inconsistent central
+// directory when the sizes are stored after the data, or damaged or
+// truncated data (checked against the entry's CRC-32).
 s32 load_file_zip(char *filename)
 {
   struct SZIPFileHeader data;
@@ -96,9 +211,8 @@ s32 load_file_zip(char *filename)
    (data.Sig[2] != 0x03) || (data.Sig[3] != 0x04))
     goto close_zip;
 
-  // Bit 0: encrypted. Bit 3: the sizes follow the data, so the header
-  // fields read below are zero.
-  if(data.GeneralBitFlag & 0x0009)
+  // Bit 0: encrypted
+  if(data.GeneralBitFlag & 0x0001)
     goto close_zip;
 
   name_length = (u16)data.FilenameLength;
@@ -114,7 +228,18 @@ s32 load_file_zip(char *filename)
    (strncasecmp(ext + 1, "bin", 3) && strncasecmp(ext + 1, "gba", 3)))
     goto close_zip;
 
-  if(data.ExtraFieldLength)
+  // Bit 3: the CRC-32 and sizes follow the data, so the local header holds
+  // zero for them. Read them from the central directory, then come back to
+  // the start of the data.
+  if(data.GeneralBitFlag & 0x0008)
+  {
+    if(zip_central_sizes(fd, (u16)data.CompressionMethod, cbuffer,
+     &data.DataDescriptor) != 0)
+      goto close_zip;
+    FILE_SEEK(fd, sizeof(data) + name_length + (u16)data.ExtraFieldLength,
+     SEEK_SET);
+  }
+  else if(data.ExtraFieldLength)
     FILE_SEEK(fd, (u16)data.ExtraFieldLength, SEEK_CUR);
 
   // A GBA ROM is at most 32 MB
