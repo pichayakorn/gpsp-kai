@@ -3788,6 +3788,8 @@ u32 load_state(char *savestate_filename, u32 slot_num)
        (s32)file_size)
       {
         FILE_CLOSE(savestate_file);
+        // Slot 10 shares this buffer, which now holds part of the file.
+        mem_save_flag = 0;
         savestate_error(msg[MSG_LOAD_STATE_ERROR]);
         return 0;
       }
@@ -3840,6 +3842,8 @@ u32 load_state(char *savestate_filename, u32 slot_num)
      ((strncmp(state_rom_name, gamepak_filename, MAX_FILE) != 0) &&
      (strncmp(state_file_name, gamepak_filename, name_length) != 0)))
     {
+      // Slot 10 shares this buffer, which now holds the other game's state.
+      mem_save_flag = 0;
       savestate_error(msg[MSG_LOAD_STATE_OTHER_GAME]);
       return 0;
     }

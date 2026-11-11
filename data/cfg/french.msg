@@ -343,6 +343,14 @@
 !           $Aucune sauvegarde existe\n\n
 !          $$état pour cet emplacement
 
+# MSG_STATE_MENU_MEMORY_NONE
+#Slot 10 (memory) is empty
+!Slot 10 (memory) is empty
+
+# MSG_STATE_MENU_MEMORY_LABEL
+#Last state (memory)
+!Last state (memory)
+
 # MSG_STATE_MENU_TITLE
 #Savestate options:
 !Savestate options:
