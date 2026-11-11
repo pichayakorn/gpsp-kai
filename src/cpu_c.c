@@ -19,7 +19,6 @@
  */
 
 // Important todo:
-// - stm reglist writeback when base is in the list needs adjustment
 // - block memory needs psr swapping and user mode reg swapping
 
 #ifdef USE_C_CORE
@@ -932,6 +931,34 @@ u32 high_frequency_branch_targets = 0;
 
 #define arm_block_memory_writeback_no()                                       \
 
+// Writeback when the base register is in the list (ARM7TDMI):
+// - LDM: the loaded value wins, so the writeback is done first and then
+//   overwritten by the load.
+// - STM: if the base register is the lowest one in the list, the original
+//   base is stored, so the writeback is done after the stores. Otherwise the
+//   new base is stored, so the writeback is done first.
+// Ported from libretro gpSP commit beb6e4b (GPL-2.0-or-later).
+
+#define arm_block_memory_store_base_first()                                   \
+  (((reg_list >> rn) & 0x01) && !(reg_list & ((1 << rn) - 1)))               \
+
+#define arm_block_memory_writeback_pre_load(writeback_type)                   \
+  arm_block_memory_writeback_##writeback_type()                               \
+
+#define arm_block_memory_writeback_post_load(writeback_type)                  \
+
+#define arm_block_memory_writeback_pre_store(writeback_type)                  \
+  if(!arm_block_memory_store_base_first())                                    \
+  {                                                                           \
+    arm_block_memory_writeback_##writeback_type();                            \
+  }                                                                           \
+
+#define arm_block_memory_writeback_post_store(writeback_type)                 \
+  if(arm_block_memory_store_base_first())                                     \
+  {                                                                           \
+    arm_block_memory_writeback_##writeback_type();                            \
+  }                                                                           \
+
 #define arm_block_memory_load_pc()                                            \
   load_aligned32(address, pc);                                                \
   reg[REG_PC] = pc                                                            \
@@ -946,7 +973,7 @@ u32 high_frequency_branch_targets = 0;
   u32 address = arm_block_memory_offset_##offset_type() & 0xFFFFFFFC;         \
   u32 i;                                                                      \
                                                                               \
-  arm_block_memory_writeback_##writeback_type();                              \
+  arm_block_memory_writeback_pre_##access_type(writeback_type);               \
                                                                               \
   for(i = 0; i < 15; i++)                                                     \
   {                                                                           \
@@ -962,6 +989,8 @@ u32 high_frequency_branch_targets = 0;
   {                                                                           \
     arm_block_memory_##access_type##_pc();                                    \
   }                                                                           \
+                                                                              \
+  arm_block_memory_writeback_post_##access_type(writeback_type);              \
 }                                                                             \
 
 #define arm_swap(type)                                                        \
@@ -1322,6 +1351,19 @@ u32 high_frequency_branch_targets = 0;
 #define thumb_block_memory_wb_store(base_reg)                                 \
   reg[base_reg] = address                                                     \
 
+// STMIA with the base register in the list stores the new base unless the
+// base register is the lowest one in the list (only STMIA can have the base
+// in the list, so the new base is the address after the stores).
+// Ported from libretro gpSP commit bfdc0d0 (GPL-2.0-or-later).
+
+#define thumb_block_memory_wb_pre_load(base_reg)                              \
+
+#define thumb_block_memory_wb_pre_store(base_reg)                             \
+  if(((reg_list >> base_reg) & 0x01) && (reg_list & ((1 << base_reg) - 1)))  \
+  {                                                                           \
+    reg[base_reg] = address + (bit_count[reg_list] * 4);                      \
+  }                                                                           \
+
 #define thumb_block_memory(access_type, pre_op, post_op, base_reg)            \
 {                                                                             \
   u32 i;                                                                      \
@@ -1329,6 +1371,7 @@ u32 high_frequency_branch_targets = 0;
   thumb_decode_rlist();                                                       \
   u32 address = reg[base_reg] & ~0x03;                                        \
   thumb_block_address_preadjust_##pre_op();                                   \
+  thumb_block_memory_wb_pre_##access_type(base_reg);                          \
                                                                               \
   for(i = 0; i < 8; i++)                                                      \
   {                                                                           \
