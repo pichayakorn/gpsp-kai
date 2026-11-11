@@ -251,7 +251,7 @@ static u32 gamepad_config_line_to_button[] = { 8, 6, 7, 9, 1, 2, 3, 0, 4, 5, 11,
 // The menu redraws every frame, so the file is read only when this changes.
 static char snapshot_path[MAX_PATH];
 
-static void get_savestate_snapshot(char *savestate_filename, u32 slot_num);
+static void get_savestate_snapshot(char *savestate_filename, u32 slot_num, u32 date_x, u32 date_y);
 static void forget_savestate_snapshot(void);
 static void get_savestate_filename(u32 slot, char *name_buffer);
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
@@ -1166,6 +1166,11 @@ u32 menu(u16 *original_screen)
   void submenu_main()
   {
     get_savestate_filename_noshot(g_savestate_slot_num, current_savestate_filename);
+
+    // On the load and save rows, the preview shows the selected slot (the
+    // only main menu rows that change the slot), with its date below it.
+    if(!first_load && (current_option->current_option == &g_savestate_slot_num))
+      get_savestate_snapshot(current_savestate_filename, g_savestate_slot_num, 230, 200);
   }
 
   char *yes_no_options[] =
@@ -1995,7 +2000,9 @@ s32 save_config_file()
   return -1;
 }
 
-static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
+// Show a slot's savestate picture in the preview area, and its date at
+// date_x, date_y.
+static void get_savestate_snapshot(char *savestate_filename, u32 slot_num, u32 date_x, u32 date_y)
   {
     static u16 snapshot_buffer[240 * 160];
     char savestate_timestamp_string[80];
@@ -2063,16 +2070,21 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
 
         savestate_timestamp_string[40] = 0;
 
-        PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, 10, 40);
+        PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, date_x, date_y);
       }
     else
       {
         memset(snapshot_buffer, 0, 240 * 160 * 2);
-        print_centered_240(msg[MSG_STATE_MENU_STATE_NONE], 65, snapshot_buffer);
+        print_centered_240(msg[(slot_num == MEM_STATE_NUM) ?
+         MSG_STATE_MENU_MEMORY_NONE : MSG_STATE_MENU_STATE_NONE], 65, snapshot_buffer);
         get_timestamp_string(savestate_timestamp_string, MSG_STATE_MENU_DATE_NONE_0, 0, 0, 0, 0, 0, 0, 0, 0);
-        PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, 10, 40);
+        PRINT_STRING_BG(savestate_timestamp_string, COLOR_HELP_TEXT, COLOR_BG, date_x, date_y);
       }
     blit_to_screen(snapshot_buffer, 240, 160, 230, 40);
+
+    // Slot 10 is lost when gpSP quits; label its picture.
+    if ((slot_num == MEM_STATE_NUM) && (valid_flag == 1))
+      PRINT_STRING_BG(msg[MSG_STATE_MENU_MEMORY_LABEL], COLOR_HELP_TEXT, COLOR_BG, 232, 42);
   }
 
 // Make the next get_savestate_snapshot() read the file again.
@@ -2088,7 +2100,7 @@ static void get_savestate_filename(u32 slot, char *name_buffer)
   sprintf(savestate_ext, "_%d.svs", (int)slot);
   change_ext(gamepak_filename, name_buffer, savestate_ext);
 
-  get_savestate_snapshot(name_buffer, g_savestate_slot_num);
+  get_savestate_snapshot(name_buffer, g_savestate_slot_num, 10, 40);
 }
 
 static u32 parse_line(char *current_line, char *current_str)

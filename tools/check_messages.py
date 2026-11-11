@@ -55,6 +55,8 @@ FIXED_FORMATS = {
     "MSG_MENU_BATTERY_CHARGING": (),
     "MSG_LOAD_STATE_NUM": ("d",),
     "MSG_SAVE_STATE_NUM": ("d",),
+    "MSG_STATE_MENU_MEMORY_LABEL": (),
+    "MSG_STATE_MENU_MEMORY_NONE": (),
     "MSG_SS_FMT_0": DATE,
     # The screenshot file name formats put the weekday first.
     "MSG_SS_FMT_1": ("s", "d", "d", "d", "d", "d", "d", "d"),

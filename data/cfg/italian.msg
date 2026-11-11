@@ -345,6 +345,14 @@
 !          $$$Non esiste alcun savestate\n\n
 !                   per questo slot
 
+# MSG_STATE_MENU_MEMORY_NONE
+#Slot 10 (memory) is empty
+!Slot 10 (memory) is empty
+
+# MSG_STATE_MENU_MEMORY_LABEL
+#Memory slot
+!Memory slot
+
 # MSG_STATE_MENU_TITLE
 #Savestate options:
 !Opzioni Savestate:

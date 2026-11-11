@@ -94,18 +94,22 @@
 # MSG_MAIN_MENU_HELP_1
 #Select to load the game state from the current slot for this game,\n
 #if it exists (see the extended menu for more information)\n
-#Press left + right to change the current slot.
+#Press left + right to change the current slot.\n
+#Slot 10 is kept in memory only and is lost when gpSP quits.
 !Select to load the game state from the current slot for this game,\n
 !if it exists (see the extended menu for more information)\n
-!Press left + right to change the current slot.
+!Press left + right to change the current slot.\n
+!Slot 10 is kept in memory only and is lost when gpSP quits.
 
 # MSG_MAIN_MENU_HELP_2
 #Select to save the game state to the current slot for this game.\n
 #See the extended menu for more information.\n
-#Press left + right to change the current slot.
+#Press left + right to change the current slot.\n
+#Slot 10 is kept in memory only and is lost when gpSP quits.
 !Select to save the game state to the current slot for this game.\n
 !See the extended menu for more information.\n
-!Press left + right to change the current slot.
+!Press left + right to change the current slot.\n
+!Slot 10 is kept in memory only and is lost when gpSP quits.
 
 # MSG_MAIN_MENU_HELP_3
 #Select to enter a menu for loading, saving, and viewing the\n
@@ -323,6 +327,14 @@
 #No savestate exists for this slot
 !No savestate exists for this slot
 
+# MSG_STATE_MENU_MEMORY_NONE
+#Slot 10 (memory) is empty
+!Slot 10 (memory) is empty
+
+# MSG_STATE_MENU_MEMORY_LABEL
+#Memory slot
+!Memory slot
+
 # MSG_STATE_MENU_TITLE
 #Savestate options:
 !Savestate options:
@@ -366,8 +378,10 @@
 !Note: The same file used to save the state must be present.
 
 # MSG_STATE_MENU_HELP_3
-#Change the current savestate slot.
-!Change the current savestate slot.
+#Change the current savestate slot.\n
+#Slot 10 is kept in memory only and is lost when gpSP quits.
+!Change the current savestate slot.\n
+!Slot 10 is kept in memory only and is lost when gpSP quits.
 
 # MSG_STATE_MENU_HELP_4
 #Return to the main menu.
