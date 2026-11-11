@@ -15,6 +15,14 @@
 #battery LifePercent: %3d%% LifeTime:%3d min
 !Carica Batteria: %3d%% Autonomia: %3d min
 
+# MSG_MENU_BATTERY_TIME
+#%dh %02dm left
+!
+
+# MSG_MENU_BATTERY_CHARGING
+#Charging
+!
+
 # MSG_DATE_FMT_0
 # for PSP_SYSTEMPARAM_DATE_FORMAT_YYYYMMDD
 #%04d/%02d/%02d  %-10s  %02d:%02d:%02d          

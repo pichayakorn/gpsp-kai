@@ -253,6 +253,7 @@ static char *skip_padding(char *str);
 static int menu_label_length(const char *line);
 static int menu_label_width(const char *line, int length);
 static void print_centered_240(char *str, u32 y, u16 *dest);
+static void print_string_right(char *str, u32 y);
 static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u16 day, u16 wday, u16 hour, u16 min, u16 sec, u32 msec);
 static void save_ss_bmp(u16 *image);
 void _flush_cache();
@@ -2157,6 +2158,17 @@ static void print_centered_240(char *str, u32 y, u16 *dest)
   PRINT_STRING_EXT_BG(str, 0xFFFF, 0x0000, x, y, dest, 240);
 }
 
+// Draw header text so that it ends at the right edge of the screen.
+static void print_string_right(char *str, u32 y)
+{
+  int x = 470 - fbm_getwidth(str);
+
+  if (x < 0)
+    x = 0;
+
+  PRINT_STRING_BG(str, COLOR_HELP_TEXT, COLOR_BG, x, y);
+}
+
 static void print_status(u32 mode)
 {
   char print_buffer_1[256];
@@ -2172,12 +2184,33 @@ static void print_status(u32 mode)
   sprintf(print_buffer_2,"%s%s", msg[MSG_MENU_DATE], print_buffer_1);
   PRINT_STRING_BG(print_buffer_2, COLOR_HELP_TEXT, COLOR_BG, 10, 0);
 
-  sprintf(print_buffer_1, msg[MSG_MENU_BATTERY], scePowerGetBatteryLifePercent(), scePowerGetBatteryLifeTime());
-  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 0);
+  // Right of row 1: time left (or "Charging") then the battery level, so
+  // the battery stays at the right edge.
+  if (scePowerIsBatteryExist() > 0)
+  {
+    int minutes = scePowerGetBatteryLifeTime();
 
-  sprintf(print_buffer_1, "MAX ROM BUF: %02d MB Ver: %s",
-      (int)(gamepak_ram_buffer_size/1024/1024), VERSION_STRING);
-  PRINT_STRING_BG(print_buffer_1, COLOR_HELP_TEXT, COLOR_BG, 229, 10);
+    print_buffer_1[0] = 0;
+    if (scePowerIsBatteryCharging() > 0)
+      sprintf(print_buffer_1, "%s", msg[MSG_MENU_BATTERY_CHARGING]);
+    else if (minutes >= 0)
+      sprintf(print_buffer_1, msg[MSG_MENU_BATTERY_TIME], minutes / 60, minutes % 60);
+    if (print_buffer_1[0] != 0)
+      strcat(print_buffer_1, "  ");
+
+    sprintf(print_buffer_2, msg[MSG_MENU_BATTERY], scePowerGetBatteryLifePercent(), minutes);
+    strcat(print_buffer_1, print_buffer_2);
+    print_string_right(print_buffer_1, 0);
+  }
+
+  // Right of row 2: the version. The ROM buffer is 32 MB on every model but
+  // the PSP-1000, where larger ROMs are paged in from the Memory Stick.
+  if (gamepak_ram_buffer_size < 32 * 1024 * 1024)
+    sprintf(print_buffer_1, "ROM buffer %d MB  UO gpSP kai %s",
+     (int)(gamepak_ram_buffer_size / 1024 / 1024), VERSION_STRING);
+  else
+    sprintf(print_buffer_1, "UO gpSP kai %s", VERSION_STRING);
+  print_string_right(print_buffer_1, 10);
 
   if (mode == 0)
   {

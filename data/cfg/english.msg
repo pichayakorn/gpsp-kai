@@ -13,8 +13,16 @@
 !
 
 # MSG_MENU_BATTERY
-#battery LifePercent: %3d%% LifeTime:%3d min
-!battery LifePercent: %3d%% LifeTime:%3d min
+#Battery %d%%
+!Battery %d%%
+
+# MSG_MENU_BATTERY_TIME
+#%dh %02dm left
+!%dh %02dm left
+
+# MSG_MENU_BATTERY_CHARGING
+#Charging
+!Charging
 
 # MSG_DATE_FMT_0
 # for PSP_SYSTEMPARAM_DATE_FORMAT_YYYYMMDD

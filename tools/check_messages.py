@@ -44,6 +44,8 @@ FIXED_FORMATS = {
     "MSG_CHEAT_MENU_NON_LOAD": ("d",),
     "MSG_CHEAT_MENU_0": ("d", "s"),
     "MSG_MENU_BATTERY": ("d", "d"),
+    "MSG_MENU_BATTERY_TIME": ("d", "d"),
+    "MSG_MENU_BATTERY_CHARGING": (),
     "MSG_LOAD_STATE_NUM": ("d",),
     "MSG_SAVE_STATE_NUM": ("d",),
     "MSG_SS_FMT_0": DATE,
