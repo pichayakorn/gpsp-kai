@@ -342,8 +342,8 @@
 !Slot 10 (memory) is empty
 
 # MSG_STATE_MENU_MEMORY_LABEL
-#Memory slot
-!Memory slot
+#Last state (memory)
+!Last state (memory)
 
 # MSG_STATE_MENU_TITLE
 #Savestate options:

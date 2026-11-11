@@ -2082,7 +2082,8 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num, u32 d
       }
     blit_to_screen(snapshot_buffer, 240, 160, 230, 40);
 
-    // Slot 10 is lost when gpSP quits; label its picture.
+    // Slot 10 is the last state saved or loaded from any slot, kept in
+    // memory only (takka's quick save); label its picture.
     if ((slot_num == MEM_STATE_NUM) && (valid_flag == 1))
       PRINT_STRING_BG(msg[MSG_STATE_MENU_MEMORY_LABEL], COLOR_HELP_TEXT, COLOR_BG, 232, 42);
   }
