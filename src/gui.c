@@ -2203,14 +2203,8 @@ static void print_status(u32 mode)
     print_string_right(print_buffer_1, 0);
   }
 
-  // Right of row 2: the version. The ROM buffer is 32 MB on every model but
-  // the PSP-1000, where larger ROMs are paged in from the Memory Stick.
-  if (gamepak_ram_buffer_size < 32 * 1024 * 1024)
-    sprintf(print_buffer_1, "ROM buffer %d MB  UO gpSP kai %s",
-     (int)(gamepak_ram_buffer_size / 1024 / 1024), VERSION_STRING);
-  else
-    sprintf(print_buffer_1, "UO gpSP kai %s", VERSION_STRING);
-  print_string_right(print_buffer_1, 10);
+  // Right of row 2: the version.
+  print_string_right(VERSION_STRING, 10);
 
   if (mode == 0)
   {
