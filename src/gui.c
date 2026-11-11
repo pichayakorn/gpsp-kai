@@ -257,6 +257,7 @@ static int menu_label_length(const char *line);
 static int menu_label_width(const char *line, int length);
 static void print_centered_240(char *str, u32 y, u16 *dest);
 static void print_string_right(char *str, u32 y);
+static void print_help(char *help);
 static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u16 day, u16 wday, u16 hour, u16 min, u16 sec, u32 msec);
 static void save_ss_bmp(u16 *image);
 void _flush_cache();
@@ -1577,7 +1578,7 @@ u32 menu(u16 *original_screen)
       }
     }
 
-    PRINT_STRING_BG(current_option->help_string, COLOR_HELP_TEXT, COLOR_BG, 30, 210);
+    print_help(current_option->help_string);
 
     gui_action = get_gui_input();
 
@@ -2163,6 +2164,43 @@ static void print_centered_240(char *str, u32 y, u16 *dest)
     x = 0;
 
   PRINT_STRING_EXT_BG(str, 0xFFFF, 0x0000, x, y, dest, 240);
+}
+
+// Draw an option's help text at the bottom of the 5-line help area. The
+// message files used to pad help texts with leading blank lines for this;
+// leading and trailing blank lines are now ignored.
+#define HELP_Y      210
+#define HELP_LINES  5
+
+static void print_help(char *help)
+{
+  char buffer[1024];
+  int length;
+  int lines;
+  int i;
+
+  while (*help == '\n')
+    help++;
+
+  snprintf(buffer, sizeof(buffer), "%s", help);
+  length = strlen(buffer);
+  while ((length > 0) && (buffer[length - 1] == '\n'))
+    buffer[--length] = 0;
+
+  if (length == 0)
+    return;
+
+  lines = 1;
+  for (i = 0; i < length; i++)
+  {
+    if (buffer[i] == '\n')
+      lines++;
+  }
+  if (lines > HELP_LINES)
+    lines = HELP_LINES;
+
+  PRINT_STRING_BG(buffer, COLOR_HELP_TEXT, COLOR_BG, 30,
+   HELP_Y + (HELP_LINES - lines) * 10);
 }
 
 // Draw header text so that it ends at the right edge of the screen.
