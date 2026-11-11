@@ -24,7 +24,9 @@ int sctrlGetInitPARAM(const char *paramName, u16 *paramType, u32 *paramLength,
 
 /* Defined by libcglue: the partition 2 block that holds the newlib heap.
  * libcglue allocates it on the first malloc, sized to
- * sceKernelMaxFreeMemSize() minus a 512 KB threshold. */
+ * sceKernelMaxFreeMemSize() minus a 512 KB threshold. That first malloc
+ * happens before main(): crt0 -> __libcglue_init -> __timezone_update ->
+ * setenv("TZ"). */
 extern SceUID __psp_heap_blockid;
 /* Linker symbols: start of the EBOOT and end of its .bss */
 extern char __executable_start[];
@@ -79,8 +81,8 @@ static u32 largest_malloc(u32 *addr)
 
 static void take_snapshot(mem_snapshot *s)
 {
-  /* Kernel numbers first: at main start the probe's malloc() may be the
-   * one that creates the heap */
+  /* The heap already exists at main start, so the kernel numbers are the
+   * memory outside the heap; "largest malloc" is about the heap size. */
   s->total_free = sceKernelTotalFreeMemSize();
   s->max_free = sceKernelMaxFreeMemSize();
   s->largest = largest_malloc(&s->largest_addr);
@@ -147,8 +149,8 @@ static void collect(void)
     heap_base = (u32)sceKernelGetBlockHeadAddr(__psp_heap_blockid);
 
   /* A small block from the high end shows where partition 2 ends:
-   * about 0x0A000000 for the normal 24 MB, about 0x0BB00000 with the
-   * extra memory unlocked. */
+   * about 0x0A000000 for the normal 24 MB; with the extra memory
+   * unlocked about 0x0BB00000 (ARK-4 with partition 11) to 0x0BF00000. */
   uid = sceKernelAllocPartitionMemory(2, "memdbg_hi", PSP_SMEM_High, 16 * KB, NULL);
   if(uid > 0)
   {
@@ -172,6 +174,15 @@ static void collect(void)
    (u32)_end, ((u32)_end - (u32)__executable_start) / KB);
   add_line("heap block id 0x%X base 0x%08X", __psp_heap_blockid, heap_base);
   add_snapshot("A main start: ", &snap_start);
+  /* The heap is nearly empty at main start, so the end of the largest
+   * malloc is about the end of the heap block. Heap size plus A max is
+   * about the largest free block partition 2 had before the heap. */
+  if(heap_base != 0 && snap_start.largest_addr != 0)
+  {
+    u32 heap_end = snap_start.largest_addr + snap_start.largest;
+    add_line("   heap ~%u KB (base to A largest end), pre-heap max ~%u KB",
+     (heap_end - heap_base) / KB, (heap_end - heap_base + snap_start.max_free) / KB);
+  }
   add_snapshot("B pre gamepak:", &snap_before);
   add_line("C ROM buffer %u KB (%u MB) at 0x%08X", gamepak_size / KB,
    gamepak_size / MB, gamepak_addr);
