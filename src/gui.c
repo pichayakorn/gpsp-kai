@@ -247,7 +247,12 @@ static char s_font[MAX_PATH];
 static u32 menu_cheat_page = 0;
 static u32 gamepad_config_line_to_button[] = { 8, 6, 7, 9, 1, 2, 3, 0, 4, 5, 11, 10 };
 
+// Path of the savestate file whose preview get_savestate_snapshot() holds.
+// The menu redraws every frame, so the file is read only when this changes.
+static char snapshot_path[MAX_PATH];
+
 static void get_savestate_snapshot(char *savestate_filename, u32 slot_num);
+static void forget_savestate_snapshot(void);
 static void get_savestate_filename(u32 slot, char *name_buffer);
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
 static u32 parse_line(char *current_line, char *current_str);
@@ -1018,6 +1023,8 @@ u32 menu(u16 *original_screen)
     {
       get_savestate_filename_noshot(g_savestate_slot_num, current_savestate_filename);
       save_state(current_savestate_filename, original_screen, g_savestate_slot_num);
+      // Show the new preview and date at once.
+      forget_savestate_snapshot();
       pause_sound(1);
       clear_screen(COLOR_BG);
       blit_to_screen(original_screen, 240, 160, 230, 40);
@@ -1497,6 +1504,10 @@ u32 menu(u16 *original_screen)
 
   // The menu runs at 222 MHz
   set_cpu_clock(10);
+
+  // A savestate may have been saved with the in-game buttons since the
+  // menu was last open.
+  forget_savestate_snapshot();
 
   if(gamepak_filename[0] == 0)
   {
@@ -1989,7 +2000,6 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     static u16 snapshot_buffer[240 * 160];
     char savestate_timestamp_string[80];
     char savestate_path[MAX_PATH];
-    static char old_savestate_path[MAX_PATH];
     FILE_ID savestate_file;
     static u64 savestate_time_flat;
     u64 local_time;
@@ -2001,10 +2011,10 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
 
     if (slot_num != MEM_STATE_NUM)
     {
-      if(strcmp(savestate_path, old_savestate_path) != 0)
+      if(strcmp(savestate_path, snapshot_path) != 0)
       {
         FILE_OPEN(savestate_file, savestate_path, READ);
-        strcpy(old_savestate_path, savestate_path);
+        strcpy(snapshot_path, savestate_path);
         if(FILE_CHECK_VALID(savestate_file))
         {
           char str[4];
@@ -2024,6 +2034,11 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     }
     else
     {
+      // Slot 10 lives in memory and replaces the buffered preview, so the
+      // next file slot must be read again.
+      forget_savestate_snapshot();
+      valid_flag = 0;
+
       if (mem_save_flag == 1)
       {
         g_state_buffer_ptr = savestate_write_buffer;
@@ -2035,8 +2050,6 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
           valid_flag = 1;
         }
       }
-      else
-        valid_flag = 0;
     }
 
     if (valid_flag == 1)
@@ -2061,6 +2074,12 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
       }
     blit_to_screen(snapshot_buffer, 240, 160, 230, 40);
   }
+
+// Make the next get_savestate_snapshot() read the file again.
+static void forget_savestate_snapshot(void)
+{
+  snapshot_path[0] = 0;
+}
 
 static void get_savestate_filename(u32 slot, char *name_buffer)
 {
