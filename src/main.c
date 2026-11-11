@@ -848,6 +848,9 @@ MAIN_SAVESTATE_BODY(READ_MEM, ver);
 void main_write_mem_savestate(u32 ver)
 MAIN_SAVESTATE_BODY(WRITE_MEM, ver);
 
+void main_get_size_savestate(u32 ver)
+MAIN_SAVESTATE_BODY(GET_SIZE, ver);
+
 void error_msg(char *text)
 {
     gui_action_type gui_action = CURSOR_NONE;

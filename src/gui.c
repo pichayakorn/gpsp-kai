@@ -1046,6 +1046,11 @@ u32 menu(u16 *original_screen)
   {
     char *file_ext[] = { ".svs", NULL };
     char load_filename[512];
+
+    // A savestate only applies to the game it was made with.
+    if(first_load)
+      return;
+
     if(load_file(file_ext, load_filename, g_default_save_dir) != -1)
     {
       if (load_state(load_filename, g_savestate_slot_num) == 1)

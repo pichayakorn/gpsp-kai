@@ -1088,6 +1088,14 @@
 #Load State End.
 !Load State End.
 
+# MSG_LOAD_STATE_OTHER_GAME
+#Savestate is from another game. Press any button.
+!Savestate is from another game. Press any button.
+
+# MSG_LOAD_STATE_ERROR
+#Could not load the savestate. Press any button.
+!Could not load the savestate. Press any button.
+
 # MSG_SAVE_STATE
 #Save State.
 !Save State.

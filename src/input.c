@@ -438,6 +438,9 @@ void input_read_mem_savestate(u32 ver)
 void input_write_mem_savestate(u32 ver)
   input_savestate_body(WRITE_MEM, ver);
 
+void input_get_size_savestate(u32 ver)
+  input_savestate_body(GET_SIZE, ver);
+
 // On-screen keyboard (OSK) code below
 #ifdef OSK
 

@@ -3605,10 +3605,10 @@ void bios_region_read_protect()
 
 // type = read_mem / write_mem
 // ver = 0(old_format) / 1(3.4 test 1 format) / 0x00010000(new format)
-#define memory_savestate_body(type, ver)                                      \
+// The fields of the memory block that come before the ROM file name.
+// savestate_rom_name() measures them to find the name in a savestate.
+#define memory_savestate_head(type)                                           \
 {                                                                             \
-  u32 i;                                                                      \
-                                                                              \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, backup_type);                    \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, sram_size);                      \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_mode);                     \
@@ -3631,6 +3631,13 @@ void bios_region_read_protect()
   FILE_##type##_VARIABLE(g_state_buffer_ptr, rtc_data_bytes);                 \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, rtc_bit_count);                  \
   FILE_##type##_ARRAY(g_state_buffer_ptr, eeprom_buffer);                     \
+}                                                                             \
+
+#define memory_savestate_body(type, ver)                                      \
+{                                                                             \
+  u32 i;                                                                      \
+                                                                              \
+  memory_savestate_head(type);                                                \
   FILE_##type##_ARRAY(g_state_buffer_ptr, gamepak_filename);                  \
   if(ver == 0)                                                                \
     g_state_buffer_ptr += 256;                                                \
@@ -3679,6 +3686,41 @@ memory_savestate_body(GET_SIZE, ver);
   update_progress();                                                     \
 
 /*--------------------------------------------------------
+  Find the ROM file name stored in a savestate
+  input
+    u8 *state_data  start of the emulator state, after the header,
+                    screenshot and time stamp
+    u32 ver         savestate format version
+  return
+    the stored name (MAX_FILE bytes, not necessarily terminated)
+--------------------------------------------------------*/
+static char *savestate_rom_name(u8 *state_data, u32 ver)
+{
+  u8 *saved_ptr = g_state_buffer_ptr;
+  char *name;
+
+  // Walk the blocks that come before the name the way savestate_block()
+  // reads them, without reading anything.
+  g_state_buffer_ptr = state_data;
+  cpu_get_size_savestate(ver);
+  input_get_size_savestate(ver);
+  main_get_size_savestate(ver);
+  memory_savestate_head(GET_SIZE);
+  name = (char *)g_state_buffer_ptr;
+
+  g_state_buffer_ptr = saved_ptr;
+  return name;
+}
+
+// Show a savestate error and wait for a button.
+static void savestate_error(char *text)
+{
+  show_progress(text);
+  button_up_wait();
+  error_msg("");
+}
+
+/*--------------------------------------------------------
   Load state
   input
     char *savestate_filename file to load
@@ -3720,7 +3762,24 @@ u32 load_state(char *savestate_filename, u32 slot_num)
     if(FILE_CHECK_VALID(savestate_file))
     {
       file_size = file_length(savestate_path);
-      FILE_READ(savestate_file, savestate_write_buffer, file_size);
+
+      // Anything else is not a savestate, or a damaged one, and a larger
+      // file would overflow the buffer.
+      if((file_size < SAVESTATE_SIZE_OLD) ||
+       (file_size > sizeof(savestate_write_buffer)))
+      {
+        FILE_CLOSE(savestate_file);
+        savestate_error(msg[MSG_LOAD_STATE_ERROR]);
+        return 0;
+      }
+
+      if(FILE_READ(savestate_file, savestate_write_buffer, file_size) !=
+       (s32)file_size)
+      {
+        FILE_CLOSE(savestate_file);
+        savestate_error(msg[MSG_LOAD_STATE_ERROR]);
+        return 0;
+      }
       FILE_CLOSE(savestate_file);
     }
     else
@@ -3754,6 +3813,27 @@ u32 load_state(char *savestate_filename, u32 slot_num)
 
   g_state_buffer_ptr += (240 * 160 * 2) + sizeof(u64);
 
+  // A savestate holds the whole machine, so applying one made with another
+  // ROM runs that game's state on this ROM and freezes. Check the ROM file
+  // name stored in it first, and leave the running game alone if it
+  // differs. A savestate whose file name starts with this ROM's name is
+  // accepted too, so states still load after the ROM file is renamed.
+  {
+    char *state_rom_name = savestate_rom_name(g_state_buffer_ptr, ver);
+    u32 name_length = strcspn(gamepak_filename, ".");
+    char *state_file_name = strrchr(savestate_filename, '/');
+
+    state_file_name = state_file_name ? state_file_name + 1 : savestate_filename;
+
+    if((gamepak_filename[0] == 0) ||
+     ((strncmp(state_rom_name, gamepak_filename, MAX_FILE) != 0) &&
+     (strncmp(state_file_name, gamepak_filename, name_length) != 0)))
+    {
+      savestate_error(msg[MSG_LOAD_STATE_OTHER_GAME]);
+      return 0;
+    }
+  }
+
   strcpy(current_gamepak_filename, gamepak_filename);
   update_progress();
 
@@ -3772,31 +3852,9 @@ u32 load_state(char *savestate_filename, u32 slot_num)
 
   mem_save_flag = 1;
 
-  // TODO: loading a savestate from a different ROM freezes
-  if(strcmp(current_gamepak_filename, gamepak_filename))
-  {
-    // We'll let it slide if the filenames of the savestate and
-    // the gamepak are similar enough.
-    u32 dot_position = strcspn(current_gamepak_filename, ".");
-    if(strncmp(savestate_filename, current_gamepak_filename, dot_position))
-    {
-      if(load_gamepak(gamepak_filename) != -1)
-      {
-        reset_gba();
-        // Okay, so this takes a while, but for now it works.
-        load_state(savestate_filename, g_savestate_slot_num);
-      }
-      else
-      {
-        quit(0);
-      }
-
-      real_frame_count = 0;
-      virtual_frame_count = 0;
-      pause_sound(0);
-      return 1;
-    }
-  }
+  // The savestate's copy of the ROM file name replaced ours; keep the name
+  // of the file that is actually loaded (they differ after a rename).
+  strcpy(gamepak_filename, current_gamepak_filename);
 
   // Oops, these contain raw pointers
   for(i = 0; i < 4; i++)
