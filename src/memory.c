@@ -3603,6 +3603,29 @@ void bios_region_read_protect()
 }
 
 
+// The flash bank (0 or 1) as stored in a savestate. Savestates used to
+// store flash_bank_ptr itself, a memory address that moves whenever the
+// program changes, so a bank 1 pointer from another build could point into
+// the middle of the save. New savestates store the bank number in the same
+// 4 bytes.
+static u32 flash_bank_state;
+
+// Turn a stored flash bank back into a pointer.
+static u8 *flash_bank_from_state(u32 state)
+{
+  // A bank number, from a savestate made by this build or a later one.
+  if(state <= 1)
+    return gamepak_backup + (state * (1024 * 64));
+
+  // An address from an older savestate: only trust it if it is exactly
+  // bank 1 in this build. Anything else falls back to bank 0; games select
+  // the bank again before they use it.
+  if(state == (u32)(gamepak_backup + (1024 * 64)))
+    return gamepak_backup + (1024 * 64);
+
+  return gamepak_backup;
+}
+
 // type = read_mem / write_mem
 // ver = 0(old_format) / 1(3.4 test 1 format) / 0x00010000(new format)
 // The fields of the memory block that come before the ROM file name.
@@ -3613,7 +3636,7 @@ void bios_region_read_protect()
   FILE_##type##_VARIABLE(g_state_buffer_ptr, sram_size);                      \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_mode);                     \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_command_position);         \
-  FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_bank_ptr);                 \
+  FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_bank_state);               \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_device_id);                \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_manufacturer_id);          \
   FILE_##type##_VARIABLE(g_state_buffer_ptr, flash_size);                     \
@@ -3652,20 +3675,19 @@ void bios_region_read_protect()
   FILE_##type(g_state_buffer_ptr, oam_ram, 0x400);                            \
   FILE_##type(g_state_buffer_ptr, palette_ram, 0x400);                        \
   FILE_##type(g_state_buffer_ptr, io_registers, 0x8000);                      \
-                                                                              \
-  /* This is a hack, for now. */                                              \
-  if((flash_bank_ptr < gamepak_backup) ||                                     \
-   (flash_bank_ptr > (gamepak_backup + (1024 * 64))))                         \
-  {                                                                           \
-    flash_bank_ptr = gamepak_backup;                                          \
-  }                                                                           \
 }                                                                             \
 
 void memory_read_mem_savestate(u32 ver)
-memory_savestate_body(READ_MEM, ver);
+{
+  memory_savestate_body(READ_MEM, ver);
+  flash_bank_ptr = flash_bank_from_state(flash_bank_state);
+}
 
 void memory_write_mem_savestate(u32 ver)
-memory_savestate_body(WRITE_MEM, ver);
+{
+  flash_bank_state = (flash_bank_ptr == (gamepak_backup + (1024 * 64))) ? 1 : 0;
+  memory_savestate_body(WRITE_MEM, ver);
+}
 
 void memory_get_size_savestate(u32 ver)
 memory_savestate_body(GET_SIZE, ver);
