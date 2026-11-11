@@ -719,8 +719,8 @@
 !Return to the main menu.
 
 # MSG_CHEAT_MENU_NON_LOAD
-#   %2d  (none loaded)
-!   %2d  (none loaded)
+#   %2d
+!   %2d
 
 # MSG_CHEAT_MENU_0
 #%%s %2d  %s
