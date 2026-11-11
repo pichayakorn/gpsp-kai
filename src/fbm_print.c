@@ -15,6 +15,11 @@
 #define FBM_SIZE_CONTROL		(9)
 #define FBM_SIZE_MAP			(6)
 
+// Glyphs are drawn centred in a cell at least this wide, so menu text
+// lines up in columns. Wider glyphs (CJK, a few symbols) keep their width.
+#define FBM_CELL_WIDTH			(6)
+#define FBM_ADVANCE(w)			((w) > FBM_CELL_WIDTH ? (w) : FBM_CELL_WIDTH)
+
 static fbm_control_t fbmControl[2];
 static fbm_map_t     *fbmFontMap[2];
 static fbm_font_t    *fbmFont[2];
@@ -181,7 +186,7 @@ int fbm_getwidth(char *str)
         font_num = 1;
     }
     font = fbm_getfont(index, font_num);
-    width += *(font->width);
+    width += FBM_ADVANCE(*(font->width));
   }
 
   return width;
@@ -256,6 +261,9 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
   int           i;
   int           j;
   int           shift;
+  int           width;
+  int           advance;
+  int           pad;
   u8            pt;
   u16           *vptr;
   fbm_font_t    *font;
@@ -263,8 +271,11 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
   if (index < 0) return;
 
   font = fbm_getfont(index, isdouble);
+  width = *(font->width);
+  advance = FBM_ADVANCE(width);
+  pad = (advance - width) / 2;
 
-  if (nextx + *(font->width) > FBM_PSP_WIDTH)
+  if (nextx + advance > FBM_PSP_WIDTH)
   {
     nextx = 0;
     nexty += fbmControl[0].height;
@@ -285,8 +296,16 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
     index = i * byteperline;
     pt = font->font[index++];
 
-    for (j = 0; j < *(font->width); j++)
+    for (j = 0; j < advance; j++)
     {
+      if ((j < pad) || (j >= pad + width))
+      {
+        if (fill & 0x10)
+          *vptr = (u16)back;
+        vptr++;
+        continue;
+      }
+
       if (shift >= 8)
       {
         shift = 0;
@@ -313,7 +332,7 @@ void fbm_printSUB(void *vram, int bufferwidth, int index, int isdouble, int heig
     vram = (u16 *)vram + bufferwidth;
   }
 
-  nextx = nextx + *(font->width);
+  nextx = nextx + advance;
 }
 
 void *fbm_malloc(size_t size)
