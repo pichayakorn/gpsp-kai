@@ -8,7 +8,7 @@ include version.mk
 
 all: systembuttons_prx dvemgr homehookprx main
 
-.PHONY: all clean main dvemgr homehookprx systembuttons_prx package check release version
+.PHONY: all clean main dvemgr homehookprx systembuttons_prx package check release testpkg version
 
 # Ready-to-copy Memory Stick folder: copy $(PACKAGE_DIR) to PSP/GAME/ and add
 # your own gba_bios.bin. Its name has no version, so an update replaces the
@@ -53,6 +53,25 @@ release: check package
 	rm -f $(RELEASE_ZIP)
 	cd out && zip -qr $(notdir $(RELEASE_ZIP)) $(notdir $(PACKAGE_DIR))
 	@echo "Release zip: $(RELEASE_ZIP)"
+
+# Local PSP test build: out/test/gpSP-kai-<version>.zip unzips to a folder
+# gpSP-kai-<version>/ to paste into PSP/GAME/, so several builds can sit side
+# by side. Every path in cfg/dir.cfg is relative to that folder. The
+# git-ignored testdata/ folder has the same layout as that folder
+# (gba_bios.bin, GBA/ROM, GBA/SAV, ...) and is copied over it. Never used
+# for releases or CI.
+TEST_DATA = testdata
+TEST_NAME = gpSP-kai-$(GPSP_VERSION_STRING)
+TEST_DIR  = out/test/$(TEST_NAME)
+
+testpkg: check package
+	rm -rf $(TEST_DIR) $(TEST_DIR).zip
+	mkdir -p out/test
+	cp -r $(PACKAGE_DIR) $(TEST_DIR)
+	if [ -d $(TEST_DATA) ]; then cp -r $(TEST_DATA)/. $(TEST_DIR)/; fi
+	find $(TEST_DIR) -name .DS_Store -delete
+	cd out/test && zip -qr $(TEST_NAME).zip $(TEST_NAME)
+	@echo "Test zip: $(TEST_DIR).zip"
 
 # Print the version string, e.g. for naming the CI artifact
 version:

@@ -12,3 +12,6 @@ prx/dvemgr/exports.c
 prx/systembuttons_prx/SystemButtons.c
 prx/homehookprx/homehook.c
 __pycache__/
+
+# local PSP test files (BIOS dump, games, saves) for make testpkg; never commit
+testdata/
