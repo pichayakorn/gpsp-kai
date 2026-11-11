@@ -65,6 +65,9 @@ committed), which has the same layout as the folder on the PSP:
 `testdata/gba_bios.bin`, `testdata/GBA/ROM/`, `testdata/GBA/SAV/` and so on.
 Each test build starts from the same clean saves.
 
+The folder name must stay at 31 characters or less: the XMB shows a longer
+`PSP/GAME/` folder as "Corrupted Data". `make testpkg` refuses a longer name.
+
 Add `-j4` (or your number of CPU cores) to build in parallel, e.g.
 `make -j4 release`.
 
