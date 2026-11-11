@@ -289,7 +289,6 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
   char *file_name;
   u32 file_name_length;
   s32 ext_pos = -1;
-  u32 chosen_file, chosen_dir;
   s32 return_value = 1;
   u32 current_file_selection;
   u32 current_file_scroll_value;
@@ -325,8 +324,6 @@ s32 load_file(char **wildcards, char *result,char *default_dir_name)
 
     num_files = 0;
     num_dirs = 0;
-    chosen_file = 0;
-    chosen_dir = 0;
 
     getcwd(current_dir_name, MAX_PATH);
     current_dir = opendir(current_dir_name);
@@ -788,10 +785,7 @@ void load_game_config_file(void)
 
   change_ext(gamepak_filename, game_config_filename, ".cfg");
 
-  if (g_default_cfg_dir != NULL)
-    path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
-  else
-    strcpy(game_config_path, game_config_filename);
+  path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
 
   FILE_OPEN(game_config_file, game_config_path, READ);
 
@@ -1646,7 +1640,6 @@ void button_up_wait()
 u32 load_dircfg(char *file_name)  // TODO: rewrite more cleanly
 {
   int loop;
-  int next_line;
   char current_line[256];
   char current_str[256];
   FILE *msg_file;
@@ -1656,7 +1649,6 @@ u32 load_dircfg(char *file_name)  // TODO: rewrite more cleanly
 
   msg_file = fopen(msg_path, "r");
 
-  next_line = 0;
   if(msg_file)
   {
     loop = 0;
@@ -1761,7 +1753,6 @@ u32 load_dircfg(char *file_name)  // TODO: rewrite more cleanly
 u32 load_fontcfg(char *file_name)  // TODO: rewrite more cleanly
 {
   int loop;
-  int next_line;
   char current_line[256];
   char current_str[256];
   FILE *msg_file;
@@ -1774,7 +1765,6 @@ u32 load_fontcfg(char *file_name)  // TODO: rewrite more cleanly
 
   msg_file = fopen(msg_path, "rb");
 
-  next_line = 0;
   if(msg_file)
   {
     loop = 0;
@@ -1887,10 +1877,7 @@ s32 save_game_config_file()
 
   change_ext(gamepak_filename, game_config_filename, ".cfg");
 
-  if (g_default_cfg_dir != NULL)
-    path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
-  else
-    strcpy(game_config_path, game_config_filename);
+  path_printf(game_config_path, sizeof(game_config_path), "%s/%s", g_default_cfg_dir, game_config_filename);
 
   if(g_game_config.use_default_gamepad_map == 0)
     memcpy(g_game_config.gamepad_config_map, gamepad_config_map, sizeof(g_game_config.gamepad_config_map));
@@ -1949,13 +1936,7 @@ static void get_savestate_snapshot(char *savestate_filename, u32 slot_num)
     ScePspDateTime current_time;
     static u32 valid_flag;
 
-    if (g_default_save_dir != NULL) {
-      path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, savestate_filename);
-    }
-    else
-      {
-        strcpy(savestate_path, savestate_filename);
-      }
+    path_printf(savestate_path, sizeof(savestate_path), "%s/%s", g_default_save_dir, savestate_filename);
 
     if (slot_num != MEM_STATE_NUM)
     {
@@ -2155,13 +2136,7 @@ static void save_ss_bmp(u16 *image)
   get_timestamp_string(timestamp, MSG_SS_FMT_0, current_time.year, current_time.month , current_time.day, 7,
     current_time.hour, current_time.minute, current_time.second, current_time.microsecond);
 
-  if (g_default_ss_dir != NULL) {
-    path_printf(save_ss_path, sizeof(save_ss_path), "%s/%s%s.bmp", g_default_ss_dir, ss_filename, timestamp);
-  }
-  else
-  {
-    sprintf(save_ss_path, "%s_%s.bmp", ss_filename, timestamp);
-  }
+  path_printf(save_ss_path, sizeof(save_ss_path), "%s/%s%s.bmp", g_default_ss_dir, ss_filename, timestamp);
 
   for(y = 0; y < 160; y++)
   {

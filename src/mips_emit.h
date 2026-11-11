@@ -2377,7 +2377,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define thumb_conditional_branch(condition)                                   \
 {                                                                             \
-  condition_check_type condition_check;                                       \
+  condition_check_type condition_check __attribute__((unused));               \
   generate_condition_##condition();                                           \
   generate_branch_no_cycle_update(                                            \
    block_exits[block_exit_position].branch_source,                            \

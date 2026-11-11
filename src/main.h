@@ -170,7 +170,7 @@ void raise_interrupt(IRQ_TYPE irq_raised);
 void change_ext(char *src, char *buffer, char *extension);
 u32 file_length(const char *filename);
 int path_printf(char *dst, size_t size, const char *fmt, ...)
-  __attribute__((format(printf, 3, 4)));
+  __attribute__((format(__printf__, 3, 4)));
 MODEL_TYPE get_model();
 
 #endif /* MAIN_H */
