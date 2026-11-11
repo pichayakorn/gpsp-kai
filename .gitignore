@@ -1,6 +1,7 @@
 # build output
 out/
 *.o
+*.d
 *.elf
 eboot/EBOOT.PBP
 eboot/PARAM.SFO
