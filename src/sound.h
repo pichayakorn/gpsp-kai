@@ -89,7 +89,10 @@ typedef struct
   s8 *sample_data;
 } GBC_SOUND_STRUCT;
 
-#define BUFFER_SIZE (0xffff)                        // in bytes; do not change
+// sound_buffer entries (s16, alternating left and right). A power of two,
+// so writers and the audio thread wrap at the same place with BUFFER_MASK.
+#define BUFFER_SIZE (0x10000)
+#define BUFFER_MASK (BUFFER_SIZE - 1)
 
 #define SOUND_FREQUENCY (44100)
 
