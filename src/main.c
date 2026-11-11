@@ -21,6 +21,7 @@
 
 #include "common.h"
 #include <stdarg.h>
+#include "memdebug.h"
 
 PSP_MODULE_INFO("gpSP", PSP_MODULE_USER, VERSION_MAJOR, VERSION_MINOR);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER|PSP_THREAD_ATTR_VFPU);
@@ -292,6 +293,10 @@ int main(int argc, char *argv[])
   char load_filename[MAX_FILE];
   char filename[MAX_FILE];
 
+#ifdef MEMDEBUG
+  memdebug_main_start();
+#endif
+
   sceDisplaySetMode(0, PSP_SCREEN_WIDTH, PSP_SCREEN_HEIGHT);
   pspDebugScreenInit();
 
@@ -385,7 +390,14 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
+#ifdef MEMDEBUG
+  memdebug_before_gamepak();
+#endif
   init_gamepak_buffer();
+#ifdef MEMDEBUG
+  memdebug_after_gamepak();
+  memdebug_show();
+#endif
   update_progress();
 
   sceImposeSetHomePopup(g_gpsp_config.enable_home);

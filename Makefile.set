@@ -11,6 +11,10 @@ USE_ADHOC = 0
 # 0: use takka's old USE_EXT_MEM code, which accesses that memory directly.
 PSP_LARGE_MEMORY = 1
 
+# 1: debug build for issue #36: show the free memory and the ROM buffer
+# size on a screen at startup and write them to memdebug.txt
+MEMDEBUG = 1
+
 # 1: also build the C interpreter ARM core, selectable as "Emulate Core" in
 # the menu (the MIPS dynarec stays the default)
 USE_C_CORE = 0

@@ -21,6 +21,10 @@ OBJS           += adhoc.o
 COMMON_FILE += adhoc.h
 endif
 
+ifeq ($(MEMDEBUG), 1)
+OBJS           += memdebug.o
+endif
+
 TARGET          = UO_gpSP_kai
 
 PSP_FW_VERSION=300
@@ -59,6 +63,10 @@ endif
 
 ifeq ($(USE_C_CORE), 1)
 CFLAGS          += -DUSE_C_CORE
+endif
+
+ifeq ($(MEMDEBUG), 1)
+CFLAGS          += -DMEMDEBUG
 endif
 
 ifeq ($(PSP_LARGE_MEMORY), 0)
