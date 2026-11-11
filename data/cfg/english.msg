@@ -816,14 +816,12 @@
 !Menu language. Takes effect the next time gpSP kai starts.
 
 # MSG_MISC_MENU_HELP_3
-#Fake Fat
-!\n\n\n\n
-!Fake Fat
+#Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\n Takes effect the next time gpSP kai starts.
+!Treat this PSP as a PSP-1000 (FAT). This turns off TV output.\n Takes effect the next time gpSP kai starts.
 
 # MSG_MISC_MENU_HELP_4
-#Boot Mode
-!\n\n\n\n
-!Boot Mode
+#GAME CART starts the game directly. GBA BIOS shows the Game Boy\n Advance start-up logo first. Takes effect when a game is loaded\n or reset.
+!GAME CART starts the game directly. GBA BIOS shows the Game Boy\n Advance start-up logo first. Takes effect when a game is loaded\n or reset.
 
 # MSG_MISC_MENU_HELP_5
 #Brightness
