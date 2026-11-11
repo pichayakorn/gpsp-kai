@@ -432,7 +432,17 @@ int main(int argc, char *argv[])
   }
   else
   {
-    if(load_file(file_ext, load_filename, g_default_rom_dir) == -1)
+    s32 loaded = -1;
+
+    // On a failed load, the error has been shown; pick another file
+    while(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
+    {
+      loaded = load_gamepak(load_filename);
+      if(loaded != -1)
+        break;
+    }
+
+    if(loaded == -1)
     {
       u16 *screen_copy = copy_screen();
       menu(screen_copy);
@@ -440,14 +450,6 @@ int main(int argc, char *argv[])
     }
     else
     {
-      if(load_gamepak(load_filename) == -1)
-      {
-        video_resolution(FRAME_MENU);
-        printf("Failed to load gamepak %s, exiting.\n", load_filename);
-        sceKernelDelayThread(5000000);
-        quit(1);
-      }
-
       clear_screen(0);
       flip_screen();
       clear_screen(0);

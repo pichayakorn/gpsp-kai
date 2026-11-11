@@ -938,21 +938,27 @@ u32 menu(u16 *original_screen)
 //    if(!g_gpsp_config.update_backup_flag) // TODO: reconsider when to do this
       update_backup_force();
 
-    if(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
+    while(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
     {
-       if(load_gamepak(load_filename) == -1)
-       {
-         quit(0);
-       }
-       reset_gba();
-       return_value = 1;
-       repeat = 0;
-       reg[CHANGED_PC_STATUS] = 1;
+      if(load_gamepak(load_filename) != -1)
+      {
+        reset_gba();
+        return_value = 1;
+        repeat = 0;
+        reg[CHANGED_PC_STATUS] = 1;
+        return;
+      }
+
+      // The failed load may have overwritten the old ROM, so continue as
+      // if no game were loaded; the file list opens again.
+      gamepak_filename[0] = 0;
+      first_load = 1;
+      memset(original_screen, 0x00, 240 * 160 * 2);
+      PRINT_STRING_EXT_BG(msg[MSG_NON_LOAD_GAME], 0xFFFF, 0x0000, 0, 75, original_screen, 240);
+      set_cpu_clock(10);
     }
-    else
-    {
-      choose_menu(current_menu);
-    }
+
+    choose_menu(current_menu);
   }
 
   void menu_restart()

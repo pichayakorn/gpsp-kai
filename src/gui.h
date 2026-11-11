@@ -76,6 +76,7 @@ extern gpsp_config_t g_gpsp_config;
 extern game_config_t g_game_config;
 
 s32 load_file(char **wildcards, char *result, char *default_dir_name);
+void button_up_wait();
 void load_game_config_file(void);
 s32 load_config_file();
 s32 save_game_config_file();

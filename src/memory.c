@@ -2607,7 +2607,7 @@ s32 load_gamepak(char *name)
   if(!strcasecmp(dot_position, ".zip"))
   {
     set_cpu_clock(9); // temporarily 333 MHz
-    init_progress(5, msg[MSG_LOAD_ZIP_ROM]);  // TODO: error check
+    init_progress(5, msg[MSG_LOAD_ZIP_ROM]);
     file_size = load_file_zip(name);
     if(file_size == -2)
       file_size = load_gamepak_raw(ZIP_TMP);
@@ -2658,6 +2658,9 @@ s32 load_gamepak(char *name)
     return 0;
   }
 
+  show_progress(msg[MSG_LOAD_ROM_ERROR]);
+  button_up_wait();
+  error_msg("");  // wait for any button
   return -1;
 }
 
