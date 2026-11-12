@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.7.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.6.0...v3.7.0) (2026-11-12)
+
+
+### Features
+
+* new XMB art with an animated icon; dev builds get a gray icon and no background ([#57](https://github.com/pichayakorn/gpsp-kai/issues/57)) ([47ae8aa](https://github.com/pichayakorn/gpsp-kai/commit/47ae8aa3450d2e4d3c455f584bde9142a78f7761))
+* **ui:** put Return to game first in the main menu ([#60](https://github.com/pichayakorn/gpsp-kai/issues/60)) ([74a217a](https://github.com/pichayakorn/gpsp-kai/commit/74a217acf97a3ef7411f04728e35bd2e1da57391)), closes [#44](https://github.com/pichayakorn/gpsp-kai/issues/44)
+
+
+### Bug Fixes
+
+* **cpu:** store the right base value for STM with writeback ([#63](https://github.com/pichayakorn/gpsp-kai/issues/63)) ([b4ba1d8](https://github.com/pichayakorn/gpsp-kai/commit/b4ba1d83189d8c4a32892117e5f46a3c2523afe8))
+* **zip:** load ZIPs that store sizes after the data ([#61](https://github.com/pichayakorn/gpsp-kai/issues/61)) ([e301c50](https://github.com/pichayakorn/gpsp-kai/commit/e301c50c778178d2debcf0a27c89b92f2317eb4a)), closes [#32](https://github.com/pichayakorn/gpsp-kai/issues/32)
+
 ## [3.6.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.5.1...v3.6.0) (2026-11-11)
 
 
