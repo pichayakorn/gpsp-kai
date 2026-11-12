@@ -27,7 +27,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: pspdev/pspdev:latest
+    # A fixed toolchain, so a release is built with the compiler that was
+    # tested. To update it, pick a newer monthly tag of pspdev/pspdev, check
+    # that the build has no new warnings, and test the result on a PSP.
+    container: pspdev/pspdev:v20261101
     steps:
       - name: Install build tools
         run: apk add --no-cache zip python3 curl
@@ -44,6 +47,10 @@ jobs:
         run: |
           curl -sSL -o /tmp/psp-cfw-sdk.zip \
             https://github.com/pspdev/psp-cfw-sdk/releases/download/latest/psp-cfw-sdk.zip
+          # psp-cfw-sdk only publishes a moving "latest" release, so check
+          # that it is still the tested file; update the hash on purpose.
+          echo "f55f69b2c5ee34bd91688ec13b66535cf18d221c412fc4c763245bea1a21e57e  /tmp/psp-cfw-sdk.zip" \
+            | sha256sum -c -
           # systemctrl_adrenaline.h is a symlink in the image; keep it.
           unzip -qo /tmp/psp-cfw-sdk.zip -d / \
             -x 'usr/local/pspdev/psp/sdk/include/systemctrl_adrenaline.h'
