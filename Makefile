@@ -64,6 +64,16 @@ TEST_DATA = testdata
 TEST_NAME = gpSP-kai-$(GPSP_VERSION_STRING)
 TEST_DIR  = out/test/$(TEST_NAME)
 
+# The XMB shows "Corrupted Data" for a PSP/GAME folder name longer than 31
+# characters (tested on a PSP-3000 with ARK-5: 31 shows, 32 does not), so
+# testpkg refuses a longer TEST_NAME before building anything.
+TEST_NAME_MAX = 31
+ifneq ($(filter testpkg,$(MAKECMDGOALS)),)
+ifeq ($(shell [ $$(printf '%s' '$(TEST_NAME)' | wc -c) -gt $(TEST_NAME_MAX) ] && echo long),long)
+$(error TEST_NAME "$(TEST_NAME)" is longer than $(TEST_NAME_MAX) characters; the PSP would show the folder as Corrupted Data)
+endif
+endif
+
 testpkg: check package
 	rm -rf $(TEST_DIR) $(TEST_DIR).zip
 	mkdir -p out/test
