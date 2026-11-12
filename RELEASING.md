@@ -56,9 +56,11 @@ The version comes only from `version.txt`. A build of the commit tagged
 `v<version>` shows `gpSP kai <version>` on the XMB; any other build shows
 `<version>-dev+<commit>`.
 
-A release has the full XMB art: the icon (`image/ICON0.png`), an animated
-icon that plays when gpSP kai is highlighted (`image/ICON1.PMF`), and the
-background (`image/PIC1.png`), which carries the gpSP改 logo. A dev build
+A release has the full XMB art: the icon (`image/ICON0.png`) and the
+background (`image/PIC1.png`), which carries the gpSP改 logo. If
+`image/ICON1.PMF` exists, a release also gets it as an animated icon that
+plays when gpSP kai is highlighted; it is optional, and without it the XMB
+shows the still icon. A dev build
 looks different: it gets only the gray icon with the amber DEV ribbon
 (`image/ICON0_dev.png`), with no animation and no background. On the PSP the
 XMB hides a game's title whenever it has a background, so only a dev build

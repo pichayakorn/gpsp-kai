@@ -142,7 +142,7 @@ src/            emulator source
 prx/            kernel PRX module sources; prx/prebuilt/ holds tested binaries
 eboot/          EBOOT Makefile
 data/           files for the Memory Stick: cfg/, font/, game_config.txt
-image/          XMB art: icon (ICON0.png; ICON0_dev.png for dev builds), animated icon (ICON1.PMF) and background (PIC1.png)
+image/          XMB art: icon (ICON0.png; ICON0_dev.png for dev builds), optional animated icon (ICON1.PMF) and background (PIC1.png)
 docs/           changes from takka's source, original and Japanese docs, licenses/
 tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
 ```

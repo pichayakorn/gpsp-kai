@@ -30,8 +30,9 @@ GPSP_VER_MINOR  := $(word 2,$(GPSP_VER_WORDS))
 
 PSP_EBOOT_TITLE = gpSP kai $(GPSP_VERSION_STRING)
 
-# XMB art. A release gets the icon, the animated icon (ICON1.PMF, played
-# when the game is highlighted) and the background. A dev build
+# XMB art. A release gets the icon and the background, plus the animated
+# icon (ICON1.PMF, played when the game is highlighted) if image/ has one; it
+# is optional, and without it the XMB shows the still icon. A dev build
 # (-dev+<commit>) gets only the gray "DEV" icon: the XMB hides the title of
 # any game that has a background, and dev builds need the title to show which
 # commit they are; the color animation would undo the gray look.
@@ -42,7 +43,7 @@ PSP_EBOOT_ICON1 ?= NULL
 PSP_EBOOT_PIC1  ?= NULL
 else
 PSP_EBOOT_ICON  ?= ../image/ICON0.png
-PSP_EBOOT_ICON1 ?= ../image/ICON1.PMF
+PSP_EBOOT_ICON1 ?= $(or $(wildcard ../image/ICON1.PMF),NULL)
 PSP_EBOOT_PIC1  ?= ../image/PIC1.png
 endif
 # The XMB information screen shows only APP_VER, in Sony's XX.YY format,
