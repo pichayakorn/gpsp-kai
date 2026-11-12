@@ -1471,9 +1471,10 @@ u32 menu(u16 *original_screen)
 
   MENU_OPTION_TYPE main_options[] =
   {
-    /* Same order and lines as b225/b230 */
-    ACTION_OPTION(menu_load, NULL, msg[MSG_MAIN_MENU_7], msg[MSG_MAIN_MENU_HELP_7], 0),
-    ACTION_OPTION(menu_exit, NULL, msg[MSG_MAIN_MENU_9], msg[MSG_MAIN_MENU_HELP_9], 1),
+    /* Same order and lines as b225/b230, except that the first two are
+       swapped on purpose (#44): the menu opens on Return to game */
+    ACTION_OPTION(menu_exit, NULL, msg[MSG_MAIN_MENU_9], msg[MSG_MAIN_MENU_HELP_9], 0),
+    ACTION_OPTION(menu_load, NULL, msg[MSG_MAIN_MENU_7], msg[MSG_MAIN_MENU_HELP_7], 1),
     ACTION_OPTION(menu_restart, NULL, msg[MSG_MAIN_MENU_8], msg[MSG_MAIN_MENU_HELP_8], 2),
 
     NUMERIC_SELECTION_ACTION_OPTION(menu_load_state, NULL, msg[MSG_MAIN_MENU_1], &g_savestate_slot_num, 11, msg[MSG_MAIN_MENU_HELP_1], 4),
@@ -1508,6 +1509,23 @@ u32 menu(u16 *original_screen)
 
     current_option = new_menu->options;
     current_option_num = 0;
+
+    // With no game loaded, Return to game does nothing: start on Load new game.
+    if((new_menu == &main_menu) && first_load)
+    {
+      u32 option_num;
+
+      for(option_num = 0; option_num < new_menu->num_options; option_num++)
+      {
+        if(new_menu->options[option_num].action_function == menu_load)
+        {
+          current_option_num = option_num;
+          current_option = new_menu->options + option_num;
+          break;
+        }
+      }
+    }
+
     if(current_menu->init_function)
      current_menu->init_function();
   }

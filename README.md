@@ -65,6 +65,9 @@ committed), which has the same layout as the folder on the PSP:
 `testdata/gba_bios.bin`, `testdata/GBA/ROM/`, `testdata/GBA/SAV/` and so on.
 Each test build starts from the same clean saves.
 
+The folder name must stay at 31 characters or less: the XMB shows a longer
+`PSP/GAME/` folder as "Corrupted Data". `make testpkg` refuses a longer name.
+
 Add `-j4` (or your number of CPU cores) to build in parallel, e.g.
 `make -j4 release`.
 
@@ -99,7 +102,7 @@ old one; saves, states and configs in `GBA/` are kept. The folder contains:
 
 ```
 EBOOT.PBP
-homehook.prx  dvemgr.prx  SystemButtons.prx
+homehook.prx  dvemgr.prx
 cfg/          message, font and directory settings (from data/cfg)
 font/         gpsp10.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
 game_config.txt
@@ -110,12 +113,27 @@ GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty)
 About the PRX modules:
 - `homehook.prx` is always loaded. `dvemgr.prx` (TV output) is loaded on
   PSP-2000 and later, unless the Fake Fat option is on.
-- `SystemButtons.prx` is shipped as in b230 but not loaded by the current code.
-- By default the package ships the hardware-tested modules from
-  `prx/prebuilt/` (takka's builds). `make package PACKAGE_PRX=built` ships the
-  ones just built into `out/` instead.
+- The package ships `homehook.prx` built from source in `prx/homehookprx/`
+  (tested on a PSP-3000), and takka's `dvemgr.prx` from `prx/prebuilt/` until
+  TV output is tested with the built one (#11).
+  `make package PACKAGE_PRX=built` ships both built modules,
+  `PACKAGE_PRX=prebuilt` both of takka's.
+- `SystemButtons.prx` (built from `prx/systembuttons_prx/`) is not loaded by
+  the current code, so it is not shipped.
 
 When upgrading from another build, delete the old `gpsp.cfg` first.
+
+### Extra memory (PSP-2000 and later)
+
+gpSP loads the whole ROM into a 32 MB buffer when the PSP gives it the extra
+memory of the PSP-2000 and later; otherwise the buffer is only 16 MB and
+larger ROMs are read from the Memory Stick while playing, which can stutter.
+
+On ARK-5, set **Use extra memory** to **Default** in ARK's settings: with
+**Off**, ARK-5 does not give the extra memory, even though gpSP's EBOOT asks
+for it (`MEMSIZE=1`). Tested on a PSP-3000 with ARK-5.2.0: Off gives a 16 MB
+buffer, Default gives 32 MB. A PSP-1000 has no extra memory and always uses
+16 MB.
 
 ## Repository layout
 

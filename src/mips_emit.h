@@ -1746,13 +1746,17 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_load_reg_pc(reg_a1, i, 8);                                         \
   generate_function_call_swap_delay(execute_aligned_store32)                  \
 
-#define arm_block_memory_final_load()                                         \
+#define arm_block_memory_final_load(writeback_type)                           \
   arm_block_memory_load()                                                     \
 
-#define arm_block_memory_final_store()                                        \
+// A deferred writeback has to be emitted before the final store call, since
+// that call can leave the block (e.g. on self-modifying code).
+
+#define arm_block_memory_final_store(writeback_type)                          \
   generate_load_pc(reg_a2, (pc + 4));                                         \
-  mips_emit_jal(mips_absolute_offset(execute_store_u32));                     \
-  generate_load_reg(reg_a1, i)                                                \
+  generate_load_reg(reg_a1, i);                                               \
+  arm_block_memory_writeback_post_store(writeback_type);                      \
+  generate_function_call_swap_delay(execute_store_u32)                        \
 
 #define arm_block_memory_adjust_pc_store()                                    \
 
@@ -1801,16 +1805,37 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_block_memory_writeback_no()
 
-// Only emit writeback if the register is not in the list
+// Writeback when the base register is in the list (ARM7TDMI):
+// - LDM: the loaded value wins, so only emit writeback if the base register
+//   is not in the list.
+// - STM: if the base register is the lowest one in the list, the original
+//   base is stored, so the writeback is deferred until after the stores.
+//   Otherwise the new base is stored, so the writeback is done first.
+// Based on libretro gpSP commit 904eaa2 (GPL-2.0-or-later), which defers
+// the writeback for every STM; here it is deferred only when needed.
 
-#define arm_block_memory_writeback_load(writeback_type)                       \
+#define arm_block_memory_store_base_first()                                   \
+  (((reg_list >> rn) & 0x01) && !(reg_list & ((1 << rn) - 1)))               \
+
+#define arm_block_memory_writeback_pre_load(writeback_type)                   \
   if(!((reg_list >> rn) & 0x01))                                              \
   {                                                                           \
     arm_block_memory_writeback_##writeback_type();                            \
   }                                                                           \
 
-#define arm_block_memory_writeback_store(writeback_type)                      \
-  arm_block_memory_writeback_##writeback_type()                               \
+#define arm_block_memory_writeback_post_load(writeback_type)                  \
+
+#define arm_block_memory_writeback_pre_store(writeback_type)                  \
+  if(!arm_block_memory_store_base_first())                                    \
+  {                                                                           \
+    arm_block_memory_writeback_##writeback_type();                            \
+  }                                                                           \
+
+#define arm_block_memory_writeback_post_store(writeback_type)                 \
+  if(arm_block_memory_store_base_first())                                     \
+  {                                                                           \
+    arm_block_memory_writeback_##writeback_type();                            \
+  }                                                                           \
 
 #define arm_block_memory(access_type, offset_type, writeback_type, s_bit)     \
 {                                                                             \
@@ -1820,7 +1845,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   u32 base_reg = arm_to_mips_reg[rn];                                         \
                                                                               \
   arm_block_memory_offset_##offset_type();                                    \
-  arm_block_memory_writeback_##access_type(writeback_type);                   \
+  arm_block_memory_writeback_pre_##access_type(writeback_type);               \
                                                                               \
   if((rn == REG_SP) && iwram_stack_optimize)                                  \
   {                                                                           \
@@ -1838,6 +1863,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
       }                                                                       \
     }                                                                         \
                                                                               \
+    arm_block_memory_writeback_post_##access_type(writeback_type);            \
     arm_block_memory_sp_adjust_pc_##access_type();                            \
   }                                                                           \
   else                                                                        \
@@ -1857,7 +1883,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
         }                                                                     \
         else                                                                  \
         {                                                                     \
-          arm_block_memory_final_##access_type();                             \
+          arm_block_memory_final_##access_type(writeback_type);               \
           break;                                                              \
         }                                                                     \
       }                                                                       \
@@ -1866,149 +1892,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
     arm_block_memory_adjust_pc_##access_type();                               \
   }                                                                           \
 }                                                                             \
-
-#define arm_block_writeback_no()
-
-#define arm_block_writeback_yes()                                             \
-  mips_emit_addu(arm_to_mips_reg[rn], reg_a2, reg_zero)                       \
-
-#define arm_block_address_preadjust_up_full(wb)                               \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   ((word_bit_count(reg_list)) * 4));                                         \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_up(wb)                                    \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn], 4);                            \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_down_full(wb)                             \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   -((word_bit_count(reg_list)) * 4));                                        \
-  arm_block_writeback_##wb()                                                  \
-
-#define arm_block_address_preadjust_down(wb)                                  \
-  mips_emit_addiu(reg_a2, arm_to_mips_reg[rn],                                \
-   -(((word_bit_count(reg_list)) * 4) - 4));                                  \
-  arm_block_writeback_##wb()
-
-#define arm_block_address_preadjust_no(wb)                                    \
-  mips_emit_addu(reg_a2, arm_to_mips_reg[rn], reg_zero)                       \
-
-#define arm_block_address_postadjust_no()                                     \
-
-#define arm_block_address_postadjust_up()                                     \
-  mips_emit_addiu(arm_to_mips_reg[rn], reg_a2,                                \
-   ((word_bit_count(reg_list)) * 4))                                          \
-
-#define arm_block_address_postadjust_down()                                   \
-  mips_emit_addiu(arm_to_mips_reg[rn], reg_a2,                                \
-   -((word_bit_count(reg_list)) * 4))                                         \
-
-#define sprint_no(access_type, pre_op, post_op, wb)                           \
-
-#define sprint_yes(access_type, pre_op, post_op, wb)                          \
-  printf("sbit on %s %s %s %s\n", #access_type, #pre_op, #post_op, #wb)       \
-
-#define arm_block_memory_load()                                               \
-  generate_function_call_swap_delay(execute_aligned_load32);                  \
-  generate_store_reg(reg_rv, i)                                               \
-
-#define arm_block_memory_store()                                              \
-  generate_load_reg_pc(reg_a1, i, 8);                                         \
-  generate_function_call_swap_delay(execute_aligned_store32)                  \
-
-#define arm_block_memory_final_load()                                         \
-  arm_block_memory_load()                                                     \
-
-#define arm_block_memory_final_store()                                        \
-  generate_load_pc(reg_a2, (pc + 4));                                         \
-  mips_emit_jal(mips_absolute_offset(execute_store_u32));                     \
-  generate_load_reg(reg_a1, i)                                                \
-
-#define arm_block_memory_adjust_pc_store()                                    \
-
-#define arm_block_memory_adjust_pc_load()                                     \
-  if(reg_list & 0x8000)                                                       \
-  {                                                                           \
-    generate_mov(reg_a0, reg_rv);                                             \
-    generate_indirect_branch_arm();                                           \
-  }                                                                           \
-
-#define arm_block_memory_sp_load()                                            \
-  mips_emit_lw(arm_to_mips_reg[i], reg_a1, offset);                           \
-
-#define arm_block_memory_sp_store()                                           \
-{                                                                             \
-  u32 store_reg = i;                                                          \
-  check_load_reg_pc(arm_reg_a0, store_reg, 8);                                \
-  mips_emit_sw(arm_to_mips_reg[store_reg], reg_a1, offset);                   \
-}                                                                             \
-
-#define arm_block_memory_sp_adjust_pc_store()                                 \
-
-#define arm_block_memory_sp_adjust_pc_load()                                  \
-  if(reg_list & 0x8000)                                                       \
-  {                                                                           \
-    generate_indirect_branch_arm();                                           \
-  }                                                                           \
-
-#define old_arm_block_memory(access_type, pre_op, post_op, wb, s_bit)         \
-{                                                                             \
-  arm_decode_block_trans();                                                   \
-  u32 i;                                                                      \
-  u32 offset = 0;                                                             \
-  u32 base_reg = arm_to_mips_reg[rn];                                         \
-                                                                              \
-  arm_block_address_preadjust_##pre_op(wb);                                   \
-  arm_block_address_postadjust_##post_op();                                   \
-                                                                              \
-  sprint_##s_bit(access_type, pre_op, post_op, wb);                           \
-                                                                              \
-  if((rn == REG_SP) && iwram_stack_optimize)                                  \
-  {                                                                           \
-    mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
-    generate_load_imm(reg_a0, ((u32)(iwram + 0x8000)));                       \
-    mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
-                                                                              \
-    for(i = 0; i < 16; i++)                                                   \
-    {                                                                         \
-      if((reg_list >> i) & 0x01)                                              \
-      {                                                                       \
-        cycle_count++;                                                        \
-        arm_block_memory_sp_##access_type();                                  \
-        offset += 4;                                                          \
-      }                                                                       \
-    }                                                                         \
-                                                                              \
-    arm_block_memory_sp_adjust_pc_##access_type();                            \
-  }                                                                           \
-  else                                                                        \
-  {                                                                           \
-    mips_emit_ins(reg_a2, reg_zero, 0, 2);                                    \
-                                                                              \
-    for(i = 0; i < 16; i++)                                                   \
-    {                                                                         \
-      if((reg_list >> i) & 0x01)                                              \
-      {                                                                       \
-        cycle_count++;                                                        \
-        mips_emit_addiu(reg_a0, reg_a2, offset);                              \
-        if(reg_list & ~((2 << i) - 1))                                        \
-        {                                                                     \
-          arm_block_memory_##access_type();                                   \
-          offset += 4;                                                        \
-        }                                                                     \
-        else                                                                  \
-        {                                                                     \
-          arm_block_memory_final_##access_type();                             \
-          break;                                                              \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-                                                                              \
-    arm_block_memory_adjust_pc_##access_type();                               \
-  }                                                                           \
-}
-
 
 
 // This isn't really a correct implementation, may have to fix later.
@@ -2252,27 +2135,31 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   mips_emit_jal(mips_absolute_offset(execute_aligned_store32));               \
   generate_load_reg(reg_a1, i)                                                \
 
-#define thumb_block_memory_final_load()                                       \
+#define thumb_block_memory_final_load(post_op, base_reg)                      \
   thumb_block_memory_load()                                                   \
 
-#define thumb_block_memory_final_store()                                      \
+// A deferred writeback has to be emitted before the final store call, since
+// that call can leave the block (e.g. on self-modifying code).
+
+#define thumb_block_memory_final_store(post_op, base_reg)                     \
+  generate_load_reg(reg_a1, i);                                               \
+  thumb_block_memory_writeback_post_store(post_op, base_reg);                 \
   generate_load_pc(reg_a2, (pc + 2));                                         \
-  mips_emit_jal(mips_absolute_offset(execute_store_u32));                     \
-  generate_load_reg(reg_a1, i)                                                \
+  generate_function_call_swap_delay(execute_store_u32)                        \
 
-#define thumb_block_memory_final_no(access_type)                              \
-  thumb_block_memory_final_##access_type()                                    \
+#define thumb_block_memory_final_no(access_type, base_reg)                    \
+  thumb_block_memory_final_##access_type(no, base_reg)                        \
 
-#define thumb_block_memory_final_up(access_type)                              \
-  thumb_block_memory_final_##access_type()                                    \
+#define thumb_block_memory_final_up(access_type, base_reg)                    \
+  thumb_block_memory_final_##access_type(up, base_reg)                        \
 
-#define thumb_block_memory_final_down(access_type)                            \
-  thumb_block_memory_final_##access_type()                                    \
+#define thumb_block_memory_final_down(access_type, base_reg)                  \
+  thumb_block_memory_final_##access_type(down, base_reg)                      \
 
-#define thumb_block_memory_final_push_lr(access_type)                         \
+#define thumb_block_memory_final_push_lr(access_type, base_reg)               \
   thumb_block_memory_##access_type()                                          \
 
-#define thumb_block_memory_final_pop_pc(access_type)                          \
+#define thumb_block_memory_final_pop_pc(access_type, base_reg)                \
   thumb_block_memory_##access_type()                                          \
 
 #define thumb_block_memory_extra_no()                                         \
@@ -2311,14 +2198,44 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define thumb_block_memory_sp_extra_push_lr()                                 \
   mips_emit_sw(reg_r14, reg_a1, (bit_count[reg_list] * 4))                    \
 
+// Same base-in-list writeback rules as the ARM block memory ops above:
+// LDMIA keeps the loaded value, STMIA stores the original base only when the
+// base register is the lowest one in the list (otherwise the new base).
+// Follows libretro gpSP's interpreter fix, commit bfdc0d0 (GPL-2.0-or-later).
+
+#define thumb_block_memory_store_base_first(base_reg)                         \
+  (((reg_list >> base_reg) & 0x01) && !(reg_list & ((1 << base_reg) - 1)))   \
+
 #define thumb_block_memory_writeback_load(post_op, base_reg)                  \
-  if(~((reg_list >> base_reg) & 0x01))                                        \
+  if(!((reg_list >> base_reg) & 0x01))                                        \
   {                                                                           \
     thumb_block_address_postadjust_##post_op(base_reg);                       \
   }                                                                           \
 
 #define thumb_block_memory_writeback_store(post_op, base_reg)                 \
-  thumb_block_address_postadjust_##post_op(base_reg)                          \
+  if(!thumb_block_memory_store_base_first(base_reg))                          \
+  {                                                                           \
+    thumb_block_address_postadjust_##post_op(base_reg);                       \
+  }                                                                           \
+
+// The deferred writeback adds to the base register itself: reg_a2 has had
+// its low bits cleared by then.
+
+#define thumb_block_address_late_writeback_no(base_reg)                       \
+
+#define thumb_block_address_late_writeback_up(base_reg)                       \
+  mips_emit_addiu(arm_to_mips_reg[base_reg], arm_to_mips_reg[base_reg],       \
+   (bit_count[reg_list] * 4))                                                 \
+
+#define thumb_block_address_late_writeback_down(base_reg)                     \
+  mips_emit_addiu(arm_to_mips_reg[base_reg], arm_to_mips_reg[base_reg],       \
+   -(bit_count[reg_list] * 4))                                                \
+
+#define thumb_block_memory_writeback_post_store(post_op, base_reg)            \
+  if(thumb_block_memory_store_base_first(base_reg))                           \
+  {                                                                           \
+    thumb_block_address_late_writeback_##post_op(base_reg);                   \
+  }                                                                           \
 
 #define thumb_block_memory(access_type, pre_op, post_op, base_reg)            \
 {                                                                             \
@@ -2365,7 +2282,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
         }                                                                     \
         else                                                                  \
         {                                                                     \
-          thumb_block_memory_final_##post_op(access_type);                    \
+          thumb_block_memory_final_##post_op(access_type, base_reg);          \
           break;                                                              \
         }                                                                     \
       }                                                                       \

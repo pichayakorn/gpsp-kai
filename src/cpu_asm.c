@@ -19,7 +19,6 @@
  */
 
 // Not-so-important todo:
-// - stm reglist writeback when base is in the list needs adjustment
 // - block memory needs psr swapping and user mode reg swapping
 
 #include "common.h"

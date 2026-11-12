@@ -12,17 +12,33 @@ all: systembuttons_prx dvemgr homehookprx main
 
 # Ready-to-copy Memory Stick folder: copy $(PACKAGE_DIR) to PSP/GAME/ and add
 # your own gba_bios.bin. Its name has no version, so an update replaces the
-# old files and keeps the saves in GBA/. PACKAGE_PRX=prebuilt ships the hardware-tested modules
-# from prx/prebuilt/; PACKAGE_PRX=built ships the ones just built in out/.
+# old files and keeps the saves in GBA/.
 PACKAGE_DIR   = out/gpSP-kai
-PACKAGE_PRX  ?= prebuilt
 PACKAGE_FONTS = gpsp10.fbm knj10.fbm batang10.fbm
+
+# PRX modules the EBOOT loads. By default homehook.prx is the one built from
+# source (tested on a PSP-3000, #11) and dvemgr.prx (TV output) is takka's
+# build from prx/prebuilt/ until TV-out is tested with the built one.
+# PACKAGE_PRX=built ships both built modules, PACKAGE_PRX=prebuilt both
+# prebuilt ones. SystemButtons.prx is never loaded, so it is not shipped.
+PACKAGE_PRX  ?= default
+ifeq ($(PACKAGE_PRX),built)
+PRX_FROM_OUT      = homehook.prx dvemgr.prx
+PRX_FROM_PREBUILT =
+else ifeq ($(PACKAGE_PRX),prebuilt)
+PRX_FROM_OUT      =
+PRX_FROM_PREBUILT = homehook.prx dvemgr.prx
+else
+PRX_FROM_OUT      = homehook.prx
+PRX_FROM_PREBUILT = dvemgr.prx
+endif
 
 package: all
 	rm -rf $(PACKAGE_DIR)
 	mkdir -p $(PACKAGE_DIR)/cfg $(PACKAGE_DIR)/font $(PACKAGE_DIR)/licenses
 	cp out/EBOOT.PBP $(PACKAGE_DIR)/
-	cp $(if $(filter built,$(PACKAGE_PRX)),out,prx/prebuilt)/*.prx $(PACKAGE_DIR)/
+	$(if $(PRX_FROM_OUT),cp $(addprefix out/,$(PRX_FROM_OUT)) $(PACKAGE_DIR)/)
+	$(if $(PRX_FROM_PREBUILT),cp $(addprefix prx/prebuilt/,$(PRX_FROM_PREBUILT)) $(PACKAGE_DIR)/)
 	cp data/cfg/* $(PACKAGE_DIR)/cfg/
 	cp $(addprefix data/font/,$(PACKAGE_FONTS)) $(PACKAGE_DIR)/font/
 	cp data/game_config.txt $(PACKAGE_DIR)/
@@ -63,6 +79,16 @@ release: check package
 TEST_DATA = testdata
 TEST_NAME = gpSP-kai-$(GPSP_VERSION_STRING)
 TEST_DIR  = out/test/$(TEST_NAME)
+
+# The XMB shows "Corrupted Data" for a PSP/GAME folder name longer than 31
+# characters (tested on a PSP-3000 with ARK-5: 31 shows, 32 does not), so
+# testpkg refuses a longer TEST_NAME before building anything.
+TEST_NAME_MAX = 31
+ifneq ($(filter testpkg,$(MAKECMDGOALS)),)
+ifeq ($(shell [ $$(printf '%s' '$(TEST_NAME)' | wc -c) -gt $(TEST_NAME_MAX) ] && echo long),long)
+$(error TEST_NAME "$(TEST_NAME)" is longer than $(TEST_NAME_MAX) characters; the PSP would show the folder as Corrupted Data)
+endif
+endif
 
 testpkg: check package
 	rm -rf $(TEST_DIR) $(TEST_DIR).zip
