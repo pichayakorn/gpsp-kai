@@ -99,7 +99,7 @@ old one; saves, states and configs in `GBA/` are kept. The folder contains:
 
 ```
 EBOOT.PBP
-homehook.prx  dvemgr.prx  SystemButtons.prx
+homehook.prx  dvemgr.prx
 cfg/          message, font and directory settings (from data/cfg)
 font/         gpsp10.fbm, knj10.fbm, batang10.fbm (the fonts cfg/*.fnt uses)
 game_config.txt
@@ -110,10 +110,13 @@ GBA/ROM GBA/SAV GBA/CFG GBA/SS GBA/CHT   (empty)
 About the PRX modules:
 - `homehook.prx` is always loaded. `dvemgr.prx` (TV output) is loaded on
   PSP-2000 and later, unless the Fake Fat option is on.
-- `SystemButtons.prx` is shipped as in b230 but not loaded by the current code.
-- By default the package ships the hardware-tested modules from
-  `prx/prebuilt/` (takka's builds). `make package PACKAGE_PRX=built` ships the
-  ones just built into `out/` instead.
+- The package ships `homehook.prx` built from source in `prx/homehookprx/`
+  (tested on a PSP-3000), and takka's `dvemgr.prx` from `prx/prebuilt/` until
+  TV output is tested with the built one (#11).
+  `make package PACKAGE_PRX=built` ships both built modules,
+  `PACKAGE_PRX=prebuilt` both of takka's.
+- `SystemButtons.prx` (built from `prx/systembuttons_prx/`) is not loaded by
+  the current code, so it is not shipped.
 
 When upgrading from another build, delete the old `gpsp.cfg` first.
 
