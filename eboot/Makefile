@@ -30,16 +30,20 @@ GPSP_VER_MINOR  := $(word 2,$(GPSP_VER_WORDS))
 
 PSP_EBOOT_TITLE = gpSP kai $(GPSP_VERSION_STRING)
 
-# XMB art. A release gets the icon and the background. A dev build
-# (-dev+<commit>) gets the gray "DEV" icon and no background: the XMB hides
-# the title of any game that has a background, and dev builds need the title
-# to show which commit they are. ?= keeps command-line overrides working.
+# XMB art. A release gets the icon, the animated icon (ICON1.PMF, played
+# when the game is highlighted) and the background. A dev build
+# (-dev+<commit>) gets only the gray "DEV" icon: the XMB hides the title of
+# any game that has a background, and dev builds need the title to show which
+# commit they are; the color animation would undo the gray look.
+# ?= keeps command-line overrides working.
 ifneq ($(findstring -dev+,$(GPSP_VERSION_STRING)),)
-PSP_EBOOT_ICON ?= ../image/ICON0_dev.png
-PSP_EBOOT_PIC1 ?= NULL
+PSP_EBOOT_ICON  ?= ../image/ICON0_dev.png
+PSP_EBOOT_ICON1 ?= NULL
+PSP_EBOOT_PIC1  ?= NULL
 else
-PSP_EBOOT_ICON ?= ../image/ICON0.png
-PSP_EBOOT_PIC1 ?= ../image/PIC1.png
+PSP_EBOOT_ICON  ?= ../image/ICON0.png
+PSP_EBOOT_ICON1 ?= ../image/ICON1.PMF
+PSP_EBOOT_PIC1  ?= ../image/PIC1.png
 endif
 # The XMB information screen shows only APP_VER, in Sony's XX.YY format,
 # which cannot express MAJOR.MINOR.PATCH (3.5.1 would read as 3.51), so
