@@ -132,12 +132,13 @@ u32 reg_tmp;
 #define calculate_v_flag_add(dest, src_a, src_b)                              \
   v_flag = ((signed)(dest) < (signed)(src_a)) != ((signed)(src_b) < 0)        \
 
-/* A shift by register uses only the lowest byte of Rs (ARM7TDMI). */
+/* A shift by register uses only the lowest byte of Rs (ARM7TDMI). The PC
+   reads as the instruction's address + 12, as Rm and as Rn (pc holds + 8
+   here; arm_pc_offset() after the instruction resets reg[REG_PC]). */
 #define get_shift_register(dest)                                              \
   u32 shift = reg[(opcode >> 8) & 0x0F] & 0xFF;                               \
-  dest = reg[rm];                                                             \
-  if(rm == 15)                                                                \
-    dest += 4                                                                 \
+  reg[REG_PC] = pc + 4;                                                       \
+  dest = reg[rm]                                                              \
 
 #define calculate_reg_sh()                                                    \
   u32 reg_sh = 0;                                                             \
