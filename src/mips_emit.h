@@ -846,8 +846,16 @@ u32 arm_to_mips_reg[] =
   u32 shift = (opcode >> 7) & 0x1F;                                           \
   generate_shift_imm_##name##_##flags_op(arm_reg, rm, shift)                  \
 
+// With a shift by register, the PC reads as the instruction's address + 12
+// (the register shift takes an extra cycle). Rm = PC maps to reg_a0, so
+// loading PC + 12 there makes every shift form below read it. Follows GBAdhoc
+// (GPL-2.0), mips/mips_emit.h (generate_shift_reg_rm).
 #define generate_shift_reg(arm_reg, name, flags_op)                           \
   u32 rs = ((opcode >> 8) & 0x0F);                                            \
+  if(rm == REG_PC)                                                            \
+  {                                                                           \
+    generate_load_pc(reg_a0, (pc + 12));                                      \
+  }                                                                           \
   generate_shift_reg_##name##_##flags_op(rm, rs);                             \
   rm = arm_reg                                                                \
 
@@ -1513,6 +1521,13 @@ typedef enum
 
 #define arm_op_check_no()                                                     \
 
+// Rn of a register-operand form: the PC reads as + 12 when the operand is
+// shifted by a register (bit 4), + 8 otherwise.
+#define arm_op_check_reg_yes()                                                \
+  check_load_reg_pc(arm_reg_a1, rn, ((opcode & 0x10) ? 12 : 8))               \
+
+#define arm_op_check_reg_no()                                                 \
+
 #define arm_generate_op_reg_flags(name, load_op)                              \
   arm_decode_data_proc_reg();                                                 \
   if(check_generate_c_flag)                                                   \
@@ -1524,14 +1539,14 @@ typedef enum
     rm = generate_load_rm_sh_no_flags(rm);                                    \
   }                                                                           \
                                                                               \
-  arm_op_check_##load_op();                                                   \
+  arm_op_check_reg_##load_op();                                               \
   generate_op_##name##_reg(arm_to_mips_reg[rd], arm_to_mips_reg[rn],          \
    arm_to_mips_reg[rm])                                                       \
 
 #define arm_generate_op_reg(name, load_op)                                    \
   arm_decode_data_proc_reg();                                                 \
   rm = generate_load_rm_sh_no_flags(rm);                                      \
-  arm_op_check_##load_op();                                                   \
+  arm_op_check_reg_##load_op();                                               \
   generate_op_##name##_reg(arm_to_mips_reg[rd], arm_to_mips_reg[rn],          \
    arm_to_mips_reg[rm])                                                       \
 
@@ -1558,9 +1573,20 @@ typedef enum
   check_store_reg_pc_##flags_op(rd);                                          \
 }                                                                             \
 
+// TST/TEQ/CMP/CMN with Rd = PC (the old "P" forms) do not write the PC: the
+// ARM7TDMI copies the SPSR to the CPSR (which can change the mode) and goes
+// on with the next instruction, without flushing the pipeline. arm_exit_point
+// ends the block here, so restore the CPSR like MOVS pc and continue at the
+// next instruction through the dual (ARM/Thumb) indirect branch.
 #define arm_data_proc_test(name, type)                                        \
 {                                                                             \
   arm_generate_op_##type(name, yes);                                          \
+  if(rd == REG_PC)                                                            \
+  {                                                                           \
+    generate_load_pc(reg_a0, (pc + 4));                                       \
+    generate_function_call(execute_spsr_restore);                             \
+    generate_indirect_branch_dual();                                          \
+  }                                                                           \
 }                                                                             \
 
 #define arm_data_proc_unary(name, type, flags_op)                             \
@@ -1664,6 +1690,9 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_store_reg(reg_rv, rd);                                             \
   check_store_reg_pc_no_flags(rd)                                             \
 
+// STR/STRB/STRH with Rd = PC store PC + 12 and do not jump, but
+// arm_exit_point ends the block at any Rd = PC, so continue at the next
+// instruction explicitly.
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
   if(same_base_store)                                                         \
@@ -1675,7 +1704,12 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
     generate_load_reg_pc(reg_a1, rd, 12);                                     \
   }                                                                           \
   generate_load_pc(reg_a2, (pc + 4));                                         \
-  generate_function_call_swap_delay(execute_store_##mem_type)                 \
+  generate_function_call_swap_delay(execute_store_##mem_type);                \
+  if(rd == REG_PC)                                                            \
+  {                                                                           \
+    generate_load_pc(reg_a0, (pc + 4));                                       \
+    generate_indirect_branch_arm();                                           \
+  }                                                                           \
 
 #define arm_access_memory_reg_pre_up()                                        \
   mips_emit_addu(reg_a0, arm_to_mips_reg[rn], arm_to_mips_reg[rm])            \

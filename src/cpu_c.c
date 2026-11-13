@@ -132,12 +132,13 @@ u32 reg_tmp;
 #define calculate_v_flag_add(dest, src_a, src_b)                              \
   v_flag = ((signed)(dest) < (signed)(src_a)) != ((signed)(src_b) < 0)        \
 
-/* A shift by register uses only the lowest byte of Rs (ARM7TDMI). */
+/* A shift by register uses only the lowest byte of Rs (ARM7TDMI). The PC
+   reads as the instruction's address + 12, as Rm and as Rn (pc holds + 8
+   here; arm_pc_offset() after the instruction resets reg[REG_PC]). */
 #define get_shift_register(dest)                                              \
   u32 shift = reg[(opcode >> 8) & 0x0F] & 0xFF;                               \
-  dest = reg[rm];                                                             \
-  if(rm == 15)                                                                \
-    dest += 4                                                                 \
+  reg[REG_PC] = pc + 4;                                                       \
+  dest = reg[rm]                                                              \
 
 #define calculate_reg_sh()                                                    \
   u32 reg_sh = 0;                                                             \
@@ -600,6 +601,19 @@ u32 high_frequency_branch_targets = 0;
   arm_spsr_restore();                                                         \
 }                                                                             \
 
+// TST/TEQ/CMP/CMN with Rd = PC (the old "P" forms) copy the SPSR to the
+// CPSR and go on with the next instruction; they never write the PC.
+#define arm_data_proc_test_pc_restore()                                       \
+  if((rd == 15) && (reg[CPU_MODE] != MODE_USR))                               \
+  {                                                                           \
+    reg[REG_CPSR] = spsr[reg[CPU_MODE]];                                      \
+    extract_flags();                                                          \
+    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);                            \
+    check_for_interrupts();                                                   \
+    if(reg[REG_CPSR] & 0x20)                                                  \
+      goto thumb_loop;                                                        \
+  }                                                                           \
+
 #define arm_data_proc_test_logic(expr, type)                                  \
 {                                                                             \
   arm_pc_offset(8);                                                           \
@@ -607,6 +621,7 @@ u32 high_frequency_branch_targets = 0;
   u32 dest = expr;                                                            \
   calculate_flags_logic(dest);                                                \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_data_proc_test_add(src_a, src_b, type)                            \
@@ -617,6 +632,7 @@ u32 high_frequency_branch_targets = 0;
   dest = _sa + _sb;                                                           \
   calculate_flags_add(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_data_proc_test_sub(src_a, src_b, type)                            \
@@ -627,6 +643,7 @@ u32 high_frequency_branch_targets = 0;
   dest = _sa - _sb;                                                           \
   calculate_flags_sub(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_multiply_flags_yes(_dest)                                         \
