@@ -1666,8 +1666,15 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 
 #define arm_access_memory_store(mem_type)                                     \
   cycle_count++;                                                              \
+  if(same_base_store)                                                         \
+  {                                                                           \
+    mips_emit_addu(reg_a1, reg_a2, reg_zero);                                 \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    generate_load_reg_pc(reg_a1, rd, 12);                                     \
+  }                                                                           \
   generate_load_pc(reg_a2, (pc + 4));                                         \
-  generate_load_reg_pc(reg_a1, rd, 12);                                       \
   generate_function_call_swap_delay(execute_store_##mem_type)                 \
 
 #define arm_access_memory_reg_pre_up()                                        \
@@ -1737,9 +1744,27 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   arm_decode_half_trans_of();                                                 \
   arm_access_memory_imm_##adjust_op(adjust_dir)                               \
 
+// A store with writeback whose source is also the base (str r0, [r0, 4]!
+// or str r0, [r0], 4) stores the base's old value. The address generation
+// writes the new base back first, so keep the old value in reg_a2, which it
+// does not use.
+#define arm_access_memory_wb_pre    0
+#define arm_access_memory_wb_pre_wb 1
+#define arm_access_memory_wb_post   1
+
+#define arm_access_memory_same_base_load(adjust_op)  0
+#define arm_access_memory_same_base_store(adjust_op)                          \
+  (arm_access_memory_wb_##adjust_op &&                                        \
+   (((opcode >> 12) & 0x0F) == ((opcode >> 16) & 0x0F)))                      \
+
 #define arm_access_memory(access_type, direction, adjust_op, mem_type,        \
  offset_type)                                                                 \
 {                                                                             \
+  u32 same_base_store = arm_access_memory_same_base_##access_type(adjust_op); \
+  if(same_base_store)                                                         \
+  {                                                                           \
+    generate_load_reg(reg_a2, ((opcode >> 16) & 0x0F));                       \
+  }                                                                           \
   arm_data_trans_##offset_type(adjust_op, direction);                         \
   arm_access_memory_##access_type(mem_type);                                  \
 }                                                                             \
