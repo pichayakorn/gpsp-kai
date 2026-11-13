@@ -549,10 +549,13 @@ u32 update_gba()
             dma_transfer(dma + 2);
           if(dma[3].start_type == DMA_START_HBLANK)
             dma_transfer(dma + 3);
-
-          if(dispstat & 0x10)
-            irq_raised |= IRQ_HBLANK; // HBLANK IRQ is not raised during VBLANK
         }
+
+        // The HBlank IRQ is raised on every line, including the V-blank
+        // lines 160-227 (GBATEK; libretro gpSP and mGBA do the same).
+        // HBlank DMA above runs only on visible lines.
+        if(dispstat & 0x10)
+          irq_raised |= IRQ_HBLANK;
 
       }
       else
