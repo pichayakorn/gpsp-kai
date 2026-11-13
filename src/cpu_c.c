@@ -969,6 +969,32 @@ u32 high_frequency_branch_targets = 0;
 #define arm_block_memory_store_pc()                                           \
   store_aligned32(address, pc + 4)                                            \
 
+// LDM with the PC in the list and the S bit ("LDM rn, {..., pc}^") is an
+// exception return: like MOVS pc (arm_spsr_restore) it also copies the SPSR
+// to the CPSR. The S-bit forms without the PC (user-bank transfers) are not
+// emulated yet (#64).
+#define arm_block_memory_pc_restore_load_yes()                                \
+  if(reg_list & 0x8000)                                                       \
+  {                                                                           \
+    if(reg[CPU_MODE] != MODE_USR)                                             \
+    {                                                                         \
+      reg[REG_CPSR] = spsr[reg[CPU_MODE]];                                    \
+      extract_flags();                                                        \
+      set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);                          \
+      check_for_interrupts();                                                 \
+    }                                                                         \
+    arm_update_pc();                                                          \
+                                                                              \
+    if(reg[REG_CPSR] & 0x20)                                                  \
+      goto thumb_loop;                                                        \
+  }                                                                           \
+
+#define arm_block_memory_pc_restore_load_no()                                 \
+
+#define arm_block_memory_pc_restore_store_yes()                               \
+
+#define arm_block_memory_pc_restore_store_no()                                \
+
 #define arm_block_memory(access_type, offset_type, writeback_type, s_bit)     \
 {                                                                             \
   arm_decode_block_trans();                                                   \
@@ -994,6 +1020,7 @@ u32 high_frequency_branch_targets = 0;
   }                                                                           \
                                                                               \
   arm_block_memory_writeback_post_##access_type(writeback_type);              \
+  arm_block_memory_pc_restore_##access_type##_##s_bit();                      \
 }                                                                             \
 
 #define arm_swap(type)                                                        \
