@@ -2309,6 +2309,43 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   }                                                                           \
 }                                                                             \
 
+// Thumb LDMIA/STMIA rb!, {} (empty register list). The ARM7TDMI transfers
+// the PC instead and moves the base by 0x40, as if all 16 registers were
+// transferred: the load jumps to the loaded address (like POP {pc}), the
+// store writes the instruction's address + 6. thumb_exit_point ends the
+// block at the empty load.
+
+#define thumb_block_memory_empty_load(base_reg)                               \
+  cycle_count += 2;                                                           \
+  mips_emit_addu(reg_a2, arm_to_mips_reg[base_reg], reg_zero);                \
+  mips_emit_ins(reg_a2, reg_zero, 0, 2);                                      \
+  mips_emit_addiu(arm_to_mips_reg[base_reg], arm_to_mips_reg[base_reg],       \
+   0x40);                                                                     \
+  mips_emit_jal(mips_absolute_offset(execute_aligned_load32));                \
+  mips_emit_addu(reg_a0, reg_a2, reg_zero);                                   \
+  generate_mov(reg_a0, reg_rv);                                               \
+  generate_indirect_branch_cycle_update(thumb)                                \
+
+#define thumb_block_memory_empty_store(base_reg)                              \
+  cycle_count++;                                                              \
+  mips_emit_addu(reg_a0, arm_to_mips_reg[base_reg], reg_zero);                \
+  mips_emit_ins(reg_a0, reg_zero, 0, 2);                                      \
+  mips_emit_addiu(arm_to_mips_reg[base_reg], arm_to_mips_reg[base_reg],       \
+   0x40);                                                                     \
+  generate_load_pc(reg_a1, (pc + 6));                                         \
+  generate_load_pc(reg_a2, (pc + 2));                                         \
+  generate_function_call_swap_delay(execute_store_u32)                        \
+
+#define thumb_block_memory_ia(access_type, base_reg)                          \
+  if((opcode & 0xFF) == 0)                                                    \
+  {                                                                           \
+    thumb_block_memory_empty_##access_type(base_reg);                         \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    thumb_block_memory(access_type, no, up, base_reg);                        \
+  }                                                                           \
+
 #define thumb_conditional_branch(condition)                                   \
 {                                                                             \
   condition_check_type condition_check __attribute__((unused));               \

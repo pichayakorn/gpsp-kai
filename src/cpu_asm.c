@@ -2332,82 +2332,82 @@ typedef struct
                                                                               \
     case 0xC0:                                                                \
       /* STMIA r0!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 0);                                   \
+      thumb_block_memory_ia(store, 0);                                        \
       break;                                                                  \
                                                                               \
     case 0xC1:                                                                \
       /* STMIA r1!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 1);                                   \
+      thumb_block_memory_ia(store, 1);                                        \
       break;                                                                  \
                                                                               \
     case 0xC2:                                                                \
       /* STMIA r2!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 2);                                   \
+      thumb_block_memory_ia(store, 2);                                        \
       break;                                                                  \
                                                                               \
     case 0xC3:                                                                \
       /* STMIA r3!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 3);                                   \
+      thumb_block_memory_ia(store, 3);                                        \
       break;                                                                  \
                                                                               \
     case 0xC4:                                                                \
       /* STMIA r4!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 4);                                   \
+      thumb_block_memory_ia(store, 4);                                        \
       break;                                                                  \
                                                                               \
     case 0xC5:                                                                \
       /* STMIA r5!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 5);                                   \
+      thumb_block_memory_ia(store, 5);                                        \
       break;                                                                  \
                                                                               \
     case 0xC6:                                                                \
       /* STMIA r6!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 6);                                   \
+      thumb_block_memory_ia(store, 6);                                        \
       break;                                                                  \
                                                                               \
     case 0xC7:                                                                \
       /* STMIA r7!, rlist */                                                  \
-      thumb_block_memory(store, no, up, 7);                                   \
+      thumb_block_memory_ia(store, 7);                                        \
       break;                                                                  \
                                                                               \
     case 0xC8:                                                                \
       /* LDMIA r0!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 0);                                    \
+      thumb_block_memory_ia(load, 0);                                         \
       break;                                                                  \
                                                                               \
     case 0xC9:                                                                \
       /* LDMIA r1!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 1);                                    \
+      thumb_block_memory_ia(load, 1);                                         \
       break;                                                                  \
                                                                               \
     case 0xCA:                                                                \
       /* LDMIA r2!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 2);                                    \
+      thumb_block_memory_ia(load, 2);                                         \
       break;                                                                  \
                                                                               \
     case 0xCB:                                                                \
       /* LDMIA r3!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 3);                                    \
+      thumb_block_memory_ia(load, 3);                                         \
       break;                                                                  \
                                                                               \
     case 0xCC:                                                                \
       /* LDMIA r4!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 4);                                    \
+      thumb_block_memory_ia(load, 4);                                         \
       break;                                                                  \
                                                                               \
     case 0xCD:                                                                \
       /* LDMIA r5!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 5);                                    \
+      thumb_block_memory_ia(load, 5);                                         \
       break;                                                                  \
                                                                               \
     case 0xCE:                                                                \
       /* LDMIA r6!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 6);                                    \
+      thumb_block_memory_ia(load, 6);                                         \
       break;                                                                  \
                                                                               \
     case 0xCF:                                                                \
       /* LDMIA r7!, rlist */                                                  \
-      thumb_block_memory(load, no, up, 7);                                    \
+      thumb_block_memory_ia(load, 7);                                         \
       break;                                                                  \
                                                                               \
     case 0xD0:                                                                \
@@ -3016,8 +3016,8 @@ block_lookup_address_body(dual);
   flag_status = 0xF                                                           \
 
 // The following Thumb instructions can exit:
-// b, bl, bx, swi, pop {... pc}, and mov pc, ..., the latter being a hireg
-// op only. Rather simpler to identify than the ARM set.
+// b, bl, bx, swi, pop {... pc}, ldmia rb!, {} (loads the PC), and mov pc, ...,
+// the latter being a hireg op only. Rather simpler to identify than the ARM set.
 
 #define thumb_exit_point                                                      \
   (((opcode >= 0xD000) && (opcode < 0xDF00)) ||                               \
@@ -3027,6 +3027,7 @@ block_lookup_address_body(dual);
    ((opcode & 0xFF00) == 0x4700) ||                                           \
    ((opcode & 0xFF00) == 0xBD00) ||                                           \
    ((opcode & 0xFF87) == 0x4687) ||                                           \
+   ((opcode & 0xF8FF) == 0xC800) ||                                           \
    ((opcode >= 0xF800)))                                                      \
 
 #define thumb_opcode_branch                                                   \
