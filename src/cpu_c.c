@@ -535,8 +535,12 @@ u32 high_frequency_branch_targets = 0;
   arm_decode_data_proc_reg();                                                 \
   calculate_reg_sh()                                                          \
 
+// Logical operations with the S bit: a rotated immediate (rotation not 0)
+// sets C to bit 31 of the immediate; with no rotation C is unchanged.
 #define arm_data_proc_flags_imm()                                             \
-  arm_decode_data_proc_imm()                                                  \
+  arm_decode_data_proc_imm();                                                 \
+  if((opcode >> 8) & 0x0F)                                                    \
+    c_flag = imm >> 31                                                        \
 
 #define arm_data_proc_imm()                                                   \
   arm_decode_data_proc_imm()                                                  \
