@@ -876,12 +876,13 @@ mips_indirect_branch_dual:
   ror $2, $2, 8                   # rotate value by 8bits
 .endm
 
-# This is technically the same as load_s8, but kept to
-# avoid confusion.
+# LDRSH from an odd address loads the byte at that address, sign-extended.
+# The translation above cleared the address's lowest bit, so the byte is at
+# offset + 1.
 
 .macro load_s16_unaligned base
   jr $ra                          # return
-  lb $2, %lo(\base)($2)           # return base[offset]
+  lb $2, (%lo(\base) + 1)($2)     # return base[offset + 1]
 .endm
 
 # Unalignment must be known statically (use the tables to
