@@ -132,8 +132,9 @@ u32 reg_tmp;
 #define calculate_v_flag_add(dest, src_a, src_b)                              \
   v_flag = ((signed)(dest) < (signed)(src_a)) != ((signed)(src_b) < 0)        \
 
+/* A shift by register uses only the lowest byte of Rs (ARM7TDMI). */
 #define get_shift_register(dest)                                              \
-  u32 shift = reg[(opcode >> 8) & 0x0F];                                      \
+  u32 shift = reg[(opcode >> 8) & 0x0F] & 0xFF;                               \
   dest = reg[rm];                                                             \
   if(rm == 15)                                                                \
     dest += 4                                                                 \
@@ -222,7 +223,8 @@ u32 reg_tmp;
     case 0x7:                                                                 \
     {                                                                         \
       get_shift_register(reg_sh);                                             \
-      ROR(reg_sh, reg_sh, shift);                                             \
+      if(shift & 0x1F)                                                        \
+        ROR(reg_sh, reg_sh, shift & 0x1F);                                    \
       break;                                                                  \
     }                                                                         \
   }                                                                           \
@@ -373,8 +375,9 @@ u32 reg_tmp;
       get_shift_register(reg_sh);                                             \
       if(shift != 0)                                                          \
       {                                                                       \
-        c_flag = (reg_sh >> (shift - 1)) & 0x01;                              \
-        ROR(reg_sh, reg_sh, shift);                                           \
+        c_flag = (reg_sh >> ((shift - 1) & 0x1F)) & 0x01;                     \
+        if(shift & 0x1F)                                                      \
+          ROR(reg_sh, reg_sh, shift & 0x1F);                                  \
       }                                                                       \
       break;                                                                  \
     }                                                                         \
@@ -1135,7 +1138,7 @@ u32 high_frequency_branch_targets = 0;
 // Affects N/Z/C flags
 
 #define thumb_shift_lsl_reg()                                                 \
-  u32 shift = reg[rs];                                                        \
+  u32 shift = reg[rs] & 0xFF;                                                 \
   u32 dest = reg[rd];                                                         \
   if(shift != 0)                                                              \
   {                                                                           \
@@ -1155,7 +1158,7 @@ u32 high_frequency_branch_targets = 0;
   }                                                                           \
 
 #define thumb_shift_lsr_reg()                                                 \
-  u32 shift = reg[rs];                                                        \
+  u32 shift = reg[rs] & 0xFF;                                                 \
   u32 dest = reg[rd];                                                         \
   if(shift != 0)                                                              \
   {                                                                           \
@@ -1175,7 +1178,7 @@ u32 high_frequency_branch_targets = 0;
   }                                                                           \
 
 #define thumb_shift_asr_reg()                                                 \
-  u32 shift = reg[rs];                                                        \
+  u32 shift = reg[rs] & 0xFF;                                                 \
   u32 dest = reg[rd];                                                         \
   if(shift != 0)                                                              \
   {                                                                           \
@@ -1192,12 +1195,13 @@ u32 high_frequency_branch_targets = 0;
   }                                                                           \
 
 #define thumb_shift_ror_reg()                                                 \
-  u32 shift = reg[rs];                                                        \
+  u32 shift = reg[rs] & 0xFF;                                                 \
   u32 dest = reg[rd];                                                         \
   if(shift != 0)                                                              \
   {                                                                           \
-    c_flag = (dest >> (shift - 1)) & 0x01;                                    \
-    ROR(dest, dest, shift);                                                   \
+    c_flag = (dest >> ((shift - 1) & 0x1F)) & 0x01;                           \
+    if(shift & 0x1F)                                                          \
+      ROR(dest, dest, shift & 0x1F);                                          \
   }                                                                           \
 
 #define thumb_shift_lsl_imm()                                                 \
