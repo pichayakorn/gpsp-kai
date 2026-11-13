@@ -2497,8 +2497,20 @@ typedef struct
     case 0xF0 ... 0xF7:                                                       \
     {                                                                         \
       /* (low word) BL label */                                               \
-      /* This should possibly generate code if not in conjunction with a BLH  \
-         next, but I don't think anyone will do that. */                      \
+      /* Normally fused with the high word that follows (thumb_bl). But a     \
+         translation gate at the high word, MAX_BLOCK_SIZE or the RAM-end     \
+         clamp can end the block right here; the high word then starts a     \
+         block of its own as thumb_blh, which takes its target from LR. So   \
+         when this is the block's last instruction, do the low word's own    \
+         work: LR = PC + 4 + (offset << 12). Without it the high word jumped \
+         to (stale LR + offset). Ported from GBAdhoc (GPL-2.0),              \
+         cpu_threaded.c. */                                                   \
+      if((pc + 2) == block_end_pc)                                            \
+      {                                                                       \
+        u32 bl_lr = pc + 4 + ((s32)((opcode & 0x07FF) << 21) >> 9);           \
+        generate_load_imm(reg_a0, bl_lr);                                     \
+        generate_store_reg(reg_a0, REG_LR);                                   \
+      }                                                                       \
       break;                                                                  \
     }                                                                         \
                                                                               \
