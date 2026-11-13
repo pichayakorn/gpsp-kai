@@ -1540,8 +1540,16 @@ typedef enum
   arm_op_check_##load_op();                                                   \
   generate_op_##name##_imm(arm_to_mips_reg[rd], arm_to_mips_reg[rn])          \
 
+// A logical operation with the S bit and a rotated immediate (rotation not
+// 0) sets C to bit 31 of the immediate; with no rotation C is unchanged.
+// Only the logical ops and TST/TEQ use this form, so C is never an input.
+// Follows libretro gpSP (GPL-2.0-or-later), mips/mips_emit.h.
 #define arm_generate_op_imm_flags(name, load_op)                              \
-  arm_generate_op_imm(name, load_op)                                          \
+  arm_generate_op_imm(name, load_op);                                         \
+  if((opcode >> 8) & 0x0F)                                                    \
+  {                                                                           \
+    mips_emit_addiu(reg_c_cache, reg_zero, imm >> 31);                        \
+  }                                                                           \
 
 
 #define arm_data_proc(name, type, flags_op)                                   \
