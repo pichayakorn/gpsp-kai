@@ -1757,7 +1757,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   generate_store_reg(reg_rv, i)                                               \
 
 #define arm_block_memory_store()                                              \
-  generate_load_reg_pc(reg_a1, i, 8);                                         \
+  generate_load_reg_pc(reg_a1, i, 12);                                        \
   generate_function_call_swap_delay(execute_aligned_store32)                  \
 
 #define arm_block_memory_final_load(writeback_type)                           \
@@ -1766,9 +1766,12 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 // A deferred writeback has to be emitted before the final store call, since
 // that call can leave the block (e.g. on self-modifying code).
 
+// STM stores the PC as the instruction's address + 12. The PC is always the
+// last register, so it goes through the final store; generate_load_reg would
+// read reg_a0 (the PC's slot), which holds the address here.
 #define arm_block_memory_final_store(writeback_type)                          \
   generate_load_pc(reg_a2, (pc + 4));                                         \
-  generate_load_reg(reg_a1, i);                                               \
+  generate_load_reg_pc(reg_a1, i, 12);                                        \
   arm_block_memory_writeback_post_store(writeback_type);                      \
   generate_function_call_swap_delay(execute_store_u32)                        \
 
@@ -1798,7 +1801,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define arm_block_memory_sp_store()                                           \
 {                                                                             \
   u32 store_reg = i;                                                          \
-  check_load_reg_pc(arm_reg_a0, store_reg, 8);                                \
+  check_load_reg_pc(arm_reg_a0, store_reg, 12);                               \
   mips_emit_sw(arm_to_mips_reg[store_reg], reg_a1, offset);                   \
 }                                                                             \
 
