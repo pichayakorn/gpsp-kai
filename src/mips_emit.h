@@ -1558,9 +1558,20 @@ typedef enum
   check_store_reg_pc_##flags_op(rd);                                          \
 }                                                                             \
 
+// TST/TEQ/CMP/CMN with Rd = PC (the old "P" forms) do not write the PC: the
+// ARM7TDMI copies the SPSR to the CPSR (which can change the mode) and goes
+// on with the next instruction, without flushing the pipeline. arm_exit_point
+// ends the block here, so restore the CPSR like MOVS pc and continue at the
+// next instruction through the dual (ARM/Thumb) indirect branch.
 #define arm_data_proc_test(name, type)                                        \
 {                                                                             \
   arm_generate_op_##type(name, yes);                                          \
+  if(rd == REG_PC)                                                            \
+  {                                                                           \
+    generate_load_pc(reg_a0, (pc + 4));                                       \
+    generate_function_call(execute_spsr_restore);                             \
+    generate_indirect_branch_dual();                                          \
+  }                                                                           \
 }                                                                             \
 
 #define arm_data_proc_unary(name, type, flags_op)                             \

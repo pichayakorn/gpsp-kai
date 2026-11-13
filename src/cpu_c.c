@@ -600,6 +600,19 @@ u32 high_frequency_branch_targets = 0;
   arm_spsr_restore();                                                         \
 }                                                                             \
 
+// TST/TEQ/CMP/CMN with Rd = PC (the old "P" forms) copy the SPSR to the
+// CPSR and go on with the next instruction; they never write the PC.
+#define arm_data_proc_test_pc_restore()                                       \
+  if((rd == 15) && (reg[CPU_MODE] != MODE_USR))                               \
+  {                                                                           \
+    reg[REG_CPSR] = spsr[reg[CPU_MODE]];                                      \
+    extract_flags();                                                          \
+    set_cpu_mode(cpu_modes[reg[REG_CPSR] & 0x1F]);                            \
+    check_for_interrupts();                                                   \
+    if(reg[REG_CPSR] & 0x20)                                                  \
+      goto thumb_loop;                                                        \
+  }                                                                           \
+
 #define arm_data_proc_test_logic(expr, type)                                  \
 {                                                                             \
   arm_pc_offset(8);                                                           \
@@ -607,6 +620,7 @@ u32 high_frequency_branch_targets = 0;
   u32 dest = expr;                                                            \
   calculate_flags_logic(dest);                                                \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_data_proc_test_add(src_a, src_b, type)                            \
@@ -617,6 +631,7 @@ u32 high_frequency_branch_targets = 0;
   dest = _sa + _sb;                                                           \
   calculate_flags_add(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_data_proc_test_sub(src_a, src_b, type)                            \
@@ -627,6 +642,7 @@ u32 high_frequency_branch_targets = 0;
   dest = _sa - _sb;                                                           \
   calculate_flags_sub(dest, _sa, _sb);                                        \
   arm_pc_offset(-4);                                                          \
+  arm_data_proc_test_pc_restore();                                            \
 }                                                                             \
 
 #define arm_multiply_flags_yes(_dest)                                         \
