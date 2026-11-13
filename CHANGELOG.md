@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.7.1](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.0...v3.7.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **cpu:** a store with writeback to its own base stores the old value ([#91](https://github.com/pichayakorn/gpsp-kai/issues/91)) ([8b195a5](https://github.com/pichayakorn/gpsp-kai/commit/8b195a53074791db99380f3940b77e6104e0298e))
+* **cpu:** a Thumb BL split across two blocks jumps to the right place ([#92](https://github.com/pichayakorn/gpsp-kai/issues/92)) ([4336448](https://github.com/pichayakorn/gpsp-kai/commit/43364487cbd4a396f93ab9999af937eedb39e2be))
+* **cpu:** instructions with Rd = PC that don't jump no longer crash ([#89](https://github.com/pichayakorn/gpsp-kai/issues/89)) ([23d56a4](https://github.com/pichayakorn/gpsp-kai/commit/23d56a49129bd3aa7b43337eab4868a1eff2e3cf))
+* **cpu:** LDM with the PC and the S bit restores the CPSR ([#78](https://github.com/pichayakorn/gpsp-kai/issues/78)) ([ec3ac88](https://github.com/pichayakorn/gpsp-kai/commit/ec3ac8827e48151c64f40c4313216ea8f14d76ad))
+* **cpu:** LDRSH from an odd address loads the byte at that address ([#76](https://github.com/pichayakorn/gpsp-kai/issues/76)) ([e552ec5](https://github.com/pichayakorn/gpsp-kai/commit/e552ec5bc62f9d2c93c996d72bddedf09a9aeeaa))
+* **cpu:** read the PC as address + 12 with a shift by register ([#85](https://github.com/pichayakorn/gpsp-kai/issues/85)) ([d442f34](https://github.com/pichayakorn/gpsp-kai/commit/d442f34cb6cae8a2887c1155c7d3cfe804cf624a))
+* **cpu:** set the carry flag for a rotated immediate ([#82](https://github.com/pichayakorn/gpsp-kai/issues/82)) ([95f086b](https://github.com/pichayakorn/gpsp-kai/commit/95f086b4a57d802569c61a5ff6f515de45e853c6))
+* **cpu:** STM stores the PC as the instruction's address + 12 ([#90](https://github.com/pichayakorn/gpsp-kai/issues/90)) ([4d30707](https://github.com/pichayakorn/gpsp-kai/commit/4d3070763834c9bae8ec627269d27b0dfa481af7))
+* **cpu:** Thumb LDMIA/STMIA with an empty register list ([#83](https://github.com/pichayakorn/gpsp-kai/issues/83)) ([04befc2](https://github.com/pichayakorn/gpsp-kai/commit/04befc27cffb83d971f5e398dc5f1dc5565e8341))
+* **cpu:** use only the lowest byte of Rs for shifts by register ([#75](https://github.com/pichayakorn/gpsp-kai/issues/75)) ([e338ce8](https://github.com/pichayakorn/gpsp-kai/commit/e338ce8dea93a1eb413f3fd39aea5910cde7562e))
+* **video:** raise the HBlank IRQ on every line, also during V-blank ([#93](https://github.com/pichayakorn/gpsp-kai/issues/93)) ([7a7847c](https://github.com/pichayakorn/gpsp-kai/commit/7a7847c4071eb4056a5de7a876da53fe35fb3e0b))
+
 ## [3.7.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.6.0...v3.7.0) (2026-11-12)
 
 
