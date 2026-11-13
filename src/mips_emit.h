@@ -795,19 +795,24 @@ u32 arm_to_mips_reg[] =
   }                                                                           \
   _rm = arm_reg                                                               \
 
+// Shifts by register (ARM "Rm, <shift> Rs" and Thumb LSL/LSR/ASR/ROR Rd, Rs)
+// use only the lowest byte of Rs as the amount, s = Rs & 0xFF. A MIPS
+// variable shift uses Rs[4:0], which equals s[4:0], so the no-flags forms
+// only need Rs & 0xE0 to tell s >= 32; ROR by s is ROR by s & 31. The flags
+// forms mask s first. Ported from GBAdhoc (GPL-2.0), mips/mips_emit.h.
 #define generate_shift_reg_lsl_no_flags(_rm, _rs)                             \
-  mips_emit_sltiu(reg_temp, arm_to_mips_reg[_rs], 32);                        \
+  mips_emit_andi(reg_temp, arm_to_mips_reg[_rs], 0xE0);                       \
   mips_emit_sllv(reg_a0, arm_to_mips_reg[_rm], arm_to_mips_reg[_rs]);         \
-  mips_emit_movz(reg_a0, reg_zero, reg_temp)                                  \
+  mips_emit_movn(reg_a0, reg_zero, reg_temp)                                  \
 
 #define generate_shift_reg_lsr_no_flags(_rm, _rs)                             \
-  mips_emit_sltiu(reg_temp, arm_to_mips_reg[_rs], 32);                        \
+  mips_emit_andi(reg_temp, arm_to_mips_reg[_rs], 0xE0);                       \
   mips_emit_srlv(reg_a0, arm_to_mips_reg[_rm], arm_to_mips_reg[_rs]);         \
-  mips_emit_movz(reg_a0, reg_zero, reg_temp)                                  \
+  mips_emit_movn(reg_a0, reg_zero, reg_temp)                                  \
 
 #define generate_shift_reg_asr_no_flags(_rm, _rs)                             \
-  mips_emit_sltiu(reg_temp, arm_to_mips_reg[_rs], 32);                        \
-  mips_emit_b(bne, reg_temp, reg_zero, 2);                                    \
+  mips_emit_andi(reg_temp, arm_to_mips_reg[_rs], 0xE0);                       \
+  mips_emit_b(beq, reg_temp, reg_zero, 2);                                    \
   mips_emit_srav(reg_a0, arm_to_mips_reg[_rm], arm_to_mips_reg[_rs]);         \
   mips_emit_sra(reg_a0, reg_a0, 31)                                           \
 
@@ -830,11 +835,12 @@ u32 arm_to_mips_reg[] =
   generate_function_call_swap_delay(execute_asr_flags_reg)                    \
 
 #define generate_shift_reg_ror_flags(_rm, _rs)                                \
-  mips_emit_b(beq, arm_to_mips_reg[_rs], reg_zero, 3);                        \
-  mips_emit_addiu(reg_temp, arm_to_mips_reg[_rs], -1);                        \
+  mips_emit_andi(reg_a1, arm_to_mips_reg[_rs], 0xFF);                         \
+  mips_emit_b(beq, reg_a1, reg_zero, 3);                                      \
+  mips_emit_addiu(reg_temp, reg_a1, -1);                                      \
   mips_emit_srlv(reg_temp, arm_to_mips_reg[_rm], reg_temp);                   \
   mips_emit_andi(reg_c_cache, reg_temp, 1);                                   \
-  mips_emit_rotrv(reg_a0, arm_to_mips_reg[_rm], arm_to_mips_reg[_rs])         \
+  mips_emit_rotrv(reg_a0, arm_to_mips_reg[_rm], reg_a1)                       \
 
 #define generate_shift_imm(arm_reg, name, flags_op)                           \
   u32 shift = (opcode >> 7) & 0x1F;                                           \

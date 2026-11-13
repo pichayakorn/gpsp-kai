@@ -3208,6 +3208,7 @@ execute_store_spsr:
 # $5: shift
 
 execute_lsl_flags_reg:
+  andi $5, $5, 0xFF               # the amount is the lowest byte of Rs
   beq $5, $0, lsl_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, lsl_shift_high      # is the shift >= 32?
@@ -3234,6 +3235,7 @@ lsl_shift_done:
 
 
 execute_lsr_flags_reg:
+  andi $5, $5, 0xFF               # the amount is the lowest byte of Rs
   beq $5, $0, lsr_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, lsr_shift_high      # is the shift >= 32?
@@ -3259,6 +3261,7 @@ lsr_shift_done:
 
 
 execute_asr_flags_reg:
+  andi $5, $5, 0xFF               # the amount is the lowest byte of Rs
   beq $5, $0, asr_shift_zero      # is the shift zero?
   sltiu $1, $5, 32                # $1 = (shift < 32) (delay)
   beq $1, $0, asr_shift_high      # is the shift >= 32?
