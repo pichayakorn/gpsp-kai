@@ -987,8 +987,9 @@ u32 high_frequency_branch_targets = 0;
   load_aligned32(address, pc);                                                \
   reg[REG_PC] = pc                                                            \
 
+// pc is the instruction's address + 4 here; STM stores address + 12.
 #define arm_block_memory_store_pc()                                           \
-  store_aligned32(address, pc + 4)                                            \
+  store_aligned32(address, pc + 8)                                            \
 
 // LDM with the PC in the list and the S bit ("LDM rn, {..., pc}^") is an
 // exception return: like MOVS pc (arm_spsr_restore) it also copies the SPSR
