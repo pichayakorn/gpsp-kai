@@ -49,7 +49,7 @@ jobs:
             https://github.com/pspdev/psp-cfw-sdk/releases/download/latest/psp-cfw-sdk.zip
           # psp-cfw-sdk only publishes a moving "latest" release, so check
           # that it is still the tested file; update the hash on purpose.
-          echo "f55f69b2c5ee34bd91688ec13b66535cf18d221c412fc4c763245bea1a21e57e  /tmp/psp-cfw-sdk.zip" \
+          echo "f7d15cb28ed56317119215fbe41162d6a9bfb5d06fd35b2eb211f3afb8800486  /tmp/psp-cfw-sdk.zip" \
             | sha256sum -c -
           # systemctrl_adrenaline.h is a symlink in the image; keep it.
           unzip -qo /tmp/psp-cfw-sdk.zip -d / \
