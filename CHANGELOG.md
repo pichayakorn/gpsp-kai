@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.2](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.1...v3.7.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* **cpu:** ARM LDM/STM with an empty register list transfer the PC ([#97](https://github.com/pichayakorn/gpsp-kai/issues/97)) ([9f79dfd](https://github.com/pichayakorn/gpsp-kai/commit/9f79dfdb4550c552d56b1e70c7b77d6df6cff808))
+* **cpu:** LDM/STM with the S bit transfer the user-mode registers ([#94](https://github.com/pichayakorn/gpsp-kai/issues/94)) ([3db5057](https://github.com/pichayakorn/gpsp-kai/commit/3db505710fe85bf81325133d157cd0e3458d164f))
+
 ## [3.7.1](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.0...v3.7.1) (2026-11-13)
 
 
