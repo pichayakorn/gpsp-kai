@@ -904,6 +904,34 @@ void set_cpu_mode(CPU_MODE_TYPE new_mode)
   }
 }
 
+// LDM/STM with the S bit and no PC in the list transfer the user-mode
+// registers: in FIQ mode r8-r14 are banked, in the other privileged modes
+// r13-r14. Returns where the user-mode copy of register index lives now.
+u32 *user_reg_ptr(u32 index)
+{
+  CPU_MODE_TYPE cpu_mode = reg[CPU_MODE];
+
+  if((cpu_mode == MODE_FIQ) ? (index >= 8) :
+   ((cpu_mode != MODE_USR) && (index >= 13)))
+  {
+    return &reg_mode[MODE_USR][index - 8];
+  }
+
+  return &reg[index];
+}
+
+// Called by the dynarec stubs, which save the cached registers to reg[]
+// before and reload them after.
+u32 user_reg_load(u32 index)
+{
+  return *user_reg_ptr(index);
+}
+
+void user_reg_store(u32 value, u32 index)
+{
+  *user_reg_ptr(index) = value;
+}
+
 void raise_interrupt(IRQ_TYPE irq_raised)
 {
   // The specific IRQ must be enabled in IE, master IRQ enable must be on,

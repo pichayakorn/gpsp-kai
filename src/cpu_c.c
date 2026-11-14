@@ -18,9 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-// Important todo:
-// - block memory needs psr swapping and user mode reg swapping
-
 #ifdef USE_C_CORE
 
 #include "common.h"
@@ -993,8 +990,8 @@ u32 high_frequency_branch_targets = 0;
 
 // LDM with the PC in the list and the S bit ("LDM rn, {..., pc}^") is an
 // exception return: like MOVS pc (arm_spsr_restore) it also copies the SPSR
-// to the CPSR. The S-bit forms without the PC (user-bank transfers) are not
-// emulated yet (#64).
+// to the CPSR. The other S-bit forms transfer the user-mode registers
+// (user_bank below).
 #define arm_block_memory_pc_restore_load_yes()                                \
   if(reg_list & 0x8000)                                                       \
   {                                                                           \
@@ -1017,11 +1014,17 @@ u32 high_frequency_branch_targets = 0;
 
 #define arm_block_memory_pc_restore_store_no()                                \
 
+#define arm_block_memory_user_bank_load_yes()   (!(reg_list & 0x8000))
+#define arm_block_memory_user_bank_load_no()    0
+#define arm_block_memory_user_bank_store_yes()  1
+#define arm_block_memory_user_bank_store_no()   0
+
 #define arm_block_memory(access_type, offset_type, writeback_type, s_bit)     \
 {                                                                             \
   arm_decode_block_trans();                                                   \
   u32 base = reg[rn];                                                         \
   u32 address = arm_block_memory_offset_##offset_type() & 0xFFFFFFFC;         \
+  u32 user_bank = arm_block_memory_user_bank_##access_type##_##s_bit();       \
   u32 i;                                                                      \
                                                                               \
   arm_block_memory_writeback_pre_##access_type(writeback_type);               \
@@ -1030,7 +1033,8 @@ u32 high_frequency_branch_targets = 0;
   {                                                                           \
     if((reg_list >> i) & 0x01)                                                \
     {                                                                         \
-      access_type##_aligned32(address, reg[i]);                               \
+      access_type##_aligned32(address,                                        \
+       *(user_bank ? user_reg_ptr(i) : &reg[i]));                             \
       address += 4;                                                           \
     }                                                                         \
   }                                                                           \

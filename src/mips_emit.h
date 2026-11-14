@@ -34,6 +34,8 @@ u32 execute_read_spsr();
 void execute_swi(u32 pc);
 
 u32 execute_spsr_restore(u32 address);
+void execute_load_user_reg(void);
+void execute_store_user_reg(void);
 void execute_store_cpsr(u32 new_cpsr, u32 store_mask);
 void execute_store_spsr(u32 new_spsr, u32 store_mask);
 
@@ -1811,13 +1813,40 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define sprint_yes(access_type, pre_op, post_op, wb)                          \
   printf("sbit on %s %s %s %s\n", #access_type, #pre_op, #post_op, #wb)       \
 
+// LDM/STM with the S bit transfer the user-mode registers (LDM only when the
+// PC is not in the list; with the PC it is an exception return). Which of
+// r8-r14 are banked depends on the mode at run time, so those go through
+// execute_load_user_reg/execute_store_user_reg, which keep a0 and a2.
+#define arm_block_memory_user_bank_load_yes()   (!(reg_list & 0x8000))
+#define arm_block_memory_user_bank_load_no()    0
+#define arm_block_memory_user_bank_store_yes()  1
+#define arm_block_memory_user_bank_store_no()   0
+
 #define arm_block_memory_load()                                               \
   generate_function_call_swap_delay(execute_aligned_load32);                  \
-  generate_store_reg(reg_rv, i)                                               \
+  if(user_bank && (i >= 8) && (i < 15))                                     \
+  {                                                                           \
+    generate_mov(reg_a0, reg_rv);                                             \
+    generate_load_imm(reg_a1, i);                                             \
+    generate_function_call(execute_store_user_reg);                           \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    generate_store_reg(reg_rv, i);                                            \
+  }                                                                           \
 
 #define arm_block_memory_store()                                              \
-  generate_load_reg_pc(reg_a1, i, 12);                                        \
-  generate_function_call_swap_delay(execute_aligned_store32)                  \
+  if(user_bank && (i >= 8) && (i < 15))                                     \
+  {                                                                           \
+    generate_load_imm(reg_a1, i);                                             \
+    generate_function_call(execute_load_user_reg);                            \
+    generate_function_call(execute_aligned_store32);                          \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    generate_load_reg_pc(reg_a1, i, 12);                                      \
+    generate_function_call_swap_delay(execute_aligned_store32);               \
+  }                                                                           \
 
 #define arm_block_memory_final_load(writeback_type)                           \
   arm_block_memory_load()                                                     \
@@ -1830,9 +1859,19 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 // read reg_a0 (the PC's slot), which holds the address here.
 #define arm_block_memory_final_store(writeback_type)                          \
   generate_load_pc(reg_a2, (pc + 4));                                         \
-  generate_load_reg_pc(reg_a1, i, 12);                                        \
-  arm_block_memory_writeback_post_store(writeback_type);                      \
-  generate_function_call_swap_delay(execute_store_u32)                        \
+  if(user_bank && (i >= 8) && (i < 15))                                     \
+  {                                                                           \
+    generate_load_imm(reg_a1, i);                                             \
+    generate_function_call(execute_load_user_reg);                            \
+    arm_block_memory_writeback_post_store(writeback_type);                    \
+    generate_function_call(execute_store_u32);                                \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    generate_load_reg_pc(reg_a1, i, 12);                                      \
+    arm_block_memory_writeback_post_store(writeback_type);                    \
+    generate_function_call_swap_delay(execute_store_u32);                     \
+  }                                                                           \
 
 #define arm_block_memory_adjust_pc_store(s_bit)                               \
 
@@ -1930,11 +1969,12 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   u32 i;                                                                      \
   u32 offset = 0;                                                             \
   u32 base_reg = arm_to_mips_reg[rn];                                         \
+  u32 user_bank = arm_block_memory_user_bank_##access_type##_##s_bit();       \
                                                                               \
   arm_block_memory_offset_##offset_type();                                    \
   arm_block_memory_writeback_pre_##access_type(writeback_type);               \
                                                                               \
-  if((rn == REG_SP) && iwram_stack_optimize)                                  \
+  if((rn == REG_SP) && iwram_stack_optimize && !user_bank)                    \
   {                                                                           \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
     generate_load_imm(reg_a0, ((u32)(iwram + 0x8000)));                       \
