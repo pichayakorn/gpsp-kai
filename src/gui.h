@@ -23,6 +23,10 @@
 
 #define MAX_GAMEPAD_CONFIG_MAP 16
 
+#define RAPIDFIRE_SLOW   0
+#define RAPIDFIRE_MEDIUM 1
+#define RAPIDFIRE_FAST   2
+
 typedef struct
 {
   u32 screen_mode;
@@ -61,6 +65,9 @@ typedef struct
   u32 gamepad_config_map[MAX_GAMEPAD_CONFIG_MAP];
   u32 use_default_gamepad_map;
   u32 allocate_sensor;
+  // Appended field: an older game config file is shorter, so it keeps the
+  // default from init_game_config().
+  u32 rapidfire_speed;     // RAPIDFIRE_SLOW, RAPIDFIRE_MEDIUM or RAPIDFIRE_FAST
 } game_config_t;
 
 #define ASM_CORE 0

@@ -1141,3 +1141,27 @@
 # MSG_G_S_MENU_HELP_FF_SOUND
 #Select 'no' to mute the sound while fast forwarding.
 !Select 'no' to mute the sound while fast forwarding.
+
+# MSG_RAPIDFIRE_SPEED
+#Rapid fire speed: %s
+!Rapid fire speed: %s
+
+# MSG_RAPIDFIRE_SLOW
+#slow
+!slow
+
+# MSG_RAPIDFIRE_MEDIUM
+#medium
+!medium
+
+# MSG_RAPIDFIRE_FAST
+#fast
+!fast
+
+# MSG_PAD_MENU_HELP_RAPIDFIRE
+#How fast the rapid fire buttons press. Saved for this game.\n
+#Fast: 30 presses a second. Medium: 15. Slow: 7.5.\n
+#Try slow or medium if a game misses rapid fire presses.
+!How fast the rapid fire buttons press. Saved for this game.\n
+!Fast: 30 presses a second. Medium: 15. Slow: 7.5.\n
+!Try slow or medium if a game misses rapid fire presses.

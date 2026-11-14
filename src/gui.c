@@ -757,6 +757,7 @@ void init_game_config()
   memcpy(g_game_config.gamepad_config_map, gamepad_config_map_init, sizeof(gamepad_config_map_init));
   g_game_config.use_default_gamepad_map = YES;
   g_game_config.allocate_sensor = NO;
+  g_game_config.rapidfire_speed = RAPIDFIRE_FAST;
 }
 
 void init_gpsp_config()
@@ -1227,6 +1228,13 @@ u32 menu(u16 *original_screen)
     msg[MSG_FF_HOLD]
   };
 
+  char *rapidfire_speed_options[] =
+  {
+    msg[MSG_RAPIDFIRE_SLOW],
+    msg[MSG_RAPIDFIRE_MEDIUM],
+    msg[MSG_RAPIDFIRE_FAST]
+  };
+
   char *filter_options[] =
   {
     msg[MSG_FILTER_OFF],
@@ -1432,6 +1440,7 @@ u32 menu(u16 *original_screen)
     GAMEPAD_CONFIG_OPTION(msg[MSG_PAD_MENU_11], 11),
 
     STRING_SELECTION_OPTION(set_gamepad, msg[MSG_PAD_MENU_12], yes_no_options, &g_game_config.use_default_gamepad_map, 2, msg[MSG_PAD_MENU_HELP_12], 13),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_RAPIDFIRE_SPEED], rapidfire_speed_options, &g_game_config.rapidfire_speed, 3, msg[MSG_PAD_MENU_HELP_RAPIDFIRE], 14),
 
     SUBMENU_OPTION(NULL, msg[MSG_PAD_MENU_13], msg[MSG_PAD_MENU_HELP_13], 15)
   };
