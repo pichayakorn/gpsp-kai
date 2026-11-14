@@ -250,7 +250,11 @@ gui_action_type get_gui_input_fs_hold(u32 button_id)
   return new_button;
 }
 
-u32 rapidfire_flag = 1;
+// Rapid fire: the button is down for the first half of each period and up
+// for the second half. Periods in frames for slow, medium and fast; fast
+// (2 frames) is the original every-other-frame speed.
+static const u32 rapidfire_period[3] = { 8, 4, 2 };
+static u32 rapidfire_frame = 0;
 
 // Input handling during emulation
 u32 update_input()
@@ -263,6 +267,7 @@ u32 update_input()
   u32 i;
   u32 new_key = 0;
   u32 fast_forward_held = 0;
+  u32 rapidfire_on;
   u32 analog_sensitivity = 92 - (g_gpsp_config.analog_sensitivity_level * 4);
   u32 inv_analog_sensitivity = 256 - analog_sensitivity;
 //  tilt_sensor_x = 0x800;
@@ -270,6 +275,13 @@ u32 update_input()
 //  sensorR = 0x650;
 
   sceCtrlPeekBufferPositive(&ctrl_data, 1);
+
+  {
+    u32 speed = g_game_config.rapidfire_speed;
+    u32 period = rapidfire_period[speed < 3 ? speed : RAPIDFIRE_FAST];
+    rapidfire_frame = (rapidfire_frame + 1) % period;
+    rapidfire_on = rapidfire_frame < (period / 2);
+  }
 
   if (g_use_home == 1)
     ctrl_buttons = readHomeButton();
@@ -387,8 +399,7 @@ u32 update_input()
       if((button_id >= BUTTON_ID_RAPIDFIRE_A) &&
        (button_id <= BUTTON_ID_RAPIDFIRE_R))
       {
-        rapidfire_flag ^= 1;
-        if(rapidfire_flag)
+        if(rapidfire_on)
         {
           new_key |= button_id_to_gba_mask[button_id - BUTTON_ID_RAPIDFIRE_A + BUTTON_ID_A];
         }
