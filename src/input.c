@@ -274,6 +274,8 @@ u32 update_input()
 //  tilt_sensor_y = 0x800;
 //  sensorR = 0x650;
 
+  check_home_quit(NULL);
+
   sceCtrlPeekBufferPositive(&ctrl_data, 1);
 
   {
