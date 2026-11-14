@@ -11,6 +11,10 @@
 #define VRAM_BUFFERS_END ((768 * 512 * 2) + (240 * 161 * 2) * 2 + (480 * 273 * 2) * 2)
 #define VRAM_GAP ((UNIVERSAL_VRAM_ADDR & 0x00FFFFFF) - VRAM_BUFFERS_END)
 
+/* Through a volatile pointer: GCC removes a malloc() whose result is only
+ * tested and freed, and assumes it succeeded. */
+static void *volatile probe_block;
+
 static u32 largest_malloc_kb(void)
 {
   u32 lo = 0, hi = 64 * 1024;  /* KB */
@@ -18,15 +22,16 @@ static u32 largest_malloc_kb(void)
   while(hi - lo > 16)
   {
     u32 mid = (lo + hi) / 2;
-    void *p = malloc(mid * 1024);
-    if(p)
+    probe_block = malloc(mid * 1024);
+    if(probe_block != NULL)
     {
-      free(p);
+      free(probe_block);
       lo = mid;
     }
     else
       hi = mid;
   }
+  probe_block = NULL;
   return lo;
 }
 
@@ -98,7 +103,8 @@ void ui_bench(void)
 
     ui_ground();
     ui_text(UI_MARGIN, 12, "UI4 benchmark", UI_COL_CREAM);
-    sprintf(line, "%d MHz", (int)clocks[clock]);
+    /* the clock the PSP reports; a CFW plugin may override the request */
+    sprintf(line, "%d MHz (set %d)", scePowerGetCpuClockFrequency(), (int)clocks[clock]);
     ui_text(UI_SCREEN_W - UI_MARGIN - ui_text_width(line), 12, line, UI_COL_MUTE);
 
     /* rows with a lifted selection and the cursor frame flying to it */
