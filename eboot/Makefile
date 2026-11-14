@@ -19,7 +19,7 @@ COMMON_FILE += adhoc.h
 endif
 
 ifeq ($(UI4), 1)
-OBJS           += ui_pool.o ui_input.o ui_draw.o ui_bench.o
+OBJS           += ui_pool.o ui_input.o ui_draw.o ui_font.o ui_bench.o
 endif
 
 TARGET          = UO_gpSP_kai

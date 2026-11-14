@@ -41,6 +41,7 @@ package: all
 	$(if $(PRX_FROM_PREBUILT),cp $(addprefix prx/prebuilt/,$(PRX_FROM_PREBUILT)) $(PACKAGE_DIR)/)
 	cp data/cfg/* $(PACKAGE_DIR)/cfg/
 	cp $(addprefix data/font/,$(PACKAGE_FONTS)) $(PACKAGE_DIR)/font/
+	$(if $(filter 1,$(UI4)),cp -r data/font/ui $(PACKAGE_DIR)/font/)
 	cp data/game_config.txt $(PACKAGE_DIR)/
 	cp COPYING $(PACKAGE_DIR)/licenses/
 	cp -r docs/licenses/. $(PACKAGE_DIR)/licenses/

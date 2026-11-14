@@ -15,10 +15,6 @@ static u32 part_sum[PART_COUNT], part_avg[PART_COUNT], part_t;
 #define MARK(n) do { u32 now_ = sceKernelGetSystemTimeLow(); \
                      part_sum[n] += now_ - part_t; part_t = now_; } while(0)
 
-/* VRAM between the end of kai's display, game and menu buffers and the
- * shared scratch buffer (UNIVERSAL_VRAM_ADDR), see gu.c. */
-#define VRAM_BUFFERS_END ((768 * 512 * 2) + (240 * 161 * 2) * 2 + (480 * 273 * 2) * 2)
-#define VRAM_GAP ((UNIVERSAL_VRAM_ADDR & 0x00FFFFFF) - VRAM_BUFFERS_END)
 
 /* Through a volatile pointer: GCC removes a malloc() whose result is only
  * tested and freed, and assumes it succeeded. */
@@ -114,7 +110,10 @@ void ui_bench(void)
 
     ui_ground();
     MARK(PART_GROUND);
-    ui_text(UI_MARGIN, 12, "UI4 benchmark", UI_COL_CREAM);
+    if(ui_font_loaded())
+      ui_print(UI_MARGIN, 2, "Benchmark", UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_2X | UI_TEXT_BOLD);
+    else
+      ui_text(UI_MARGIN, 12, "UI4 benchmark", UI_COL_CREAM);
     /* the clock the PSP reports; a CFW plugin may override the request */
     sprintf(line, "%d MHz (set %d)", scePowerGetCpuClockFrequency(), (int)clocks[clock]);
     ui_text(UI_SCREEN_W - UI_MARGIN - ui_text_width(line), 12, line, UI_COL_MUTE);
@@ -128,10 +127,21 @@ void ui_bench(void)
       sprintf(line, "Row %d: Smoothing", i + 1);
       ui_card(UI_MARGIN, y, 180, UI_ROW_H, (i == cursor) ? UI_COL_TANGERINE : UI_COL_CARD, i == cursor);
       x = (i == cursor) ? UI_MARGIN - UI_LIFT : UI_MARGIN;
-      ui_text(x + 6, ((i == cursor) ? y - UI_LIFT : y) + 5, line,
-       (i == cursor) ? UI_COL_PLUM : UI_COL_CREAM);
-      if(heavy)
-        ui_text(x + 120, ((i == cursor) ? y - UI_LIFT : y) + 5, "Sharp", UI_COL_MUTE);
+      if(ui_font_loaded())
+      {
+        ui_print(x + 6, ((i == cursor) ? y - UI_LIFT : y) + 2, line,
+         (i == cursor) ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_BODY, (i == cursor) ? UI_TEXT_BOLD : 0);
+        if(heavy)
+          ui_print(x + 130, ((i == cursor) ? y - UI_LIFT : y) + 2, "Sharp",
+           UI_COL_MUTE, UI_FONT_BODY, 0);
+      }
+      else
+      {
+        ui_text(x + 6, ((i == cursor) ? y - UI_LIFT : y) + 5, line,
+         (i == cursor) ? UI_COL_PLUM : UI_COL_CREAM);
+        if(heavy)
+          ui_text(x + 120, ((i == cursor) ? y - UI_LIFT : y) + 5, "Sharp", UI_COL_MUTE);
+      }
     }
     y = ui_ease_out_back(cursor_from, 40 + cursor * UI_ROW_PITCH, cursor_frame, UI_F_CURSOR);
     ui_rect(UI_MARGIN - UI_LIFT - 2, y - UI_LIFT - 2, 184, UI_ROW_H + 4, 2, UI_COL_CREAM);
@@ -144,8 +154,21 @@ void ui_bench(void)
       ui_door(220, 40, 240, 160);
     MARK(PART_GAME);
     if(heavy)
-      for(i = 0; i < 8; i++)
-        ui_text(228, 48 + i * 18, "The quick brown fox jumps over the dog", UI_COL_CREAM);
+    {
+      /* the menu language's script, or Japanese for game titles */
+      static const char *cjk_sample[12] =
+      {
+        "セーブして終了します", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        "저장하고 종료합니다", "儲存並離開遊戲", "保存并退出游戏"
+      };
+      u32 lang = g_gpsp_config.language;
+      const char *sample = ((lang < 12) && cjk_sample[lang]) ? cjk_sample[lang] : cjk_sample[0];
+
+      for(i = 0; i < 7; i++)
+        ui_print_fit(228, 46 + i * 18, "The quick brown fox jumps over the lazy dog",
+         UI_COL_CREAM, UI_FONT_BODY, 0, 224);
+      ui_print(228, 46 + 7 * 18, (char *)sample, UI_COL_CREAM, UI_FONT_BODY, 0);
+    }
 
     MARK(PART_TEXT);
 
@@ -189,10 +212,10 @@ void ui_bench(void)
       x = ui_text(x, 27, line, UI_COL_MUTE) + 8;
     }
 
-    sprintf(line, "draw %d.%02d ms avg, %d.%02d max  heap %d KB  pool %d KB  game %d MB  VRAM gap %d KB",
+    sprintf(line, "draw %d.%02d / %d.%02d ms  heap %d KB  pool free %d KB  fonts %d KB  game %d MB",
      (int)(avg_us / 1000), (int)(avg_us % 1000 / 10), (int)(peak_us / 1000), (int)(peak_us % 1000 / 10),
-     (int)heap_kb, (int)(ui_pool_free() / 1024), (int)(gamepak_ram_buffer_size >> 20),
-     (int)(VRAM_GAP / 1024));
+     (int)heap_kb, (int)(ui_pool_free() / 1024), (int)(ui_font_bytes() / 1024),
+     (int)(gamepak_ram_buffer_size >> 20));
     ui_text(UI_MARGIN, 230, line, UI_COL_MUTE);
 
     MARK(PART_STATS);

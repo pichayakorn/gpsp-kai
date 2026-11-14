@@ -3,10 +3,9 @@
 #include <malloc.h>
 #include "ui.h"
 
-/* The part of the spec's 1 MB UI budget that is not fonts: messages,
- * savestate thumbnails and screen state. Fonts still load on their own,
- * before this, until the font rewrite moves them in. */
-#define UI_POOL_SIZE (384 * 1024)
+/* The spec's UI budget: fonts (up to ~610 KB for Korean), the 261 KB
+ * ground layer, messages, savestate thumbnails and screen state. */
+#define UI_POOL_SIZE (1024 * 1024)
 #define UI_POOL_ALIGN 16
 
 static u8 *pool_base = NULL;

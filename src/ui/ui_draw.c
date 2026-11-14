@@ -2,8 +2,10 @@
 #include "../common.h"
 #include "ui.h"
 
-static u16 *fb;
-static u32 fb_pitch;
+u16 *ui_fb;
+u32 ui_fb_pitch;
+#define fb ui_fb
+#define fb_pitch ui_fb_pitch
 
 /* The CPU writes the menu buffer through the uncached VRAM address: going
  * through the data cache makes every write miss fill a cache line from
@@ -126,14 +128,19 @@ void ui_card(int x, int y, int w, int h, u16 color, int lifted)
   ui_fill(x, y, w, h, color);
 }
 
+/* Small text: the UI font when it is loaded, else kai's old font. */
 int ui_text(int x, int y, char *str, u16 color)
 {
+  if(ui_font_loaded())
+    return ui_print(x, y, str, color, UI_FONT_SMALL, 0);
   fbm_printVRAM(fb, fb_pitch, x, y, str, color, 0, FBM_FONT_FILL);
   return x + fbm_getwidth(str);
 }
 
 int ui_text_width(char *str)
 {
+  if(ui_font_loaded())
+    return ui_print_width(str, UI_FONT_SMALL, 0);
   return fbm_getwidth(str);
 }
 

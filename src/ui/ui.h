@@ -30,6 +30,24 @@ u32 ui_hold_frames(u32 key); /* frames one key has been down */
 extern u32 ui_key_confirm;   /* × or ○, from the PSP's Enter setting */
 extern u32 ui_key_back;
 
+/* UI fonts (Fusion Pixel, data/font/ui): a Latin set at 10 and 12 px plus
+ * the CJK set of the menu language, loaded into the pool. ui_font_init()
+ * returns the bytes loaded, 0 if the Latin fonts are missing. */
+#define UI_FONT_SMALL 0  /* 10 px, 14 px line */
+#define UI_FONT_BODY  1  /* 12 px, 16 px line */
+#define UI_TEXT_BOLD  1  /* double-struck, for Latin and Cyrillic only */
+#define UI_TEXT_2X    2  /* drawn at twice the size (page titles) */
+u32 ui_font_init(u32 language);
+int ui_font_loaded(void);
+u32 ui_font_bytes(void);
+int ui_print(int x, int y, const char *utf8, u16 color, int font, int flags);
+int ui_print_width(const char *utf8, int font, int flags);
+int ui_print_fit(int x, int y, const char *utf8, u16 color, int font, int flags, int max_width);
+
+/* The frame being drawn (uncached VRAM), for the drawing code. */
+extern u16 *ui_fb;
+extern u32 ui_fb_pitch;
+
 /* Frame: draw into the back buffer, then ui_frame_end() shows it at the
  * next vblank. */
 void ui_frame_begin(void);
