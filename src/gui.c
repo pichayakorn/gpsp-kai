@@ -784,6 +784,7 @@ void init_gpsp_config()
   g_gpsp_config.fast_forward_mode = FF_TOGGLE;
   g_gpsp_config.fast_forward_sound = YES;
   g_gpsp_config.show_fps = NO;
+  g_gpsp_config.save_on_leave = YES;
 #if 0
   g_gpsp_config.solar_level = 0;
 #endif
@@ -962,6 +963,8 @@ u32 menu(u16 *original_screen)
 
   void menu_quit()
   {
+    if(!first_load && g_gpsp_config.save_on_leave)
+      save_last_state(original_screen);
     quit(0);
   }
 
@@ -978,6 +981,11 @@ u32 menu(u16 *original_screen)
 
     while(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
     {
+      // Save the game being left into slot 10 before the new ROM replaces
+      // it. After a failed load first_load is set, so this runs once.
+      if(!first_load && g_gpsp_config.save_on_leave)
+        save_last_state(original_screen);
+
       if(load_gamepak(load_filename) != -1)
       {
         reset_gba();
@@ -1066,7 +1074,7 @@ u32 menu(u16 *original_screen)
 
     if(g_savestate_slot_num == MEM_STATE_NUM)
     {
-      // Slot 10 is only in memory
+      // Slot 10 is in memory, with a copy in its file
       if(mem_save_flag == 0)
         return;
     }
@@ -1083,7 +1091,7 @@ u32 menu(u16 *original_screen)
     if(yesno_dialog(buf) == 0)
     {
       if(g_savestate_slot_num == MEM_STATE_NUM)
-        mem_save_flag = 0;
+        delete_last_state();
       else
         sceIoRemove(savestate_path);
       forget_savestate_snapshot();
@@ -1417,6 +1425,7 @@ u32 menu(u16 *original_screen)
     NUMERIC_SELECTION_HIDE_OPTION(menu_delete_state, menu_change_state, msg[MSG_STATE_MENU_5], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_5], 10),
 
     NUMERIC_SELECTION_OPTION(menu_change_state, msg[MSG_STATE_MENU_3], &g_savestate_slot_num, 11, msg[MSG_STATE_MENU_HELP_3], 12),
+    STRING_SELECTION_OPTION(NULL, msg[MSG_SAVE_ON_LEAVE], yes_no_options, &g_gpsp_config.save_on_leave, 2, msg[MSG_STATE_MENU_HELP_SAVE_ON_LEAVE], 13),
 
 
 
