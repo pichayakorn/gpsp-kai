@@ -1141,3 +1141,13 @@
 # MSG_G_S_MENU_HELP_FF_SOUND
 #Select 'no' to mute the sound while fast forwarding.
 !Select 'no' to mute the sound while fast forwarding.
+
+# MSG_SHOW_FPS
+#Show FPS: %s
+!Show FPS: %s
+
+# MSG_G_S_MENU_HELP_SHOW_FPS
+#Select 'yes' to show the frames per second\n
+#in the bottom right corner of the game.
+!Select 'yes' to show the frames per second\n
+!in the bottom right corner of the game.
