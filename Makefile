@@ -77,8 +77,12 @@ release: check package
 # (gba_bios.bin, GBA/ROM, GBA/SAV, ...) and is copied over it. Never used
 # for releases or CI.
 TEST_DATA = testdata
-TEST_NAME = gpSP-kai-$(GPSP_VERSION_STRING)
+TEST_NAME_DEFAULT = gpSP-kai-$(GPSP_VERSION_STRING)
+TEST_NAME = $(TEST_NAME_DEFAULT)
 TEST_DIR  = out/test/$(TEST_NAME)
+# A custom TEST_NAME (e.g. two variants of one build) is also the XMB title,
+# so the variants can be told apart on the PSP.
+TEST_TITLE = $(if $(filter $(TEST_NAME_DEFAULT),$(TEST_NAME)),,$(TEST_NAME))
 
 # The XMB shows "Corrupted Data" for a PSP/GAME folder name longer than 31
 # characters (tested on a PSP-3000 with ARK-5: 31 shows, 32 does not), so
@@ -95,6 +99,7 @@ testpkg: check package
 	mkdir -p out/test
 	cp -r $(PACKAGE_DIR) $(TEST_DIR)
 	if [ -d $(TEST_DATA) ]; then cp -r $(TEST_DATA)/. $(TEST_DIR)/; fi
+	$(if $(TEST_TITLE),tools/retitle_eboot.sh $(TEST_DIR)/EBOOT.PBP '$(TEST_TITLE)' $(GPSP_VERSION))
 	find $(TEST_DIR) -name .DS_Store -delete
 	cd out/test && zip -qr $(TEST_NAME).zip $(TEST_NAME)
 	@echo "Test zip: $(TEST_DIR).zip"
