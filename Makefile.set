@@ -20,6 +20,6 @@ USE_C_CORE = 0
 # benchmark screen.
 UI4 = 0
 
-# 1: test build that holds back the PSP-2000/3000's extra 32 MB at start,
+# 1: test build that holds back the PSP-2000/3000's extra 28 MB at start,
 # so memory is as tight as on a PSP-1000 (there is no PSP-1000 to test on)
 SIM_PSP1000 = 0

@@ -312,9 +312,10 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef SIM_PSP1000
-  // Test build: hold back the PSP-2000/3000's extra 32 MB, so the game
-  // buffer gets what a PSP-1000 would leave it. Never freed.
-  sim_psp1000_ballast = malloc(32 * 1024 * 1024);
+  // Test build: hold back what MEMSIZE adds on a PSP-2000/3000 (user
+  // memory 52 MB instead of the PSP-1000's 24 MB), so the game buffer gets
+  // what a PSP-1000 would leave it. Never freed.
+  sim_psp1000_ballast = malloc(28 * 1024 * 1024);
 #endif
 
   load_config_file();
