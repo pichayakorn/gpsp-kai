@@ -5,9 +5,16 @@
 static u16 *fb;
 static u32 fb_pitch;
 
+/* The CPU writes the menu buffer through the uncached VRAM address: going
+ * through the data cache makes every write miss fill a cache line from
+ * VRAM first, which made a plain copy run at about 80 MB/s at 222 MHz. */
+#define UNCACHED(p) ((u16 *)((u32)(p) | 0x40000000))
+
+static u32 __attribute__((aligned(16))) ge_list[64];
+
 void ui_frame_begin(void)
 {
-  fb = screen_address;
+  fb = UNCACHED(screen_address);
   fb_pitch = screen_pitch;
 }
 
@@ -42,26 +49,47 @@ void ui_fill(int x, int y, int w, int h, u16 color)
   }
 }
 
-/* The ground: plum with an 8 px check in plum-2. Two rows are built once
- * and copied, so a full ground costs one 480 x 272 copy. */
-void ui_ground(void)
-{
-  static u16 rows[2][UI_SCREEN_W];
-  static int built = 0;
-  int x, y;
+/* The ground: plum with an 8 px check in plum-2, kept as a 480 x 272 layer
+ * in the UI pool and copied into the frame by the GE, so the CPU spends
+ * almost nothing on it. Static parts of a screen can be drawn into the
+ * layer once. Without pool memory it is drawn by the CPU from two rows. */
+static u16 *ground_layer = NULL;
 
-  if(!built)
+static void build_ground(u16 *dest, u32 pitch)
+{
+  int x, y;
+  u16 rows[2][UI_SCREEN_W];
+
+  for(x = 0; x < UI_SCREEN_W; x++)
   {
-    for(x = 0; x < UI_SCREEN_W; x++)
-    {
-      int odd = (x / UI_CHECK) & 1;
-      rows[0][x] = odd ? UI_COL_PLUM_2 : UI_COL_PLUM;
-      rows[1][x] = odd ? UI_COL_PLUM : UI_COL_PLUM_2;
-    }
-    built = 1;
+    int odd = (x / UI_CHECK) & 1;
+    rows[0][x] = odd ? UI_COL_PLUM_2 : UI_COL_PLUM;
+    rows[1][x] = odd ? UI_COL_PLUM : UI_COL_PLUM_2;
   }
   for(y = 0; y < UI_SCREEN_H; y++)
-    memcpy(fb + y * fb_pitch, rows[(y / UI_CHECK) & 1], UI_SCREEN_W * 2);
+    memcpy(dest + y * pitch, rows[(y / UI_CHECK) & 1], UI_SCREEN_W * 2);
+}
+
+void ui_ground(void)
+{
+  if(ground_layer == NULL)
+  {
+    ground_layer = ui_pool_alloc(UI_SCREEN_W * UI_SCREEN_H * 2);
+    if(ground_layer == NULL)
+    {
+      build_ground(fb, fb_pitch);
+      return;
+    }
+    build_ground(ground_layer, UI_SCREEN_W);
+    sceKernelDcacheWritebackRange(ground_layer, UI_SCREEN_W * UI_SCREEN_H * 2);
+  }
+
+  sceGuStart(GU_DIRECT, ge_list);
+  sceGuCopyImage(GU_PSM_5551, 0, 0, UI_SCREEN_W, UI_SCREEN_H, UI_SCREEN_W,
+   ground_layer, 0, 0, fb_pitch, screen_address);
+  sceGuTexSync();
+  sceGuFinish();
+  sceGuSync(0, 0);
 }
 
 /* Screen door: every other pixel in shade, a dim without alpha. */
