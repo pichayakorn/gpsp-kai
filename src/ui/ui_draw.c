@@ -152,6 +152,13 @@ static const u8 glyph_circle[7]   = { 0x1C, 0x22, 0x41, 0x41, 0x41, 0x22, 0x1C }
 static const u8 glyph_triangle[7] = { 0x08, 0x08, 0x14, 0x14, 0x22, 0x22, 0x7F };
 static const u8 glyph_square[7]   = { 0x7F, 0x41, 0x41, 0x41, 0x41, 0x41, 0x7F };
 
+/* Top of a small text line centred in a box: the UI font's capitals sit
+ * on rows 4-10 of its 14 px cell; kai's old font starts higher. */
+static int small_text_top(int box_y, int box_h)
+{
+  return ui_font_loaded() ? box_y + box_h / 2 - 7 : box_y + 2;
+}
+
 static char *key_label(u32 key)
 {
   switch(key)
@@ -206,7 +213,7 @@ int ui_glyph(int x, int y, u32 key)
     ui_fill(x + 1, y, w - 2, UI_DISC, UI_COL_CREAM);
     ui_fill(x, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
     ui_fill(x + w - 1, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
-    ui_text(x + 4, y + 2, key_label(key), UI_COL_PLUM);
+    ui_text(x + 4, small_text_top(y, UI_DISC), key_label(key), UI_COL_PLUM);
   }
   return x + w;
 }
@@ -224,7 +231,7 @@ void ui_hint_strip(const ui_hint_t *hints, int count)
     for(bit = 1; bit; bit <<= 1)
       if(hints[n].keys & bit)
         x = ui_glyph(x, y, bit) + 2;
-    x = ui_text(x + 2, y + 2, hints[n].verb, UI_COL_CREAM) + 14;
+    x = ui_text(x + 2, small_text_top(y, UI_DISC), hints[n].verb, UI_COL_CREAM) + 14;
   }
 }
 
