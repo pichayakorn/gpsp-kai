@@ -420,12 +420,12 @@
 !→　　　　　 : %s
 
 # MSG_PAD_MENU_4
-#Circle: %s
-!○　　　　　 : %s
-
-# MSG_PAD_MENU_5
 #Cross: %s
 !×　　　　　 : %s
+
+# MSG_PAD_MENU_5
+#Circle: %s
+!○　　　　　 : %s
 
 # MSG_PAD_MENU_6
 #Square: %s
