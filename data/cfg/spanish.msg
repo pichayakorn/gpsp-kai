@@ -1225,3 +1225,13 @@
 !How fast the rapid fire buttons press. Saved for this game.\n
 !Fast: 30 presses a second. Medium: 15. Slow: 7.5.\n
 !Try slow or medium if a game misses rapid fire presses.
+
+# MSG_SAVE_ON_LEAVE
+#Save when leaving a game: %s
+!Save when leaving a game: %s
+
+# MSG_STATE_MENU_HELP_SAVE_ON_LEAVE
+#Select 'yes' to save into slot 10 when you load another game or exit.\n
+#Load slot 10 next time to continue from where you left.
+!Select 'yes' to save into slot 10 when you load another game or exit.\n
+!Load slot 10 next time to continue from where you left.
