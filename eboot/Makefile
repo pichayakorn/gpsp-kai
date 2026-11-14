@@ -11,7 +11,7 @@ PREFIX          = ${shell psp-config --psp-prefix}
 
 OBJS            = main.o cpu_common.o cpu_asm.o cpu_c.o video.o memory.o sound.o input.o gu.o
 OBJS           += gui.o zip.o cheats.o mips_stub.o fbm_print.o bios.o draw.o video_setting.o
-OBJS           += pspDveManager.o homehook.o unicode.o
+OBJS           += pspDveManager.o homehook.o unicode.o bios_data.o
 
 ifeq ($(USE_ADHOC), 1)
 OBJS           += adhoc.o
@@ -136,6 +136,7 @@ bios.o			: ${COMMON_FILE} ${SRC_DIR}bios.c ${SRC_DIR}bios.h
 draw.o			: ${COMMON_FILE} ${UI_COMMON_FILE} ${SRC_DIR}draw.c ${SRC_DIR}draw.h
 pspDveManager.o : ${SRC_DIR}pspDveManager.S
 homehook.o		: ${SRC_DIR}homehook.S
+bios_data.o		: ${SRC_DIR}bios_data.S ../bios/open_gba_bios.bin
 video_setting.o	: ${COMMON_FILE} ${SRC_DIR}video_setting.c
 unicode.o		: ${COMMON_FILE} ${SRC_DIR}unicode.c
 

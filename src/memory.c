@@ -2445,8 +2445,13 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
   idle_loop_targets = 0;
   idle_loop_target_pc[0] = 0xFFFFFFFF;
   iwram_stack_optimize = 1;
-  bios_rom[0x39] = 0x00;
-  bios_rom[0x2C] = 0x00;
+  // The bios_rom_hack_* settings patch the official BIOS. The built-in one
+  // has other code at these offsets (0x2C is in its IRQ handler).
+  if(!bios_builtin)
+  {
+    bios_rom[0x39] = 0x00;
+    bios_rom[0x2C] = 0x00;
+  }
   translation_gate_targets = 0;
   flash_device_id = FLASH_DEVICE_MACRONIX_64KB;
   backup_type = BACKUP_NONE;
@@ -2529,13 +2534,13 @@ s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_make
             }
 
             if(!strcasecmp(current_variable, "bios_rom_hack_39") &&
-              !strcasecmp(current_value, "yes"))
+              !strcasecmp(current_value, "yes") && !bios_builtin)
             {
               bios_rom[0x39] = 0xC0;
             }
 
             if(!strcasecmp(current_variable, "bios_rom_hack_2C") &&
-              !strcasecmp(current_value, "yes"))
+              !strcasecmp(current_value, "yes") && !bios_builtin)
             {
                bios_rom[0x2C] = 0x02;
             }
@@ -2666,16 +2671,35 @@ s32 load_gamepak(char *name)
 
 
 // Returns 0 on success, -2 on MD5 mismatch, -1 if unreadable
+extern u8 open_gba_bios_rom[0x4000];
+
+// 1 when the built-in BIOS is in use (src/bios_data.S).
+u32 bios_builtin = 0;
+
+void load_builtin_bios(void)
+{
+  memcpy(bios_rom, open_gba_bios_rom, 0x4000);
+  bios_builtin = 1;
+}
+
+// Returns 0 for a known BIOS dump, -2 for an unknown one, and -1 when the
+// file is missing or does not look like a GBA BIOS: its first instruction
+// is the reset vector's branch, so the first byte is 0x18 (as libretro gpSP
+// checks).
 s32 load_bios(char *name)
 {
   u8 md5[16];
   FILE_ID bios_file;
   FILE_OPEN(bios_file, name, READ);
 
+  bios_builtin = 0;
+
   if(FILE_CHECK_VALID(bios_file))
   {
     FILE_READ(bios_file, bios_rom, 0x4000);
     FILE_CLOSE(bios_file);
+    if(bios_rom[0] != 0x18)
+      return -1;
     sceKernelUtilsMd5Digest(bios_rom, 0x4000, md5);
     if ((memcmp(md5,gba_md5,16) == 0) || (memcmp(md5,nds_md5,16) == 0))
       return 0;
