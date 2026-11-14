@@ -932,11 +932,22 @@ u32 high_frequency_branch_targets = 0;
 #define store_block_memory(address, dest)                                     \
   ADDRESS32(address_region, ((address) + offset) & 0x7FFF) = dest             \
 
+// An empty register list (ARM7TDMI) transfers the PC instead and moves the
+// base by 0x40, as if all 16 registers were transferred (#96). Thumb's
+// LDMIA/STMIA rb!, {} does the same (thumb_block_memory_empty_*).
+#define arm_block_memory_empty_list()                                         \
+  u32 block_bytes __attribute__((unused)) = word_bit_count(reg_list) * 4;     \
+  if(reg_list == 0)                                                           \
+  {                                                                           \
+    reg_list = 0x8000;                                                        \
+    block_bytes = 0x40;                                                       \
+  }                                                                           \
+
 #define arm_block_memory_offset_down_a()                                      \
-  (base - ((word_bit_count(reg_list) * 4) - 4))                               \
+  (base - (block_bytes - 4))                                                  \
 
 #define arm_block_memory_offset_down_b()                                      \
-  (base - (word_bit_count(reg_list) * 4))                                     \
+  (base - block_bytes)                                                        \
 
 #define arm_block_memory_offset_no()                                          \
   (base)                                                                      \
@@ -945,10 +956,10 @@ u32 high_frequency_branch_targets = 0;
   (base + 4)                                                                  \
 
 #define arm_block_memory_writeback_down()                                     \
-  reg[rn] = base - (word_bit_count(reg_list) * 4)                             \
+  reg[rn] = base - block_bytes                                                \
 
 #define arm_block_memory_writeback_up()                                       \
-  reg[rn] = base + (word_bit_count(reg_list) * 4)                             \
+  reg[rn] = base + block_bytes                                                \
 
 #define arm_block_memory_writeback_no()                                       \
 
@@ -1022,6 +1033,7 @@ u32 high_frequency_branch_targets = 0;
 #define arm_block_memory(access_type, offset_type, writeback_type, s_bit)     \
 {                                                                             \
   arm_decode_block_trans();                                                   \
+  arm_block_memory_empty_list();                                              \
   u32 base = reg[rn];                                                         \
   u32 address = arm_block_memory_offset_##offset_type() & 0xFFFFFFFC;         \
   u32 user_bank = arm_block_memory_user_bank_##access_type##_##s_bit();       \
