@@ -392,14 +392,15 @@ int main(int argc, char *argv[])
 
   gamepak_filename[0] = 0;
 
-  u32 bios_ret = load_bios("gba_bios.bin");
-  if(bios_ret == -1) // not readable
+  s32 bios_ret = load_bios("gba_bios.bin");
+  if(bios_ret == -1) // missing or not a GBA BIOS
   {
-    PRINT_STRING_BG(msg[MSG_ERR_BIOS_1], 0xFFFF, 0x0000, 0, 0);
-    PRINT_STRING_BG(msg[MSG_ERR_BIOS_2], 0xFFFF, 0x0000, 0, 60);
+    // Built-in BIOS (#73). Ported from libretro gpSP (GPL-2.0-or-later),
+    // which falls back the same way.
+    load_builtin_bios();
+    PRINT_STRING_BG(msg[MSG_BIOS_BUILTIN], 0xFFFF, 0x0000, 0, 0);
     flip_screen();
-    error_msg("");
-    quit(1);
+    sceKernelDelayThread(3000000);
   }
   update_progress();
   if(bios_ret == -2) // MD5 mismatch

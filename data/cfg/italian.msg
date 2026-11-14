@@ -1040,32 +1040,6 @@
 #%s%02d_%02d_%04d_%02d_%02d_%02d_%03d
 !%s%02d_%02d_%04d_%02d_%02d_%02d_%03d
 
-# MSG_ERR_BIOS_1
-#Sorry, but gpSP requires a Gameboy Advance BIOS image to run\n
-#correctly. Make sure to get an authentic one (search the web,\n
-#beg other people if you want, but don't hold me accountable\n
-#if you get hated or banned for it), it'll be exactly 16384\n
-#bytes large and should have the following md5sum value:\n\n
-!Spiacente, ma il gpSP richiede un'immagine del BIOS Gameboy Advance per\n
-!funzionare correttamente. Verificate di averne una autentica (cercate sul\n
-!Web o chiedete ai vostri amici, ma non chiedetela all'autore del gpSP\n
-!o sarete bannati e odiati), l'immagine ha esattamente la dimensione di\n
-!16384 bytes e il seguente valore di md5sum:\n\n
-
-# MSG_ERR_BIOS_2
-#a860e8c0b6d573d191e4ec7db1b1e4f6 or 1c0d67db9e1208b95a1506b1688a0ad6\n\n
-#Other BIOS files might work either partially completely, I\n
-#really don't know.\n\n
-#When you do get it name it gba_bios.bin and put it in the\n
-#same directory as this EBOOT.\n\n
-#Good luck. Press any button to exit.\n
-!a860e8c0b6d573d191e4ec7db1b1e4f6 o 1c0d67db9e1208b95a1506b1688a0ad6\n\n
-!Altri BIOS potrebbero funzionare parzialmente o perfettamente\n
-!Ma non sono stati testati dall'autore del programma.\n\n
-!L'immagine deve essere rinominata gba_bios.bin e salvata nella\n
-!stessa cartella dell'EBOOT del gpSP.\n\n
-!Buona fortuna. Premere qualunque pulsante per uscire.\n
-
 # MSG_ERR_BIOS_MD5
 #This BIOS is not regular.\n
 #There is a possibility of various trouble.\n\n
@@ -1186,3 +1160,11 @@
 # MSG_FILTER_SHARP_BILINEAR
 #sharp bilinear
 !sharp bilinear
+
+# MSG_BIOS_BUILTIN
+#No usable gba_bios.bin: using the built-in BIOS.\n\n
+#Most games run with it. If one does not, put a dump of the GBA\n
+#BIOS in the gpSP folder as gba_bios.bin.\n
+!No usable gba_bios.bin: using the built-in BIOS.\n\n
+!Most games run with it. If one does not, put a dump of the GBA\n
+!BIOS in the gpSP folder as gba_bios.bin.\n
