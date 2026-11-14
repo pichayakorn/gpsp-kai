@@ -63,7 +63,8 @@ typedef enum
 typedef enum
 {
   filter_nearest,
-  filter_bilinear
+  filter_bilinear,
+  filter_sharp_bilinear
 } video_filter_type;
 
 typedef enum

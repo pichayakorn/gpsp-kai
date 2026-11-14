@@ -214,10 +214,10 @@
 #scaling the screen. Selecting this will produce a more even and\n
 #smooth image, at the cost of being blurry and having less vibrant\n
 #colors.
-!Determines whether or not bilinear filtering should be used when\n
-!scaling the screen. Selecting this will produce a more even and\n
-!smooth image, at the cost of being blurry and having less vibrant\n
-!colors.
+!How the screen is smoothed when it is scaled. Off keeps sharp pixels\n
+!of uneven width, which shimmer when the picture scrolls. Bilinear is\n
+!even and smooth, but blurry. Sharp bilinear keeps square, crisp\n
+!pixels and blends only their edges.
 
 # MSG_G_S_MENU_HELP_2
 #Determines what kind of frameskipping should be employed.\n
@@ -1119,3 +1119,15 @@
 # MSG_DELETE_STATE_NUM
 #Delete savestate in slot %d?
 !Delete savestate in slot %d?
+
+# MSG_FILTER_OFF
+#off
+!off
+
+# MSG_FILTER_BILINEAR
+#bilinear
+!bilinear
+
+# MSG_FILTER_SHARP_BILINEAR
+#sharp bilinear
+!sharp bilinear

@@ -233,11 +233,188 @@ u32 TSIZE0_temp;
 u32 flip_address_temp[2];
 u32 flip_offset_address_temp[2];
 
+// Sharp bilinear (#74): crisp, square pixels at a non-integer scale, without
+// the uneven pixel widths of nearest. Ported from GBAdhoc (GPL-2.0),
+// gpsp/psp/video_psp.c sharp_draw(). The GE has no shaders, so it takes two
+// passes per frame:
+//  1. prescale: draw the GBA frame with nearest at an integer factor kx x ky
+//     (k = the final scale rounded up) into a target in VRAM;
+//  2. resample: draw the target with bilinear at the final size. Inside a
+//     k x k block every tap reads the same color, so only the screen pixel
+//     on the edge between two GBA pixels is blended.
+// The target is the display buffer below the 272 rows the LCD shows (its
+// stride is 768 for TV-out), so it needs no VRAM of its own. TV-out uses
+// those rows, so there sharp bilinear draws plain bilinear.
+
+#define SHARP_STRIDE 512
+#define SHARP_OFFSET 0x68000  // byte offset in VRAM: display buffer row 277
+#define SHARP_ROWS   ((PSP_DISPLAY_BUFFER_SIZE - SHARP_OFFSET) / (SHARP_STRIDE * 2))
+
+#define GE_CMD_REGION1  0x15
+#define GE_CMD_REGION2  0x16
+#define GE_CMD_TFILTER  0xC6
+#define GE_CMD_TSYNC    0xCC
+#define GE_CMD_SCISSOR1 0xD4
+#define GE_CMD_SCISSOR2 0xD5
+
+static u32 __attribute__((aligned(16))) sharp_cmd[64];
+static float __attribute__((aligned(16))) sharp_vertex[32 * 5];
+static u32 *sharp_cmd_end;
+static u32 *sharp_texture_slot;  // pass 1's TBP0, TBW0 and TSIZE0
+static u32 sharp_active = 0;
+
+#define SHARP_CMD(cmd, operand)                                             \
+  *cmd_ptr = (((GE_CMD_##cmd) << 24) | ((operand) & 0xFFFFFF));             \
+  cmd_ptr++                                                                 \
+
+static float *sharp_sprite(float *v, float u1, float v1, float x1, float y1,
+ float u2, float v2, float x2, float y2)
+{
+  v[0] = u1; v[1] = v1; v[2] = x1; v[3] = y1; v[4] = 0;
+  v[5] = u2; v[6] = v2; v[7] = x2; v[8] = y2; v[9] = 0;
+  return v + 10;
+}
+
+// Builds the two-pass list for the game picture sprite s. Returns the GE
+// filter to use when sharp bilinear does not apply: nearest at an integer
+// scale (sharp would look the same), bilinear when the target does not fit.
+static u32 sharp_setup(SPRITE *s)
+{
+  float sw = fabsf(s->u2 - s->u1);
+  float sh = fabsf(s->v2 - s->v1);
+  float dw = fabsf(s->x2 - s->x1);
+  float dh = fabsf(s->y2 - s->y1);
+  u32 kx, ky, iw, ih, x, sprites;
+  float *v = sharp_vertex;
+  u32 *cmd_ptr = sharp_cmd;
+  u32 view_w = current_parameter->view.width;
+  u32 view_h = current_parameter->view.height;
+
+  sharp_active = 0;
+
+  if((sw != GBA_SCREEN_WIDTH) || (sh != GBA_SCREEN_HEIGHT) ||
+   (dw <= 0) || (dh <= 0))
+    return GU_LINEAR;
+
+  if((fmodf(dw, sw) == 0) && (fmodf(dh, sh) == 0))
+    return GU_NEAREST;
+
+  kx = (u32)ceilf(dw / sw);
+  ky = (u32)ceilf(dh / sh);
+  iw = kx * GBA_SCREEN_WIDTH;
+  ih = ky * GBA_SCREEN_HEIGHT;
+
+  // +1: the duplicated last column and row
+  if(((kx == 1) && (ky == 1)) || (iw + 1 > SHARP_STRIDE) || (ih + 1 > SHARP_ROWS))
+    return GU_LINEAR;
+
+  // Pass 1 vertices: 60-pixel strips (texture cache), then the last column
+  // and row once more, one texel past the picture, so the bilinear taps on
+  // the far edge read the edge color instead of stale VRAM.
+  for(x = 0; x < GBA_SCREEN_WIDTH; x += 60)
+  {
+    v = sharp_sprite(v, x, 0, x * kx, 0, x + 60, GBA_SCREEN_HEIGHT,
+     (x + 60) * kx, ih);
+  }
+  v = sharp_sprite(v, GBA_SCREEN_WIDTH - 1, 0, iw, 0,
+   GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, iw + 1, ih);
+  v = sharp_sprite(v, 0, GBA_SCREEN_HEIGHT - 1, 0, ih,
+   GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, iw, ih + 1);
+  v = sharp_sprite(v, GBA_SCREEN_WIDTH - 1, GBA_SCREEN_HEIGHT - 1, iw, ih,
+   GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, iw + 1, ih + 1);
+  sprites = (GBA_SCREEN_WIDTH / 60) + 3;
+
+  SHARP_CMD(VTYPE, (1 << 23) | (3 << 7) | 3);
+  SHARP_CMD(BASE, ((u32)sharp_vertex & 0xFF000000) >> 8);
+  SHARP_CMD(VADDR, ((u32)sharp_vertex & 0x00FFFFFF));
+
+  // Pass 1: the GBA frame (patched in by flip_screen), nearest, into the
+  // target. The scissor and the drawing region open to the whole target.
+  sharp_texture_slot = cmd_ptr;
+  SHARP_CMD(TBP0, 0);
+  SHARP_CMD(TBW0, 0);
+  SHARP_CMD(TSIZE0, 0);
+  SHARP_CMD(TFLUSH, 0);
+  SHARP_CMD(TFILTER, (GU_NEAREST << 8) | GU_NEAREST);
+  SHARP_CMD(FBP, SHARP_OFFSET);
+  SHARP_CMD(FBW, SHARP_STRIDE);
+  SHARP_CMD(SCISSOR1, 0);
+  SHARP_CMD(SCISSOR2, (ih << 10) | iw);
+  SHARP_CMD(REGION1, 0);
+  SHARP_CMD(REGION2, (ih << 10) | iw);
+  SHARP_CMD(PRIM, (6 << 16) | (sprites * 2));
+
+  // Pass 2: back to the display buffer, the target with bilinear, in
+  // 64-texel strips that share exact edges. The sprite's texture
+  // coordinates scale by k, so the rotated screen option works too.
+  // TSYNC: pass 1's pixels must be in VRAM before they are read.
+  SHARP_CMD(TSYNC, 0);
+  SHARP_CMD(FBP, ((u32)psp_gu_vram_base & 0x00FFFFFF));
+  SHARP_CMD(FBW, (((u32)psp_gu_vram_base & 0xFF000000) >> 8) | FRAME_LINE_SIZE);
+  SHARP_CMD(SCISSOR1, (current_parameter->view.y << 10) | current_parameter->view.x);
+  SHARP_CMD(SCISSOR2, ((current_parameter->view.y + view_h - 1) << 10) |
+   (current_parameter->view.x + view_w - 1));
+  SHARP_CMD(REGION1, 0);
+  SHARP_CMD(REGION2, ((current_parameter->screen_size.height - 1) << 10) |
+   (current_parameter->screen_size.width - 1));
+  SHARP_CMD(TBP0, (0x04000000 + SHARP_OFFSET) & 0x00FFFFFF);
+  SHARP_CMD(TBW0, (((0x04000000 + SHARP_OFFSET) & 0xFF000000) >> 8) | SHARP_STRIDE);
+  SHARP_CMD(TSIZE0, (9 << 8) | 9);
+  SHARP_CMD(TFLUSH, 0);
+  SHARP_CMD(TFILTER, (GU_LINEAR << 8) | GU_LINEAR);
+
+  {
+    float u1 = s->u1 * kx, u2 = s->u2 * kx;
+    float v1 = s->v1 * ky, v2 = s->v2 * ky;
+    float t0 = (u1 < u2) ? u1 : u2;
+    float xa, xb, t, tb;
+
+    sprites = 0;
+    for(t = t0; t < t0 + iw; t += 64)
+    {
+      tb = (t + 64 < t0 + iw) ? (t + 64) : (t0 + iw);
+      xa = s->x1 + (s->x2 - s->x1) * (t - u1) / (u2 - u1);
+      xb = s->x1 + (s->x2 - s->x1) * (tb - u1) / (u2 - u1);
+      if(xa <= xb)
+        v = sharp_sprite(v, t, v1, xa, s->y1, tb, v2, xb, s->y2);
+      else
+        v = sharp_sprite(v, tb, v1, xb, s->y1, t, v2, xa, s->y2);
+      sprites++;
+    }
+  }
+  SHARP_CMD(PRIM, (6 << 16) | (sprites * 2));
+
+  SHARP_CMD(FINISH, 0);
+  SHARP_CMD(SIGNAL, 0);
+  SHARP_CMD(NOP, 0);
+  SHARP_CMD(NOP, 0);
+  sharp_cmd_end = cmd_ptr;
+
+  sharp_active = 1;
+  return GU_LINEAR;
+}
+
 void flip_screen()
 {
   u32 *old_ge_cmd_ptr = ge_cmd_ptr;
 
   sceKernelDcacheWritebackAll();
+
+  if(sharp_active)
+  {
+    sharp_texture_slot[0] = TBP0_temp[screen_flip];
+    sharp_texture_slot[1] = TBW0_temp[screen_flip];
+    sharp_texture_slot[2] = TSIZE0_temp;
+
+    screen_flip ^= 1;
+    screen_address = (u16 *)flip_address_temp[screen_flip];
+    screen_offset_address = (u16 *)flip_offset_address_temp[screen_flip];
+
+    sceKernelDcacheWritebackAll();
+
+    sceGeListEnQueue(sharp_cmd, sharp_cmd_end, gecbid, NULL);
+    return;
+  }
 
   // Render the current screen
   ge_cmd_ptr = ge_cmd + 2;
@@ -264,6 +441,7 @@ void video_resolution(u32 frame)
   static u32 first_load = 0;
   static SCREEN_PARAMETER *old_parameter = NULL;
   float x, y, cx, cy, xx, yy;
+  u32 filter;
   SCREEN_PARAMETER sp; // TODO: rename
 
   if(first_load == 0)
@@ -343,6 +521,22 @@ void video_resolution(u32 frame)
     memcpy(screen_vertex, &current_parameter->screen_setting_1, sizeof(float) * 20);
     memcpy(screen_vertex, &sp.screen_setting_1, sizeof(float) * 20);
 
+    if(g_gpsp_config.screen_filter != filter_sharp_bilinear)
+    {
+      sharp_active = 0;
+      filter = current_parameter->filter[g_gpsp_config.screen_filter];
+    }
+    else
+    {
+      if(((video_out_mode << 1) | frame) == ((PSP_OUT << 1) | FRAME_GAME))
+        filter = sharp_setup(&sp.screen_setting_1);
+      else
+      {
+        sharp_active = 0;
+        filter = current_parameter->filter[filter_bilinear];
+      }
+    }
+
     video_draw_frame = frame;
     screen_address = (u16 *)flip_address[frame][0];
     screen_flip = 0;
@@ -368,7 +562,7 @@ void video_resolution(u32 frame)
     sceGuViewport(2048, 2048, current_parameter->screen_size.width, current_parameter->screen_size.height);
     sceGuScissor(current_parameter->view.x, current_parameter->view.y, current_parameter->view.width, current_parameter->view.height);
     sceGuEnable(GU_SCISSOR_TEST);
-    sceGuTexFilter(current_parameter->filter[g_gpsp_config.screen_filter], current_parameter->filter[g_gpsp_config.screen_filter]);
+    sceGuTexFilter(filter, filter);
     sceGuTexWrap(GU_CLAMP, GU_CLAMP);
     sceGuEnable(GU_TEXTURE_2D);
     sceGuFinish();

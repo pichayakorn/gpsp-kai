@@ -1167,3 +1167,15 @@
 # MSG_DELETE_STATE_NUM
 #Delete savestate in slot %d?
 !Delete savestate in slot %d?
+
+# MSG_FILTER_OFF
+#off
+!off
+
+# MSG_FILTER_BILINEAR
+#bilinear
+!bilinear
+
+# MSG_FILTER_SHARP_BILINEAR
+#sharp bilinear
+!sharp bilinear
