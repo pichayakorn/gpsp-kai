@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.8.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.2...v3.8.0) (2026-11-14)
+
+
+### Features
+
+* **input:** fast forward hold mode and sound while fast ([#112](https://github.com/pichayakorn/gpsp-kai/issues/112)) ([de3e2d3](https://github.com/pichayakorn/gpsp-kai/commit/de3e2d3654ef78a681601fc687ca335590e51036))
+* start without gba_bios.bin, with a built-in open-source BIOS ([#110](https://github.com/pichayakorn/gpsp-kai/issues/110)) ([2bdce31](https://github.com/pichayakorn/gpsp-kai/commit/2bdce31d6058fe5218e8be5ef436e248cdcf9107))
+* **video:** sharp bilinear screen filter ([#98](https://github.com/pichayakorn/gpsp-kai/issues/98)) ([2639f26](https://github.com/pichayakorn/gpsp-kai/commit/2639f26054b3704220403fea870a1976816c898a))
+
+
+### Bug Fixes
+
+* **menu:** Japanese gamepad labels for × and ○, "Frameskip" spelling ([#109](https://github.com/pichayakorn/gpsp-kai/issues/109)) ([b720940](https://github.com/pichayakorn/gpsp-kai/commit/b720940d50aa3d9ad01c33ac77ef719fbe966cd3))
+
 ## [3.7.2](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.1...v3.7.2) (2026-11-14)
 
 
