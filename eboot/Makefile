@@ -18,6 +18,10 @@ OBJS           += adhoc.o
 COMMON_FILE += adhoc.h
 endif
 
+ifeq ($(UI4), 1)
+OBJS           += ui_pool.o ui_input.o ui_draw.o ui_bench.o
+endif
+
 TARGET          = UO_gpSP_kai
 
 PSP_FW_VERSION=300
@@ -73,6 +77,14 @@ endif
 
 ifeq ($(USE_C_CORE), 1)
 CFLAGS          += -DUSE_C_CORE
+endif
+
+ifeq ($(UI4), 1)
+CFLAGS          += -DUI4
+endif
+
+ifeq ($(SIM_PSP1000), 1)
+CFLAGS          += -DSIM_PSP1000
 endif
 
 ifeq ($(PSP_LARGE_MEMORY), 0)
@@ -146,11 +158,21 @@ endif
 
 # version.txt and Makefile.set set compiler flags for every object (version
 # numbers, USE_* options), so a change to either must recompile everything.
-$(OBJS): ../version.txt ../version.mk ../Makefile.set
+# Options given on the command line (make UI4=1) don't touch Makefile.set,
+# so they are written to build_options.stamp, rewritten only when they
+# change.
+BUILD_OPTIONS := $(USE_DEBUG) $(USE_ADHOC) $(USE_C_CORE) $(PSP_LARGE_MEMORY) $(UI4) $(SIM_PSP1000)
+$(shell [ "$$(cat build_options.stamp 2>/dev/null)" = "$(BUILD_OPTIONS)" ] || echo "$(BUILD_OPTIONS)" > build_options.stamp)
+EXTRA_CLEAN     += build_options.stamp
+$(OBJS): ../version.txt ../version.mk ../Makefile.set build_options.stamp
 
 -include $(OBJS:.o=.d)
 
 %.o: ../src/%.c
+	@echo Compiling $<...
+	@$(CC) $(CDEFS) $(CFLAGS) -c $< -o$@
+
+%.o: ../src/ui/%.c
 	@echo Compiling $<...
 	@$(CC) $(CDEFS) $(CFLAGS) -c $< -o$@
 
