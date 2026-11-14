@@ -49,6 +49,7 @@ typedef struct
   u32 fast_forward_mode;   // FF_TOGGLE or FF_HOLD
   u32 fast_forward_sound;  // NO: silent while fast forwarding
   u32 show_fps;            // YES: FPS counter in the corner of the game
+  u32 save_on_leave;       // YES: save into slot 10 when leaving a game
 #if 0
   u32 solar_level;
 #endif

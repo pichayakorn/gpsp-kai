@@ -3613,7 +3613,7 @@ void init_memory()
   memset(rtc_registers, 0, sizeof(rtc_registers));
   bios_read_protect = 0xe129f000;
 
-  mem_save_flag = 0;
+  load_last_state();
 }
 
 void bios_region_read_allow()
@@ -3919,6 +3919,32 @@ u32 load_state(char *savestate_filename, u32 slot_num)
     0 on failure
     1 on success
 --------------------------------------------------------*/
+// Build a savestate of the running game in savestate_write_buffer (which is
+// also slot 10), with a progress bar.
+static void write_state_buffer(u16 *screen_capture)
+{
+  u64 current_time;
+  ScePspDateTime current_time_fix; // time() does not return the date, so fix it up
+
+  g_state_buffer_ptr = savestate_write_buffer;
+  init_progress(9, msg[MSG_SAVE_STATE]);
+
+  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_str);
+  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_ver);
+
+  FILE_WRITE_MEM(g_state_buffer_ptr, screen_capture, 240 * 160 * 2);
+  update_progress();
+
+  sceRtcGetCurrentClock(&current_time_fix, 0);
+  sceRtcGetTick(&current_time_fix, &current_time);
+
+  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, current_time);
+  update_progress();
+
+  savestate_block(write_mem, 0x00010000);
+  mem_save_flag = 1;
+}
+
 u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
 {
   char savestate_path[MAX_PATH];
@@ -3939,37 +3965,15 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
     strcpy(savestate_path, savestate_filename);
   }
 
-  g_state_buffer_ptr = savestate_write_buffer;
+  write_state_buffer(screen_capture);
 
-  u64 current_time;
-  ScePspDateTime current_time_fix; // time() does not return the date, so fix it up
-  init_progress(9, msg[MSG_SAVE_STATE]);
-
-  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_str);
-  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_ver);
-
-  FILE_WRITE_MEM(g_state_buffer_ptr, screen_capture, 240 * 160 * 2);
-  update_progress();
-
-  sceRtcGetCurrentClock(&current_time_fix, 0);
-  sceRtcGetTick(&current_time_fix, &current_time);
-
-  FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, current_time);
-  update_progress();
-
-  savestate_block(write_mem, 0x00010000);
-
-  if (slot_num != MEM_STATE_NUM)
+  // Slot 10 is written to its file too, so it is kept after quitting.
+  FILE_OPEN(savestate_file, savestate_path, WRITE);
+  if(FILE_CHECK_VALID(savestate_file))
   {
-    FILE_OPEN(savestate_file, savestate_path, WRITE);
-    if(FILE_CHECK_VALID(savestate_file))
-    {
-      FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer));
-      FILE_CLOSE(savestate_file);
-    }
+    FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer));
+    FILE_CLOSE(savestate_file);
   }
-
-  mem_save_flag = 1;
 
   update_progress();
   show_progress(msg[MSG_SAVE_STATE_END]);
@@ -3977,6 +3981,89 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
   virtual_frame_count = 0;
   pause_sound(0);
   return 1;
+}
+
+/*--------------------------------------------------------
+  Slot 10 on the Memory Stick
+  Slot 10 is savestate_write_buffer: the last state saved, loaded or made
+  on leaving a game. <game>_10.svs keeps it between sessions: it is
+  written when the player leaves a game and read back when the game
+  starts, so the game can continue from where it was left.
+--------------------------------------------------------*/
+static void get_last_state_path(char *savestate_path)
+{
+  char savestate_filename[MAX_FILE];
+
+  get_savestate_filename_noshot(MEM_STATE_NUM, savestate_filename);
+  if (g_default_save_dir[0] != '\0')
+    path_printf(savestate_path, MAX_PATH, "%s/%s", g_default_save_dir, savestate_filename);
+  else
+    strcpy(savestate_path, savestate_filename);
+}
+
+// Save the running game into slot 10 and its file, without asking.
+u32 save_last_state(u16 *screen_capture)
+{
+  char savestate_path[MAX_PATH];
+  FILE_ID savestate_file;
+  u32 ret = 0;
+
+  if (gamepak_filename[0] == 0)
+    return 0;
+
+  pause_sound(1);
+  write_state_buffer(screen_capture);
+
+  get_last_state_path(savestate_path);
+  FILE_OPEN(savestate_file, savestate_path, WRITE);
+  if(FILE_CHECK_VALID(savestate_file))
+  {
+    if(FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer)) ==
+     (s32)sizeof(savestate_write_buffer))
+      ret = 1;
+    FILE_CLOSE(savestate_file);
+  }
+  update_progress();
+  return ret;
+}
+
+// Fill slot 10 from the file, if this game has one.
+void load_last_state(void)
+{
+  char savestate_path[MAX_PATH];
+  FILE_ID savestate_file;
+  SceIoStat stat;
+  u32 file_size;
+
+  mem_save_flag = 0;
+  if (gamepak_filename[0] == 0)
+    return;
+
+  get_last_state_path(savestate_path);
+  if (sceIoGetstat(savestate_path, &stat) < 0)
+    return;
+
+  file_size = file_length(savestate_path);
+  if((file_size < SAVESTATE_SIZE_OLD) || (file_size > sizeof(savestate_write_buffer)))
+    return;
+
+  FILE_OPEN(savestate_file, savestate_path, READ);
+  if(FILE_CHECK_VALID(savestate_file))
+  {
+    if(FILE_READ(savestate_file, savestate_write_buffer, file_size) == (s32)file_size)
+      mem_save_flag = 1;
+    FILE_CLOSE(savestate_file);
+  }
+}
+
+// Delete slot 10 and its file.
+void delete_last_state(void)
+{
+  char savestate_path[MAX_PATH];
+
+  mem_save_flag = 0;
+  get_last_state_path(savestate_path);
+  sceIoRemove(savestate_path);
 }
 
 u32 get_sio_mode(u16 io1, u16 io2)
