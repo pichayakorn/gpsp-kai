@@ -166,6 +166,9 @@ void main_get_size_savestate(u32 ver);
 
 void error_msg(char *text);
 void set_cpu_mode(CPU_MODE_TYPE new_mode);
+u32 *user_reg_ptr(u32 index);
+u32 user_reg_load(u32 index);
+void user_reg_store(u32 value, u32 index);
 void raise_interrupt(IRQ_TYPE irq_raised);
 void change_ext(char *src, char *buffer, char *extension);
 u32 file_length(const char *filename);

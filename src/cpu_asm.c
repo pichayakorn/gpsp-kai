@@ -18,9 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-// Not-so-important todo:
-// - block memory needs psr swapping and user mode reg swapping
-
 #include "common.h"
 #include "cpu_common.h"
 

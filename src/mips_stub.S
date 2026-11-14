@@ -40,6 +40,8 @@
 .global execute_read_spsr
 .global execute_swi
 .global execute_spsr_restore
+.global execute_load_user_reg
+.global execute_store_user_reg
 .global execute_store_cpsr
 .global execute_store_spsr
 .global execute_lsl_flags_reg
@@ -3125,6 +3127,42 @@ execute_swi:
   lw $ra, ($sp)                   # pop $ra
   jr $ra                          # return
   addiu $sp, $sp, 8               # fix stack (delay slot)
+
+# User-bank register access for LDM/STM with the S bit (#64).
+# The C side reads or writes reg[] or reg_mode[MODE_USR], so the cached
+# registers go through reg[] around the call.
+
+# $5: register index
+# returns the user-mode value in $5; keeps $4 (address) and $6
+
+execute_load_user_reg:
+  sw $4, REG_SAVE($16)            # save a0
+  sw $ra, REG_SAVE2($16)          # save ra
+  sw $6, REG_SAVE3($16)           # save a2
+  save_registers
+  jal user_reg_load               # $2 = user-mode register
+  addu $4, $5, $0                 # $4 = index (delay)
+  restore_registers
+  addu $5, $2, $0                 # $5 = value
+  lw $4, REG_SAVE($16)            # restore a0
+  lw $ra, REG_SAVE2($16)          # restore ra
+  jr $ra
+  lw $6, REG_SAVE3($16)           # restore a2 (delay)
+
+# $4: value
+# $5: register index
+# keeps $6
+
+execute_store_user_reg:
+  sw $ra, REG_SAVE2($16)          # save ra
+  sw $6, REG_SAVE3($16)           # save a2
+  save_registers
+  jal user_reg_store              # write the user-mode register
+  nop
+  restore_registers
+  lw $ra, REG_SAVE2($16)          # restore ra
+  jr $ra
+  lw $6, REG_SAVE3($16)           # restore a2 (delay)
 
 # $4: pc to restore to
 # returns in $4
