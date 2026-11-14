@@ -2929,6 +2929,7 @@ block_lookup_address_body(dual);
   ((opcode & 0xDB0F000) != 0x120F000)) ||                                     \
   ((opcode & 0x12FFF10) == 0x12FFF10) ||                                      \
   ((opcode & 0x8108000) == 0x8108000) ||                                      \
+  ((opcode & 0xE10FFFF) == 0x8100000) ||                                      \
   ((opcode >= 0xA000000) && (opcode < 0xF000000)) ||                          \
   ((opcode >= 0xF000000) && (!swi_hle_handle[((opcode >> 16) & 0xFF)][bios_mode])))       \
 

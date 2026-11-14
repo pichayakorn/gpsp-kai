@@ -1911,11 +1911,22 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
     arm_block_memory_pc_load_##s_bit();                                       \
   }                                                                           \
 
+// An empty register list (ARM7TDMI) transfers the PC instead and moves the
+// base by 0x40, as if all 16 registers were transferred (#96). Thumb's
+// LDMIA/STMIA rb!, {} does the same (thumb_block_memory_empty_*).
+#define arm_block_memory_empty_list()                                         \
+  u32 block_bytes __attribute__((unused)) = word_bit_count(reg_list) * 4;     \
+  if(reg_list == 0)                                                           \
+  {                                                                           \
+    reg_list = 0x8000;                                                        \
+    block_bytes = 0x40;                                                       \
+  }                                                                           \
+
 #define arm_block_memory_offset_down_a()                                      \
-  mips_emit_addiu(reg_a2, base_reg, (-((word_bit_count(reg_list) * 4) - 4)))  \
+  mips_emit_addiu(reg_a2, base_reg, (-(block_bytes - 4)))                     \
 
 #define arm_block_memory_offset_down_b()                                      \
-  mips_emit_addiu(reg_a2, base_reg, (word_bit_count(reg_list) * -4))          \
+  mips_emit_addiu(reg_a2, base_reg, (-block_bytes))                           \
 
 #define arm_block_memory_offset_no()                                          \
   mips_emit_addu(reg_a2, base_reg, reg_zero)                                  \
@@ -1924,10 +1935,10 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
   mips_emit_addiu(reg_a2, base_reg, 4)                                        \
 
 #define arm_block_memory_writeback_down()                                     \
-  mips_emit_addiu(base_reg, base_reg, (-(word_bit_count(reg_list) * 4)))      \
+  mips_emit_addiu(base_reg, base_reg, (-block_bytes))                         \
 
 #define arm_block_memory_writeback_up()                                       \
-  mips_emit_addiu(base_reg, base_reg, (word_bit_count(reg_list) * 4))         \
+  mips_emit_addiu(base_reg, base_reg, block_bytes)                            \
 
 #define arm_block_memory_writeback_no()
 
@@ -1966,6 +1977,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 #define arm_block_memory(access_type, offset_type, writeback_type, s_bit)     \
 {                                                                             \
   arm_decode_block_trans();                                                   \
+  arm_block_memory_empty_list();                                              \
   u32 i;                                                                      \
   u32 offset = 0;                                                             \
   u32 base_reg = arm_to_mips_reg[rn];                                         \
