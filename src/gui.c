@@ -783,6 +783,7 @@ void init_gpsp_config()
   g_gpsp_config.boot_mode = GAME_CART;
   g_gpsp_config.fast_forward_mode = FF_TOGGLE;
   g_gpsp_config.fast_forward_sound = YES;
+  g_gpsp_config.show_fps = NO;
 #if 0
   g_gpsp_config.solar_level = 0;
 #endif
@@ -1351,7 +1352,7 @@ u32 menu(u16 *original_screen)
     /* 10 */ STRING_SELECTION_OPTION(NULL, msg[MSG_AUDIO_BUFFER], audio_buffer_options, &g_game_config.audio_buffer_size_number, 11, msg[MSG_G_S_MENU_HELP_6], 10),
     /* 11 */ STRING_SELECTION_OPTION(NULL, msg[MSG_FF_SOUND], yes_no_options, &g_gpsp_config.fast_forward_sound, 2, msg[MSG_G_S_MENU_HELP_FF_SOUND], 11),
     /* 12 */ ACTION_OPTION(menu_save_ss, NULL, msg[MSG_SCREEN_SHOT], msg[MSG_G_S_MENU_HELP_7], 12),
-    /* 13 */
+    /* 13 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SHOW_FPS], yes_no_options, &g_gpsp_config.show_fps, 2, msg[MSG_G_S_MENU_HELP_SHOW_FPS], 13),
     /* 14 */NUMERIC_SELECTION_OPTION(NULL, msg[MSG_DISPLAY_SCALE], &g_gpsp_config.screen_scale, 201, msg[MSG_G_S_MENU_HELP_10], 14),
     /* 15 */
     /* 16 */ SUBMENU_OPTION(NULL, msg[MSG_MENU_RETURN_MAIN], msg[MSG_G_S_MENU_HELP_8], 16)

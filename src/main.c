@@ -795,6 +795,16 @@ void synchronize()
 
   if(!g_synchronize_flag)
     PRINT_STRING_BG("--FF--", 0xFFFF, 0x000, 0, 10);
+
+  // Small counter in the bottom right corner, away from most games' HUD
+  // at the top. Drawn into the game frame, so it scales with the picture.
+  if(g_gpsp_config.show_fps)
+  {
+    char fps_buffer[16];
+    sprintf(fps_buffer, "%d FPS", (int)fps);
+    PRINT_STRING_BG(fps_buffer, 0xFFFF, 0x000,
+     screen_width - fbm_getwidth(fps_buffer) - 1, screen_height - FONT_HEIGHT - 1);
+  }
 }
 
 void reset_gba()
