@@ -780,6 +780,8 @@ void init_gpsp_config()
   g_gpsp_config.debug_flag = NO;
   g_gpsp_config.fake_fat = NO;
   g_gpsp_config.boot_mode = GAME_CART;
+  g_gpsp_config.fast_forward_mode = FF_TOGGLE;
+  g_gpsp_config.fast_forward_sound = YES;
 #if 0
   g_gpsp_config.solar_level = 0;
 #endif
@@ -1219,6 +1221,12 @@ u32 menu(u16 *original_screen)
     msg[MSG_YES]
   };
 
+  char *fast_forward_options[] =
+  {
+    msg[MSG_FF_TOGGLE],
+    msg[MSG_FF_HOLD]
+  };
+
   char *filter_options[] =
   {
     msg[MSG_FILTER_OFF],
@@ -1330,10 +1338,10 @@ u32 menu(u16 *original_screen)
     /* 05 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SKIP_TYPE], frameskip_options, &g_game_config.frameskip_type, 3, msg[MSG_G_S_MENU_HELP_2], 5),
     /* 06 */ NUMERIC_SELECTION_OPTION(NULL, msg[MSG_SKIP_VALUE], &g_game_config.frameskip_value, 100, msg[MSG_G_S_MENU_HELP_3], 6),
     /* 07 */ STRING_SELECTION_OPTION(NULL, msg[MSG_SKIP_RANDOM], frameskip_variation_options, &g_game_config.random_skip, 2, msg[MSG_G_S_MENU_HELP_4], 7),
-    /* 08 */
+    /* 08 */ STRING_SELECTION_OPTION(NULL, msg[MSG_FF_MODE], fast_forward_options, &g_gpsp_config.fast_forward_mode, 2, msg[MSG_G_S_MENU_HELP_FF_MODE], 8),
     /* 09 */ STRING_SELECTION_OPTION(NULL, msg[MSG_AUDIO_ENABLE], yes_no_options, &g_gpsp_config.enable_audio, 2, msg[MSG_G_S_MENU_HELP_5], 9),
     /* 10 */ STRING_SELECTION_OPTION(NULL, msg[MSG_AUDIO_BUFFER], audio_buffer_options, &g_game_config.audio_buffer_size_number, 11, msg[MSG_G_S_MENU_HELP_6], 10),
-    /* 11 */
+    /* 11 */ STRING_SELECTION_OPTION(NULL, msg[MSG_FF_SOUND], yes_no_options, &g_gpsp_config.fast_forward_sound, 2, msg[MSG_G_S_MENU_HELP_FF_SOUND], 11),
     /* 12 */ ACTION_OPTION(menu_save_ss, NULL, msg[MSG_SCREEN_SHOT], msg[MSG_G_S_MENU_HELP_7], 12),
     /* 13 */
     /* 14 */NUMERIC_SELECTION_OPTION(NULL, msg[MSG_DISPLAY_SCALE], &g_gpsp_config.screen_scale, 201, msg[MSG_G_S_MENU_HELP_10], 14),

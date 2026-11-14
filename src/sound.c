@@ -624,6 +624,10 @@ static int sound_update_thread(SceSize args, void *argp)
   {
     left_buffer = CHECK_BUFFER() / SAMPLE_SIZE;
     buffer_num = g_gpsp_config.enable_audio;
+    // Silent while fast forwarding if "Sound while fast" is off; the samples
+    // are still consumed below, so the buffer does not fill up.
+    if(!g_synchronize_flag && (g_gpsp_config.fast_forward_sound == NO))
+      buffer_num = 0;
 
     if((CHECK_BUFFER() > SAMPLE_SIZE) && (pause_sound_flag == 0))
     {

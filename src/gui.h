@@ -40,6 +40,10 @@ typedef struct
   u32 debug_flag;
   u32 fake_fat;
   u32 boot_mode;
+  // Appended fields: an older config file is shorter, so they keep the
+  // defaults from init_gpsp_config().
+  u32 fast_forward_mode;   // FF_TOGGLE or FF_HOLD
+  u32 fast_forward_sound;  // NO: silent while fast forwarding
 #if 0
   u32 solar_level;
 #endif
@@ -64,6 +68,9 @@ typedef struct
 
 #define GAME_CART 0
 #define GBA_BIOS  1
+
+#define FF_TOGGLE 0
+#define FF_HOLD   1
 
 extern u32 g_savestate_slot_num;
 extern char g_default_rom_dir[MAX_PATH];
