@@ -177,7 +177,7 @@
 
 # MSG_SKIP_RANDOM
 #Framskip variation: %s
-!Framskip variation: %s
+!Frameskip variation: %s
 
 # MSG_AUDIO_ENABLE
 #Audio output: %s
