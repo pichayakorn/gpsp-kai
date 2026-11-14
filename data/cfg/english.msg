@@ -1078,7 +1078,8 @@
 
 # MSG_CHEAT_MENU_HELP_6
 #Select 'yes' to also show the PSP's quit screen when HOME is pressed.
-!Select 'yes' to also show the PSP's quit screen when HOME is pressed.
+!Select 'yes' to also show the PSP's quit screen when HOME is pressed.\n
+!Quitting from that screen doesn't save into slot 10; use Exit in this menu.
 
 # MSG_STATE_MENU_5
 #Delete savestate in current slot
