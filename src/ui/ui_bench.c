@@ -6,6 +6,15 @@
 
 #define BENCH_ROWS 9
 
+/* Per-part timing: MARK(n) adds the time since the last mark to part n. */
+enum { PART_GROUND, PART_ROWS, PART_GAME, PART_TEXT, PART_TOAST, PART_STATS,
+       PART_HINTS, PART_COUNT };
+static const char *part_names[PART_COUNT] =
+  { "ground", "rows", "game+door", "text", "toast+bar", "stats", "hints" };
+static u32 part_sum[PART_COUNT], part_avg[PART_COUNT], part_t;
+#define MARK(n) do { u32 now_ = sceKernelGetSystemTimeLow(); \
+                     part_sum[n] += now_ - part_t; part_t = now_; } while(0)
+
 /* VRAM between the end of kai's display, game and menu buffers and the
  * shared scratch buffer (UNIVERSAL_VRAM_ADDR), see gu.c. */
 #define VRAM_BUFFERS_END ((768 * 512 * 2) + (240 * 161 * 2) * 2 + (480 * 273 * 2) * 2)
@@ -84,6 +93,7 @@ void ui_bench(void)
       clock = (clock + (ui_pressed(PSP_CTRL_RTRIGGER) ? 1 : 2)) % 3;
       scePowerSetClockFrequency(clocks[clock], clocks[clock], clocks[clock] / 2);
       frames = sum_us = max_us = 0;
+      memset(part_sum, 0, sizeof(part_sum));
     }
     if(ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     {
@@ -99,9 +109,11 @@ void ui_bench(void)
     if(ui_held(PSP_CTRL_SELECT)) hold_done = UI_F_FLASH;
 
     t0 = sceKernelGetSystemTimeLow();
+    part_t = t0;
     ui_frame_begin();
 
     ui_ground();
+    MARK(PART_GROUND);
     ui_text(UI_MARGIN, 12, "UI4 benchmark", UI_COL_CREAM);
     /* the clock the PSP reports; a CFW plugin may override the request */
     sprintf(line, "%d MHz (set %d)", scePowerGetCpuClockFrequency(), (int)clocks[clock]);
@@ -124,13 +136,18 @@ void ui_bench(void)
     y = ui_ease_out_back(cursor_from, 40 + cursor * UI_ROW_PITCH, cursor_frame, UI_F_CURSOR);
     ui_rect(UI_MARGIN - UI_LIFT - 2, y - UI_LIFT - 2, 184, UI_ROW_H + 4, 2, UI_COL_CREAM);
 
+    MARK(PART_ROWS);
+
     /* the game behind, with the screen door */
     draw_game_stand_in(220, 40);
     if(door)
       ui_door(220, 40, 240, 160);
+    MARK(PART_GAME);
     if(heavy)
       for(i = 0; i < 8; i++)
         ui_text(228, 48 + i * 18, "The quick brown fox jumps over the dog", UI_COL_CREAM);
+
+    MARK(PART_TEXT);
 
     /* toast: in 12 f, held 120 f, out 8 f */
     if(toast_frame >= 0)
@@ -161,13 +178,26 @@ void ui_bench(void)
       if(hold_done) hold_done--;
     }
 
+    MARK(PART_TOAST);
+
+    /* per-part averages, in hundredths of a ms */
+    x = UI_MARGIN;
+    for(i = 0; i < PART_COUNT; i++)
+    {
+      sprintf(line, "%s %d.%02d", part_names[i], (int)(part_avg[i] / 1000),
+       (int)(part_avg[i] % 1000 / 10));
+      x = ui_text(x, 27, line, UI_COL_MUTE) + 8;
+    }
+
     sprintf(line, "draw %d.%02d ms avg, %d.%02d max  heap %d KB  pool %d KB  game %d MB  VRAM gap %d KB",
      (int)(avg_us / 1000), (int)(avg_us % 1000 / 10), (int)(peak_us / 1000), (int)(peak_us % 1000 / 10),
      (int)heap_kb, (int)(ui_pool_free() / 1024), (int)(gamepak_ram_buffer_size >> 20),
      (int)(VRAM_GAP / 1024));
     ui_text(UI_MARGIN, 230, line, UI_COL_MUTE);
 
+    MARK(PART_STATS);
     ui_hint_strip(hints, sizeof(hints) / sizeof(hints[0]));
+    MARK(PART_HINTS);
 
     t1 = sceKernelGetSystemTimeLow();
     sum_us += t1 - t0;
@@ -177,6 +207,11 @@ void ui_bench(void)
     {
       avg_us = sum_us / frames;
       peak_us = max_us;
+      for(i = 0; i < PART_COUNT; i++)
+      {
+        part_avg[i] = part_sum[i] / frames;
+        part_sum[i] = 0;
+      }
       frames = sum_us = max_us = 0;
     }
 
