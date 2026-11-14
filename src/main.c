@@ -59,14 +59,7 @@ u32 g_synchronize_flag = 1;
 char main_path[MAX_PATH];
 char rom_path[MAX_PATH];
 
-// HOME -> Exit Game: the exit callback runs in its own thread while the
-// game may still be running, so it only asks to quit. The emulation
-// thread answers at a safe point (end of a frame, or a menu input poll),
-// saves slot 10 with the game stopped, and quits.
-#define QUIT_NONE      0
-#define QUIT_REQUESTED 1  // set by the exit callback
-#define QUIT_TAKEN     2  // the emulation thread is quitting
-static vu32 quit_flag = QUIT_NONE;
+//vu32 quit_flag;
 vu32 power_flag;
 
 vu32 real_frame_count = 0;
@@ -199,60 +192,10 @@ void init_main()
   flush_translation_cache_bios();
 }
 
-// Change quit_flag from one value to another; 1 if it had the first value.
-static u32 swap_quit_flag(u32 from, u32 to)
-{
-  u32 swapped = 0;
-  int intr = sceKernelCpuSuspendIntr();
-
-  if(quit_flag == from)
-  {
-    quit_flag = to;
-    swapped = 1;
-  }
-  sceKernelCpuResumeIntr(intr);
-  return swapped;
-}
-
-// Called by the emulation thread at a safe point. If HOME -> Exit Game was
-// chosen, save slot 10 (when that setting is on and a game is running) and
-// quit. screen is the game picture, or NULL to copy it from the screen.
-void check_home_quit(u16 *screen)
-{
-  if(!swap_quit_flag(QUIT_REQUESTED, QUIT_TAKEN))
-    return;
-
-  if(g_gpsp_config.save_on_leave && (gamepak_filename[0] != 0))
-  {
-    u16 *screen_copy = NULL;
-
-    if(screen == NULL)
-      screen = screen_copy = copy_screen();
-    save_last_state(screen);
-    free(screen_copy);
-  }
-  quit(0);
-}
-
 int exit_callback(int arg1, int arg2, void *common)
 {
-  u32 i;
-
-  quit_flag = QUIT_REQUESTED;
-
-  // Give the emulation thread up to 3 seconds to take the request; once
-  // taken, it saves and ends the program itself.
-  for(i = 0; i < 300; i++)
-  {
-    sceKernelDelayThread(10000);
-    if(quit_flag == QUIT_TAKEN)
-      sceKernelSleepThread();
-  }
-
-  // No answer (a file list or a dialog is open): quit without saving.
-  if(swap_quit_flag(QUIT_REQUESTED, QUIT_NONE))
-    quit(0);
-  sceKernelSleepThread();
+  quit(0);
+//  quit_flag = 1; // TODO
   return 0;
 }
 
@@ -377,6 +320,7 @@ int main(int argc, char *argv[])
       error_msg("Error in load/start TV OUT module.\n");
   }
 
+//  quit_flag = 0;
   power_flag = 0;
   SetupCallbacks();
 

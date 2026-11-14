@@ -159,7 +159,6 @@ u32 update_gba();
 void reset_gba();
 void synchronize();
 void quit(u32 mode);
-void check_home_quit(u16 *screen);
 void game_name_ext(u8 *src, u8 *buffer, u8 *extension);
 void main_read_mem_savestate(u32 ver);
 void main_write_mem_savestate(u32 ver);

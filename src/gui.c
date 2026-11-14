@@ -1696,7 +1696,8 @@ u32 menu(u16 *original_screen)
 
     gui_action = get_gui_input();
 
-    check_home_quit(first_load ? NULL : original_screen);
+//    if (quit_flag == 1)
+//      menu_quit();
 
     switch(gui_action)
     {
