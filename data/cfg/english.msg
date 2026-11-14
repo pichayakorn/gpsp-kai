@@ -381,7 +381,7 @@
 #Change the current savestate slot.\n
 #Slot 10 (memory) holds the last state saved or loaded; lost on quit.
 !Change the current savestate slot.\n
-!Slot 10 (memory) holds the last state saved or loaded; lost on quit.
+!Slot 10 holds the last state saved, loaded or made on leaving a game.
 
 # MSG_STATE_MENU_HELP_4
 #Return to the main menu.
@@ -1078,7 +1078,8 @@
 
 # MSG_CHEAT_MENU_HELP_6
 #Select 'yes' to also show the PSP's quit screen when HOME is pressed.
-!Select 'yes' to also show the PSP's quit screen when HOME is pressed.
+!Select 'yes' to also show the PSP's quit screen when HOME is pressed.\n
+!Quitting from that screen doesn't save into slot 10; use Exit in this menu.
 
 # MSG_STATE_MENU_5
 #Delete savestate in current slot
@@ -1175,3 +1176,13 @@
 !How fast the rapid fire buttons press. Saved for this game.\n
 !Fast: 30 presses a second. Medium: 15. Slow: 7.5.\n
 !Try slow or medium if a game misses rapid fire presses.
+
+# MSG_SAVE_ON_LEAVE
+#Save when leaving a game: %s
+!Save when leaving a game: %s
+
+# MSG_STATE_MENU_HELP_SAVE_ON_LEAVE
+#Select 'yes' to save into slot 10 when you load another game or exit.\n
+#Load slot 10 next time to continue from where you left.
+!Select 'yes' to save into slot 10 when you load another game or exit.\n
+!Load slot 10 next time to continue from where you left.
