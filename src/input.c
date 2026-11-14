@@ -262,6 +262,7 @@ u32 update_input()
   u32 button_id = 0;
   u32 i;
   u32 new_key = 0;
+  u32 fast_forward_held = 0;
   u32 analog_sensitivity = 92 - (g_gpsp_config.analog_sensitivity_level * 4);
   u32 inv_analog_sensitivity = 256 - analog_sensitivity;
 //  tilt_sensor_x = 0x800;
@@ -303,6 +304,11 @@ u32 update_input()
 
   for(i = 0; i < 16; i++)
   {
+    // button_id is reset for every button: carried over, the action of one
+    // newly pressed or held button ran again for each button after it, so
+    // a toggle like fast forward flipped an even or odd number of times
+    // depending on which button it was mapped to.
+    button_id = BUTTON_ID_NONE;
     if(non_repeat_buttons & button_psp_mask_to_config[i])
       button_id = gamepad_config_map[i];
     // HOME opens the menu
@@ -350,10 +356,9 @@ u32 update_input()
       }
 
       case BUTTON_ID_FASTFORWARD:
-//        PRINT_STRING_BG("FASTFORWARD", 0xFFFF, 0x0000, 0, 50);
-        g_synchronize_flag ^= 1;
+        if(g_gpsp_config.fast_forward_mode == FF_TOGGLE)
+          g_synchronize_flag ^= 1;
         break;
-//        return 0;
 
       case BUTTON_ID_VOLUP:
 //        gp2x_sound_volume(1);
@@ -371,6 +376,8 @@ u32 update_input()
     if(buttons & button_psp_mask_to_config[i])
     {
       button_id = gamepad_config_map[i];
+      if(button_id == BUTTON_ID_FASTFORWARD)
+        fast_forward_held = 1;
       if(button_id < BUTTON_ID_MENU)
       {
         new_key |= button_id_to_gba_mask[button_id];
@@ -392,6 +399,10 @@ u32 update_input()
       }
     }
   }
+
+  // Hold mode: fast only while a fast forward button is down.
+  if(g_gpsp_config.fast_forward_mode == FF_HOLD)
+    g_synchronize_flag = !fast_forward_held;
 
   if((new_key | key) != key)
     trigger_key(new_key);

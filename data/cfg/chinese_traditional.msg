@@ -1164,3 +1164,31 @@
 !No usable gba_bios.bin: using the built-in BIOS.\n\n
 !Most games run with it. If one does not, put a dump of the GBA\n
 !BIOS in the gpSP folder as gba_bios.bin.\n
+
+# MSG_FF_MODE
+#Fast forward: %s
+!Fast forward: %s
+
+# MSG_FF_TOGGLE
+#toggle
+!toggle
+
+# MSG_FF_HOLD
+#hold
+!hold
+
+# MSG_G_S_MENU_HELP_FF_MODE
+#How the fast forward button works (map it in the gamepad menu).\n
+#Toggle: press once to go fast, again to go back to normal speed.\n
+#Hold: fast only while the button is held down.
+!How the fast forward button works (map it in the gamepad menu).\n
+!Toggle: press once to go fast, again to go back to normal speed.\n
+!Hold: fast only while the button is held down.
+
+# MSG_FF_SOUND
+#Sound while fast: %s
+!Sound while fast: %s
+
+# MSG_G_S_MENU_HELP_FF_SOUND
+#Select 'no' to mute the sound while fast forwarding.
+!Select 'no' to mute the sound while fast forwarding.
