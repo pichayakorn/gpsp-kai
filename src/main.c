@@ -268,6 +268,7 @@ void quit(u32 mode)
 {
   if(mode == 0)
     {
+      note_game_left();
       save_game_config_file();
       save_config_file();
 
@@ -699,6 +700,26 @@ void vblank_interrupt_handler(u32 sub, u32 *parg)
 
 // TODO: optimize / switch to a timer-based approach
 // GBA frame: 16.743 ms, 280896 cycles at 16.78 MHz, 59.737 Hz
+/* Add the real time since the last frame to the game's play time. A gap
+   over one second (the menu, sleep mode, loading) is not play. */
+static void count_play_time(void)
+{
+  static u64 last_frame_us = 0;
+  static u32 partial_us = 0;
+  u64 now_us = sceKernelGetSystemTimeWide();
+  u64 gap_us = now_us - last_frame_us;
+
+  last_frame_us = now_us;
+  if(gap_us >= 1000000)
+    return;
+  partial_us += (u32)gap_us;
+  while(partial_us >= 1000000)
+  {
+    partial_us -= 1000000;
+    g_game_config.play_seconds++;
+  }
+}
+
 void synchronize()
 {
 //  char char_buffer[64];
@@ -715,6 +736,7 @@ void synchronize()
 
   skip_next_frame_flag = 0;
   frames++;
+  count_play_time();
 
   switch(g_game_config.frameskip_type)
   {

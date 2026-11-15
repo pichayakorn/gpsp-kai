@@ -758,6 +758,8 @@ void init_game_config()
   g_game_config.use_default_gamepad_map = YES;
   g_game_config.allocate_sensor = NO;
   g_game_config.rapidfire_speed = RAPIDFIRE_FAST;
+  g_game_config.play_seconds = 0;
+  g_game_config.last_played = 0;
 }
 
 void init_gpsp_config()
@@ -983,8 +985,13 @@ u32 menu(u16 *original_screen)
     {
       // Save the game being left into slot 10 before the new ROM replaces
       // it. After a failed load first_load is set, so this runs once.
-      if(!first_load && g_gpsp_config.save_on_leave)
-        save_last_state(original_screen);
+      if(!first_load)
+      {
+        note_game_left();
+        save_game_config_file();
+        if(g_gpsp_config.save_on_leave)
+          save_last_state(original_screen);
+      }
 
       if(load_gamepak(load_filename) != -1)
       {
@@ -2040,6 +2047,62 @@ void get_savestate_filename_noshot(u32 slot, char *name_buffer)
 
   sprintf(savestate_ext, "_%d.svs", (int)slot);
   change_ext(gamepak_filename, name_buffer, savestate_ext);
+}
+
+/*--------------------------------------------------------
+  Recent games
+  <cfg dir>/recent.txt lists the games played, newest first, one full
+  path per line (UTF-8), at most RECENT_MAX. It is written when a game
+  is left; the 4.0 library reads it.
+--------------------------------------------------------*/
+#define RECENT_MAX 30
+#define RECENT_FILENAME "recent.txt"
+
+static void update_recent_list(const char *game_path)
+{
+  static char lines[RECENT_MAX][MAX_PATH];
+  char list_path[MAX_PATH];
+  FILE *list_file;
+  u32 count = 0, i;
+
+  path_printf(list_path, sizeof(list_path), "%s/%s", g_default_cfg_dir, RECENT_FILENAME);
+
+  list_file = fopen(list_path, "r");
+  if(list_file)
+  {
+    while((count < RECENT_MAX) && fgets(lines[count], MAX_PATH, list_file))
+    {
+      lines[count][strcspn(lines[count], "\r\n")] = 0;
+      if((lines[count][0] != 0) && strcasecmp(lines[count], game_path))
+        count++;
+    }
+    fclose(list_file);
+  }
+  if(count == RECENT_MAX)
+    count--;  // the oldest drops off
+
+  list_file = fopen(list_path, "w");
+  if(list_file == NULL)
+    return;
+  fprintf(list_file, "%s\n", game_path);
+  for(i = 0; i < count; i++)
+    fprintf(list_file, "%s\n", lines[i]);
+  fclose(list_file);
+}
+
+// The player is leaving the running game: stamp it and move it to the
+// top of the Recent list. The caller saves the game config afterwards.
+void note_game_left(void)
+{
+  ScePspDateTime now;
+  time_t now_t;
+
+  if((gamepak_filename[0] == 0) || (gamepak_path[0] == 0))
+    return;
+
+  if((sceRtcGetCurrentClock(&now, 0) >= 0) && (sceRtcGetTime_t(&now, &now_t) >= 0))
+    g_game_config.last_played = (u32)now_t;
+  update_recent_list(gamepak_path);
 }
 
 /*--------------------------------------------------------
