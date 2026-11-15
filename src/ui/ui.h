@@ -52,6 +52,7 @@ extern u32 ui_fb_pitch;
  * next vblank. */
 void ui_frame_begin(void);
 void ui_frame_end(void);
+void ui_frame_end_now(void);
 
 /* Drawing into the 480 x 272 menu buffer (16-bit, 5 bits per channel). */
 #define UI_SCREEN_W 480
@@ -59,6 +60,12 @@ void ui_frame_end(void);
 void ui_fill(int x, int y, int w, int h, u16 color);
 void ui_ground(void);
 void ui_door(int x, int y, int w, int h);
+void ui_checker(int x, int y, int w, int h, u16 color);
+void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h);
+int ui_layer_begin(void);
+void ui_layer_end(void);
+void ui_layer_reset(void);
+int ui_layer_ready(void);
 void ui_rect(int x, int y, int w, int h, int thickness, u16 color);
 void ui_card(int x, int y, int w, int h, u16 color, int lifted);
 int ui_text(int x, int y, char *str, u16 color);
@@ -113,6 +120,7 @@ typedef struct
 int ui_hold_step(ui_hold_t *h, u32 key);
 void ui_hold_bar(int x, int y, int w, int p, u16 color);
 
+int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size);
 void ui_dialog(const char *title, const char *body, const char **buttons,
  int button_count, int selected, u16 edge, int f, int closing);
 
@@ -120,5 +128,9 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
 void ui_bench(void);
 /* Step 2 component screen: hold L while kai starts. */
 void ui_components(void);
+
+/* The pause screen (the menu button in a game); returns 1 when the game's
+ * state changed (a load or a restart), like menu(). */
+u32 ui_pause(u16 *game_picture);
 
 #endif

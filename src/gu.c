@@ -593,6 +593,21 @@ void clear_screen(u16 color)
   sceGuSync(0, 0);
 }
 
+/* Where video_resolution(FRAME_GAME) puts the game picture on the LCD. */
+void get_game_rect(int *x, int *y, int *w, int *h)
+{
+  SPRITE *s = &screen_parameter_psp_game[g_gpsp_config.screen_mode].screen_setting_1;
+  float hx = (s->x2 - s->x1) / 2, hy = (s->y2 - s->y1) / 2;
+  float cx = s->x1 + hx, cy = s->y1 + hy;
+
+  hx = hx * g_gpsp_config.screen_scale / 100;
+  hy = hy * g_gpsp_config.screen_scale / 100;
+  *x = (int)(cx - hx);
+  *y = (int)(cy - hy);
+  *w = (int)(hx * 2);
+  *h = (int)(hy * 2);
+}
+
 u16 *copy_screen()
 {
   u16 *copy = malloc(240 * 160 * 2);

@@ -36,6 +36,9 @@
 
 u32 yesno_dialog(char *text);
 
+/* When set, the progress functions call it instead of drawing (the 4.0
+   UI draws its own bar); show_progress then does nothing. */
+void (*progress_hook)(int current, int total) = NULL;
 static int progress_total;
 static int progress_current;
 static char progress_message[256];
@@ -190,6 +193,11 @@ void init_progress(u32 total, char *text)
 {
   progress_current = 0;
   progress_total   = total;
+  if(progress_hook)
+  {
+    progress_hook(0, total);
+    return;
+  }
   strcpy(progress_message, text);
 
   draw_dialog(progress_sx - 8, progress_sy -29, progress_ex + 8, progress_ey + 13);
@@ -204,7 +212,14 @@ void init_progress(u32 total, char *text)
 
 void update_progress(void)
 {
-  int width = (int)( ((float)++progress_current / (float)progress_total) * ((float)screen_width / 3.0 * 2.0) );
+  int width;
+
+  if(progress_hook)
+  {
+    progress_hook(++progress_current, progress_total);
+    return;
+  }
+  width = (int)( ((float)++progress_current / (float)progress_total) * ((float)screen_width / 3.0 * 2.0) );
 
   draw_dialog(progress_sx - 8, progress_sy -29, progress_ex + 8, progress_ey + 13);
 
@@ -221,6 +236,8 @@ void update_progress(void)
 --------------------------------------------------------*/
 void show_progress(char *text)
 {
+  if(progress_hook)
+    return;
   draw_dialog(progress_sx - 8, progress_sy -29, progress_ex + 8, progress_ey + 13);
 
   boxfill(progress_sx - 1, progress_sy - 1, progress_ex + 1, progress_ey + 1, COLOR_BLACK);

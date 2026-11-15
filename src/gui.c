@@ -264,7 +264,7 @@ static void print_centered_240(char *str, u32 y, u16 *dest);
 static void print_string_right(char *str, u32 y);
 static void print_help(char *help);
 static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u16 day, u16 wday, u16 hour, u16 min, u16 sec, u32 msec);
-static void save_ss_bmp(u16 *image);
+void save_ss_bmp(u16 *image);
 void _flush_cache();
 void button_up_wait();
 void init_gpsp_config();
@@ -2550,7 +2550,7 @@ static void get_timestamp_string(char *buffer, u16 msg_id, u16 year, u16 mon, u1
   }
 }
 
-static void save_ss_bmp(u16 *image)
+void save_ss_bmp(u16 *image)
 {
   static unsigned char header[] ={ 'B',  'M',  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x28, 0x00,
                                    0x00, 0x00,  240, 0x00, 0x00, 0x00,  160, 0x00, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00,

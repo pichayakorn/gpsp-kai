@@ -3739,8 +3739,18 @@ static char *savestate_rom_name(u8 *state_data, u32 ver)
 }
 
 // Show a savestate error and wait for a button.
+/* Set by the 4.0 UI: load and save without asking, and errors are kept in
+   state_error_text for the UI to show instead of the old dialog. */
+u32 state_no_question = 0;
+char *state_error_text = NULL;
+
 static void savestate_error(char *text)
 {
+  if(progress_hook)
+  {
+    state_error_text = text;
+    return;
+  }
   show_progress(text);
   button_up_wait();
   error_msg("");
@@ -3788,7 +3798,7 @@ u32 load_state(char *savestate_filename, u32 slot_num)
       return 0;
 
   sprintf(buf, msg[MSG_LOAD_STATE_NUM], (int)slot_num);
-  if(yesno_dialog(buf) == 1)
+  if(!state_no_question && (yesno_dialog(buf) == 1))
     return 0;
 
   init_progress(9, msg[MSG_LOAD_STATE]);
@@ -3911,16 +3921,29 @@ u32 load_state(char *savestate_filename, u32 slot_num)
   return 1;
 }
 
-/*--------------------------------------------------------
-  Save state
-  input
-    char *savestate_filename file to save
-    u16 *screen_capture      screenshot image
-    u32 slot_num             slot number; also tells whether this is an in-memory save
-  return
-    0 on failure
-    1 on success
---------------------------------------------------------*/
+// The savestate file is written in chunks with a progress step after each,
+// so a bar can move while the 512 KB go to the Memory Stick.
+#define STATE_WRITE_CHUNKS 16
+
+static u32 write_state_file(const char *savestate_path)
+{
+  const u32 chunk = sizeof(savestate_write_buffer) / STATE_WRITE_CHUNKS;
+  FILE_ID savestate_file;
+  u32 i, ok = 1;
+
+  FILE_OPEN(savestate_file, savestate_path, WRITE);
+  if(!FILE_CHECK_VALID(savestate_file))
+    return 0;
+  for(i = 0; i < STATE_WRITE_CHUNKS; i++)
+  {
+    if(ok && (FILE_WRITE(savestate_file, savestate_write_buffer + i * chunk, chunk) != (s32)chunk))
+      ok = 0;
+    update_progress();
+  }
+  FILE_CLOSE(savestate_file);
+  return ok;
+}
+
 // Build a savestate of the running game in savestate_write_buffer (which is
 // also slot 10), with a progress bar.
 static void write_state_buffer(u16 *screen_capture)
@@ -3929,7 +3952,7 @@ static void write_state_buffer(u16 *screen_capture)
   ScePspDateTime current_time_fix; // time() does not return the date, so fix it up
 
   g_state_buffer_ptr = savestate_write_buffer;
-  init_progress(9, msg[MSG_SAVE_STATE]);
+  init_progress(9 + STATE_WRITE_CHUNKS, msg[MSG_SAVE_STATE]);
 
   FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_str);
   FILE_WRITE_MEM_VARIABLE(g_state_buffer_ptr, g_state_ver);
@@ -3976,11 +3999,11 @@ static void get_thumbnail_path(const char *savestate_path, char *thumbnail_path)
     strcpy(thumbnail_path + len - 4, ".thm");
 }
 
-// Write the sidecar for the savestate in savestate_write_buffer.
-static void write_state_thumbnail(const char *savestate_path)
+// Write the sidecar for a savestate: shot is its 240x160 screenshot and
+// save_time the 8 bytes of its save time.
+static void write_thumbnail_file(const char *savestate_path, const u16 *shot, const u8 *save_time)
 {
   static u8 thm[THM_HEADER + THM_W * THM_H * 2];
-  const u16 *shot = (const u16 *)(savestate_write_buffer + SVS_SHOT_OFFSET);
   u16 *out = (u16 *)(thm + THM_HEADER);
   char thumbnail_path[MAX_PATH];
   FILE_ID thumbnail_file;
@@ -3991,7 +4014,7 @@ static void write_state_thumbnail(const char *savestate_path)
   thm[5] = THM_W;
   thm[6] = THM_H;
   thm[7] = 0;
-  memcpy(thm + 8, savestate_write_buffer + SVS_TIME_OFFSET, 8);
+  memcpy(thm + 8, save_time, 8);
 
   // average each 240x160 -> 64x43 source box (3-4 px each way)
   for(y = 0; y < THM_H; y++)
@@ -4025,6 +4048,102 @@ static void write_state_thumbnail(const char *savestate_path)
     }
     FILE_CLOSE(thumbnail_file);
   }
+}
+
+// The sidecar for the savestate in savestate_write_buffer.
+static void write_state_thumbnail(const char *savestate_path)
+{
+  write_thumbnail_file(savestate_path, (const u16 *)(savestate_write_buffer + SVS_SHOT_OFFSET),
+   savestate_write_buffer + SVS_TIME_OFFSET);
+}
+
+/*--------------------------------------------------------
+  Reading savestates for the 4.0 pause screen
+  Slots 0-9 are <game>_N.svs, Last (10) is <game>_10.svs.
+--------------------------------------------------------*/
+void get_state_slot_path(u32 slot, char *savestate_path)
+{
+  char savestate_filename[MAX_FILE];
+
+  get_savestate_filename_noshot(slot, savestate_filename);
+  if (g_default_save_dir[0] != '\0')
+    path_printf(savestate_path, MAX_PATH, "%s/%s", g_default_save_dir, savestate_filename);
+  else
+    strcpy(savestate_path, savestate_filename);
+}
+
+// Does the slot hold a savestate? Its save time (RTC ticks) goes to *time.
+u32 read_state_time(u32 slot, u64 *time)
+{
+  char savestate_path[MAX_PATH];
+  FILE_ID savestate_file;
+  u8 head[4];
+  u32 ok = 0;
+
+  *time = 0;
+  if(gamepak_filename[0] == 0)
+    return 0;
+  get_state_slot_path(slot, savestate_path);
+  FILE_OPEN(savestate_file, savestate_path, READ);
+  if(!FILE_CHECK_VALID(savestate_file))
+    return 0;
+  if((FILE_READ(savestate_file, head, 4) == 4) && (memcmp(head, g_state_str, 4) == 0))
+  {
+    FILE_SEEK(savestate_file, SVS_TIME_OFFSET, SEEK_SET);
+    if(FILE_READ(savestate_file, time, 8) == 8)
+      ok = 1;
+  }
+  else
+    ok = 1;  /* an old savestate without the header: no time */
+  FILE_CLOSE(savestate_file);
+  return ok;
+}
+
+// The slot's 64x43 picture from its .thm, if it belongs to this save.
+u32 read_state_thumbnail(u32 slot, u64 time, u16 *pixels)
+{
+  char savestate_path[MAX_PATH];
+  char thumbnail_path[MAX_PATH];
+  FILE_ID thumbnail_file;
+  u8 head[THM_HEADER];
+  u32 ok = 0;
+
+  get_state_slot_path(slot, savestate_path);
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  FILE_OPEN(thumbnail_file, thumbnail_path, READ);
+  if(!FILE_CHECK_VALID(thumbnail_file))
+    return 0;
+  if((FILE_READ(thumbnail_file, head, THM_HEADER) == THM_HEADER) &&
+   (memcmp(head, "KTHM", 4) == 0) && (head[4] == 1) && (head[5] == THM_W) &&
+   (head[6] == THM_H) && (memcmp(head + 8, &time, 8) == 0) &&
+   (FILE_READ(thumbnail_file, pixels, THM_W * THM_H * 2) == THM_W * THM_H * 2))
+    ok = 1;
+  FILE_CLOSE(thumbnail_file);
+  return ok;
+}
+
+// The slot's full 240x160 screenshot from its .svs. With make_thumbnail,
+// also (re)write its .thm, for savestates from before .thm files.
+u32 read_state_shot(u32 slot, u16 *pixels, u32 make_thumbnail)
+{
+  char savestate_path[MAX_PATH];
+  FILE_ID savestate_file;
+  u8 head[8];
+  u8 save_time[8];
+  u32 ok = 0;
+
+  get_state_slot_path(slot, savestate_path);
+  FILE_OPEN(savestate_file, savestate_path, READ);
+  if(!FILE_CHECK_VALID(savestate_file))
+    return 0;
+  if((FILE_READ(savestate_file, head, 8) == 8) && (memcmp(head, g_state_str, 4) == 0) &&
+   (FILE_READ(savestate_file, pixels, 240 * 160 * 2) == 240 * 160 * 2) &&
+   (FILE_READ(savestate_file, save_time, 8) == 8))
+    ok = 1;
+  FILE_CLOSE(savestate_file);
+  if(ok && make_thumbnail)
+    write_thumbnail_file(savestate_path, pixels, save_time);
+  return ok;
 }
 
 /*--------------------------------------------------------
@@ -4111,16 +4230,25 @@ void delete_state_files(const char *savestate_path)
   backup_state_files(savestate_path);
 }
 
+/*--------------------------------------------------------
+  Save state
+  input
+    char *savestate_filename file to save
+    u16 *screen_capture      screenshot image
+    u32 slot_num             slot number; also tells whether this is an in-memory save
+  return
+    0 on failure
+    1 on success
+--------------------------------------------------------*/
 u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
 {
   char savestate_path[MAX_PATH];
-  FILE_ID savestate_file;
   char buf[256];
 
   pause_sound(1);
 
   sprintf(buf, msg[MSG_SAVE_STATE_NUM], (int)slot_num);
-  if(yesno_dialog(buf) == 1)
+  if(!state_no_question && (yesno_dialog(buf) == 1))
     return 0;
 
   if (g_default_save_dir[0] != '\0') {
@@ -4136,16 +4264,8 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
   // Slot 10 is written to its file too, so it is kept after quitting.
   // The old file becomes the backup; a failed write puts it back.
   backup_state_files(savestate_path);
-  FILE_OPEN(savestate_file, savestate_path, WRITE);
-  if(FILE_CHECK_VALID(savestate_file))
-  {
-    s32 written = FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer));
-    FILE_CLOSE(savestate_file);
-    if(written == (s32)sizeof(savestate_write_buffer))
-      write_state_thumbnail(savestate_path);
-    else
-      undo_state_files(savestate_path);
-  }
+  if(write_state_file(savestate_path))
+    write_state_thumbnail(savestate_path);
   else
     undo_state_files(savestate_path);
 
@@ -4179,7 +4299,6 @@ static void get_last_state_path(char *savestate_path)
 u32 save_last_state(u16 *screen_capture)
 {
   char savestate_path[MAX_PATH];
-  FILE_ID savestate_file;
   u32 ret = 0;
 
   if (gamepak_filename[0] == 0)
@@ -4190,16 +4309,9 @@ u32 save_last_state(u16 *screen_capture)
 
   get_last_state_path(savestate_path);
   drop_state_backup(savestate_path);  // the automatic save has no Undo
-  FILE_OPEN(savestate_file, savestate_path, WRITE);
-  if(FILE_CHECK_VALID(savestate_file))
-  {
-    if(FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer)) ==
-     (s32)sizeof(savestate_write_buffer))
-      ret = 1;
-    FILE_CLOSE(savestate_file);
-    if(ret)
-      write_state_thumbnail(savestate_path);
-  }
+  ret = write_state_file(savestate_path);
+  if(ret)
+    write_state_thumbnail(savestate_path);
   update_progress();
   return ret;
 }

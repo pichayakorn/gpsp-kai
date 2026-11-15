@@ -368,9 +368,9 @@ int ui_hold_step(ui_hold_t *h, u32 key)
   return h->p;
 }
 
-/* Word wrap: copies line n of text (fitting max_width) into out. Breaks at
+/* Word wrap: copies line n of text (fitting max_width in font) into out. Breaks at
  * spaces, or anywhere in text without spaces (CJK). Returns 0 past the end. */
-static int wrap_line(const char *text, int n, int max_width, char *out, int out_size)
+int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size)
 {
   const char *p = text;
   int line = 0;
@@ -395,7 +395,7 @@ static int wrap_line(const char *text, int n, int max_width, char *out, int out_
         break;
       memcpy(buf, p, len);
       buf[len] = 0;
-      if(body_width(buf, 0) > max_width)
+      if(((font == UI_FONT_BODY) ? body_width(buf, 0) : small_width(buf)) > max_width)
         break;
       if(*q == ' ')
         last_space = q;
@@ -453,7 +453,7 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
   else
     ui_text(x + 18, y + 10, (char *)title, UI_COL_PLUM);
   for(j = 0; j < 3; j++)
-    if(wrap_line(body, j, w - 36, line, sizeof(line)))
+    if(ui_wrap_line(body, j, w - 36, UI_FONT_BODY, line, sizeof(line)))
       body_text(x + 18, y + 40 + j * 16, line, UI_COL_PLUM, 0);
 
   bx = x + w - 16;

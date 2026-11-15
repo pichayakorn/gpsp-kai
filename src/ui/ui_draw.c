@@ -26,6 +26,13 @@ void ui_frame_end(void)
   sceDisplayWaitVblankStart();
 }
 
+/* Show the frame without waiting for the vblank: a bar redrawn between
+ * chunks of a save must not slow the save down. */
+void ui_frame_end_now(void)
+{
+  flip_screen();
+}
+
 static int clip(int *x, int *y, int *w, int *h)
 {
   if(*x < 0) { *w += *x; *x = 0; }
@@ -72,18 +79,65 @@ static void build_ground(u16 *dest, u32 pitch)
     memcpy(dest + y * pitch, rows[(y / UI_CHECK) & 1], UI_SCREEN_W * 2);
 }
 
-void ui_ground(void)
+static int alloc_ground_layer(void)
 {
   if(ground_layer == NULL)
   {
     ground_layer = ui_pool_alloc(UI_SCREEN_W * UI_SCREEN_H * 2);
     if(ground_layer == NULL)
-    {
-      build_ground(fb, fb_pitch);
-      return;
-    }
+      return 0;
     build_ground(ground_layer, UI_SCREEN_W);
     sceKernelDcacheWritebackRange(ground_layer, UI_SCREEN_W * UI_SCREEN_H * 2);
+  }
+  return 1;
+}
+
+/* Draw the static parts of a screen into the ground layer once: between
+ * ui_layer_begin() and ui_layer_end() every ui_* drawing goes to the layer.
+ * ui_layer_begin() starts from the plain ground and returns 0 without
+ * pool memory (then draw them every frame instead). */
+static u16 *saved_fb;
+static u32 saved_fb_pitch;
+
+int ui_layer_begin(void)
+{
+  if(!alloc_ground_layer())
+    return 0;
+  build_ground(ground_layer, UI_SCREEN_W);
+  saved_fb = fb;
+  saved_fb_pitch = fb_pitch;
+  fb = ground_layer;
+  fb_pitch = UI_SCREEN_W;
+  return 1;
+}
+
+void ui_layer_end(void)
+{
+  sceKernelDcacheWritebackRange(ground_layer, UI_SCREEN_W * UI_SCREEN_H * 2);
+  fb = saved_fb;
+  fb_pitch = saved_fb_pitch;
+}
+
+int ui_layer_ready(void)
+{
+  return ground_layer != NULL;
+}
+
+/* Back to the plain ground, for the next screen. */
+void ui_layer_reset(void)
+{
+  if(ground_layer == NULL)
+    return;
+  build_ground(ground_layer, UI_SCREEN_W);
+  sceKernelDcacheWritebackRange(ground_layer, UI_SCREEN_W * UI_SCREEN_H * 2);
+}
+
+void ui_ground(void)
+{
+  if(!alloc_ground_layer())
+  {
+    build_ground(fb, fb_pitch);
+    return;
   }
 
   sceGuStart(GU_DIRECT, ge_list);
@@ -94,8 +148,9 @@ void ui_ground(void)
   sceGuSync(0, 0);
 }
 
-/* Screen door: every other pixel in shade, a dim without alpha. */
-void ui_door(int x, int y, int w, int h)
+/* Every other pixel in one colour: the screen door (shade over the game, a
+ * dim without alpha) and the checker of an empty savestate. */
+void ui_checker(int x, int y, int w, int h, u16 color)
 {
   int i, j;
   u16 *row;
@@ -105,7 +160,29 @@ void ui_door(int x, int y, int w, int h)
   row = fb + y * fb_pitch;
   for(j = 0; j < h; j++, row += fb_pitch)
     for(i = x + ((x + y + j) & 1); i < x + w; i += 2)
-      row[i] = UI_COL_SHADE;
+      row[i] = color;
+}
+
+void ui_door(int x, int y, int w, int h)
+{
+  ui_checker(x, y, w, h, UI_COL_SHADE);
+}
+
+/* A picture (sw x sh, pitch sw) scaled to w x h at x, y, nearest pixel. */
+void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
+{
+  int i, j, x0 = x, y0 = y, cw = w, ch = h;
+  u16 *row;
+
+  if((w <= 0) || (h <= 0) || !clip(&x0, &y0, &cw, &ch))
+    return;
+  row = fb + y0 * fb_pitch;
+  for(j = y0; j < y0 + ch; j++, row += fb_pitch)
+  {
+    const u16 *line = src + ((j - y) * sh / h) * sw;
+    for(i = x0; i < x0 + cw; i++)
+      row[i] = line[(i - x) * sw / w];
+  }
 }
 
 void ui_rect(int x, int y, int w, int h, int t, u16 color)
