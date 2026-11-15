@@ -234,5 +234,6 @@ extern u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_nu
 extern u32 save_last_state(u16 *screen_capture);
 extern void load_last_state(void);
 extern void delete_last_state(void);
+extern void delete_state_files(const char *savestate_path);
 
 #endif

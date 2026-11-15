@@ -3945,6 +3945,96 @@ static void write_state_buffer(u16 *screen_capture)
   mem_save_flag = 1;
 }
 
+/*--------------------------------------------------------
+  Savestate pictures (.thm)
+  Every savestate file <game>_N.svs gets a sidecar <game>_N.thm with a
+  64 x 43 copy of its screenshot, so a menu can show all slots without
+  reading eleven 512 KB savestates. Layout (little endian):
+    0  "KTHM"      magic
+    4  u8 1        version
+    5  u8 64, 43   width, height
+    7  u8 0        padding
+    8  u64         the savestate's save time, as stored in the .svs; a
+                   picture whose time differs belongs to an older save
+   16  u16[43][64] pixels, COLOR16 like the screenshot
+--------------------------------------------------------*/
+#define THM_W 64
+#define THM_H 43
+#define THM_HEADER 16
+#define SVS_SHOT_OFFSET (sizeof(g_state_str) + sizeof(g_state_ver))
+#define SVS_TIME_OFFSET (SVS_SHOT_OFFSET + 240 * 160 * 2)
+
+// <name>.svs -> <name>.thm
+static void get_thumbnail_path(const char *savestate_path, char *thumbnail_path)
+{
+  size_t len = strlen(savestate_path);
+
+  strcpy(thumbnail_path, savestate_path);
+  if((len > 4) && (strcasecmp(thumbnail_path + len - 4, ".svs") == 0))
+    strcpy(thumbnail_path + len - 4, ".thm");
+}
+
+// Write the sidecar for the savestate in savestate_write_buffer.
+static void write_state_thumbnail(const char *savestate_path)
+{
+  static u8 thm[THM_HEADER + THM_W * THM_H * 2];
+  const u16 *shot = (const u16 *)(savestate_write_buffer + SVS_SHOT_OFFSET);
+  u16 *out = (u16 *)(thm + THM_HEADER);
+  char thumbnail_path[MAX_PATH];
+  FILE_ID thumbnail_file;
+  u32 x, y, sx, sy;
+
+  memcpy(thm, "KTHM", 4);
+  thm[4] = 1;
+  thm[5] = THM_W;
+  thm[6] = THM_H;
+  thm[7] = 0;
+  memcpy(thm + 8, savestate_write_buffer + SVS_TIME_OFFSET, 8);
+
+  // average each 240x160 -> 64x43 source box (3-4 px each way)
+  for(y = 0; y < THM_H; y++)
+  {
+    u32 y0 = y * 160 / THM_H, y1 = (y + 1) * 160 / THM_H;
+    for(x = 0; x < THM_W; x++)
+    {
+      u32 x0 = x * 240 / THM_W, x1 = (x + 1) * 240 / THM_W;
+      u32 r = 0, g = 0, b = 0, n = (x1 - x0) * (y1 - y0);
+      for(sy = y0; sy < y1; sy++)
+        for(sx = x0; sx < x1; sx++)
+        {
+          u16 c = shot[sy * 240 + sx];
+          r += c & 0x1F;
+          g += (c >> 5) & 0x1F;
+          b += (c >> 10) & 0x1F;
+        }
+      out[y * THM_W + x] = COLOR16((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n);
+    }
+  }
+
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  FILE_OPEN(thumbnail_file, thumbnail_path, WRITE);
+  if(FILE_CHECK_VALID(thumbnail_file))
+  {
+    if(FILE_WRITE(thumbnail_file, thm, sizeof(thm)) != (s32)sizeof(thm))
+    {
+      FILE_CLOSE(thumbnail_file);
+      sceIoRemove(thumbnail_path);  // no half-written picture
+      return;
+    }
+    FILE_CLOSE(thumbnail_file);
+  }
+}
+
+// Delete a savestate file and its picture.
+void delete_state_files(const char *savestate_path)
+{
+  char thumbnail_path[MAX_PATH];
+
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  sceIoRemove(savestate_path);
+  sceIoRemove(thumbnail_path);
+}
+
 u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
 {
   char savestate_path[MAX_PATH];
@@ -3971,8 +4061,10 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
   FILE_OPEN(savestate_file, savestate_path, WRITE);
   if(FILE_CHECK_VALID(savestate_file))
   {
-    FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer));
+    s32 written = FILE_WRITE(savestate_file, savestate_write_buffer, sizeof(savestate_write_buffer));
     FILE_CLOSE(savestate_file);
+    if(written == (s32)sizeof(savestate_write_buffer))
+      write_state_thumbnail(savestate_path);
   }
 
   update_progress();
@@ -4022,6 +4114,8 @@ u32 save_last_state(u16 *screen_capture)
      (s32)sizeof(savestate_write_buffer))
       ret = 1;
     FILE_CLOSE(savestate_file);
+    if(ret)
+      write_state_thumbnail(savestate_path);
   }
   update_progress();
   return ret;
@@ -4063,7 +4157,7 @@ void delete_last_state(void)
 
   mem_save_flag = 0;
   get_last_state_path(savestate_path);
-  sceIoRemove(savestate_path);
+  delete_state_files(savestate_path);
 }
 
 u32 get_sio_mode(u16 io1, u16 io2)
