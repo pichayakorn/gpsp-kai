@@ -153,7 +153,7 @@ static u16 *thumb(int slot)
 
 /* the big picture's read, a slice a frame (load_big_picture) */
 static SceUID shot_fd = -1;
-static int shot_reading = -1, shot_done, shot_failed = -1;
+static int shot_state, shot_reading = -1, shot_failed = -1;
 
 static void read_slot(int slot)
 {
@@ -168,19 +168,33 @@ static void read_slot(int slot)
 }
 
 /* The big picture: the full screenshot of the selected slot. Once the
- * cursor moves, it is read a slice a frame on this thread (a second thread
- * gave nothing on the PSP), so it is sharp by the time the strip stops; the
- * 64 x 43 picture stands in meanwhile. Moving on drops the read. Every
- * other file action closes it first (shot_wait). A savestate without its
- * .thm (from an older kai) is read at once, which makes the .thm. */
+ * cursor moves it is read with the PSP's asynchronous file calls (open,
+ * then the 8-byte head and the picture), polled once a frame, so the frame
+ * never waits for the Memory Stick and the picture is sharp by the time
+ * the strip stops; the 64 x 43 picture stands in meanwhile. A read the
+ * cursor has left is finished and dropped. Every other file action waits
+ * for it first (shot_wait). A savestate without its .thm (from an older
+ * kai) is read at once, which makes the .thm. */
 #define SHOT_BYTES (240 * 160 * 2)
-#define SHOT_SLICE (SHOT_BYTES / 8)
+enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_PIXELS };
 
+static u8 shot_head[8] __attribute__((aligned(64)));
+
+/* Wait for the asynchronous call in flight, then close. */
 static void shot_wait(void)
 {
+  SceInt64 res;
+
+  if(shot_state == SHOT_IDLE)
+    return;
   if(shot_fd >= 0)
-    sceIoClose(shot_fd);
+  {
+    sceIoWaitAsync(shot_fd, &res);
+    if((shot_state != SHOT_OPENING) || (res >= 0))  /* a failed open has nothing to close */
+      sceIoClose(shot_fd);
+  }
   shot_fd = -1;
+  shot_state = SHOT_IDLE;
   shot_reading = -1;
 }
 
@@ -204,51 +218,92 @@ static void load_big_picture_now(void)
   }
 }
 
-/* Once a frame: the next slice of the selected slot's picture. */
+static void shot_fail(int slot)
+{
+  shot_wait();
+  shot_failed = slot;
+}
+
+/* Once a frame: start, advance or finish the read of the selected slot. */
 static void load_big_picture(void)
 {
-  int slot = cur_slot(), n;
+  int slot = cur_slot();
+  SceInt64 res;
 
-  if((shot_fd >= 0) && (shot_reading != slot))
-    shot_wait();  /* the cursor moved on */
+  if(shot_state != SHOT_IDLE)
+  {
+    if(sceIoPollAsync(shot_fd, &res) == 1)
+      return;  /* still busy */
+    if(shot_reading != slot)
+    {
+      /* the cursor moved on: this call is done, so close and start over */
+      if((shot_state != SHOT_OPENING) || (res >= 0))
+        sceIoClose(shot_fd);
+      shot_fd = -1;
+      shot_state = SHOT_IDLE;
+      shot_reading = -1;
+    }
+    else
+    {
+      switch(shot_state)
+      {
+        case SHOT_OPENING:
+          if(res < 0)
+          {
+            shot_fd = -1;
+            shot_state = SHOT_IDLE;
+            shot_failed = slot;
+            return;
+          }
+          shot_state = SHOT_HEAD;
+          sceIoReadAsync(shot_fd, shot_head, 8);
+          return;
+        case SHOT_HEAD:
+          if((res != 8) || memcmp(shot_head, g_state_str, 4))
+          {
+            shot_fail(slot);
+            return;
+          }
+          shot_state = SHOT_PIXELS;
+          p.shot_slot = -1;  /* p.shot is being written */
+          sceIoReadAsync(shot_fd, p.shot, SHOT_BYTES);
+          return;
+        case SHOT_PIXELS:
+          if(res != SHOT_BYTES)
+          {
+            shot_fail(slot);
+            return;
+          }
+          sceIoClose(shot_fd);
+          shot_fd = -1;
+          shot_state = SHOT_IDLE;
+          shot_reading = -1;
+          p.shot_slot = slot;
+          return;
+      }
+    }
+  }
+
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot) || (shot_failed == slot))
     return;
-  if(shot_fd < 0)
+  if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
+  {
+    load_big_picture_now();
+    return;
+  }
   {
     char path[MAX_PATH];
-    u8 head[8];
 
-    if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
-    {
-      load_big_picture_now();
-      return;
-    }
     get_state_slot_path(slot, path);
-    shot_fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
-    if((shot_fd < 0) || (sceIoRead(shot_fd, head, 8) != 8) || memcmp(head, g_state_str, 4))
+    shot_fd = sceIoOpenAsync(path, PSP_O_RDONLY, 0777);
+    if(shot_fd < 0)
     {
-      shot_wait();
+      shot_fd = -1;
       shot_failed = slot;
       return;
     }
+    shot_state = SHOT_OPENING;
     shot_reading = slot;
-    shot_done = 0;
-    p.shot_slot = -1;  /* p.shot is being written */
-  }
-  n = SHOT_BYTES - shot_done;
-  if(n > SHOT_SLICE)
-    n = SHOT_SLICE;
-  if(sceIoRead(shot_fd, (u8 *)p.shot + shot_done, n) != n)
-  {
-    shot_wait();
-    shot_failed = slot;
-    return;
-  }
-  shot_done += n;
-  if(shot_done == SHOT_BYTES)
-  {
-    shot_wait();
-    p.shot_slot = slot;
   }
 }
 
@@ -286,6 +341,30 @@ static void format_time(u64 tick, char *out)
 static void draw_icon20(int x, int y, const u32 (*bits)[20], u16 fill)
 {
   int i, j;
+
+  /* on screen (always, but for the edges of a motion): straight into the
+     frame, without a clipped fill per pixel */
+  if((x >= 0) && (y >= 0) && (x + 21 <= UI_SCREEN_W) && (y + 21 <= UI_SCREEN_H))
+  {
+    u16 *row = ui_fb + y * ui_fb_pitch + x;
+    for(j = 0; j < 20; j++, row += ui_fb_pitch)
+    {
+      u32 any = bits[0][j] | bits[1][j];
+      for(i = 0; i < 20; i++)
+        if(any & (0x80000 >> i))
+          row[ui_fb_pitch + i + 1] = UI_COL_PLUM;
+    }
+    row = ui_fb + y * ui_fb_pitch + x;
+    for(j = 0; j < 20; j++, row += ui_fb_pitch)
+      for(i = 0; i < 20; i++)
+      {
+        if(bits[0][j] & (0x80000 >> i))
+          row[i] = UI_COL_PLUM;
+        else if(bits[1][j] & (0x80000 >> i))
+          row[i] = fill;
+      }
+    return;
+  }
 
   for(j = 0; j < 20; j++)
     for(i = 0; i < 20; i++)
@@ -976,6 +1055,7 @@ u32 ui_pause(u16 *game_picture)
   p.shot_slot = -1;
   p.toast_f = -1;
   shot_fd = -1;
+  shot_state = 0;
   shot_reading = -1;
   shot_failed = -1;
   /* It opens on the slot last saved or loaded in this game (slot 0 at
