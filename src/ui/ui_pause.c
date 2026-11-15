@@ -266,7 +266,8 @@ static void shrink_rows(const u16 *src, int rows, u16 *dst)
  * slot goes first, then any slot still without its picture. Every other
  * file action waits for it first (shot_wait). */
 #define CHUNK_BYTES (240 * CHUNK_ROWS * 2)
-enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_CHUNK, SHOT_TIME };
+enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_CHUNK, SHOT_TIME,
+       SHOT_WOPEN, SHOT_WRITE, SHOT_WCLOSE };  /* then the .thm, if it was made */
 static int shot_chunk;  /* the chunk being read */
 
 static u8 shot_head[8] __attribute__((aligned(64)));
@@ -282,8 +283,12 @@ static void shot_wait(void)
   if(shot_fd >= 0)
   {
     sceIoWaitAsync(shot_fd, &res);
-    if((shot_state != SHOT_OPENING) || (res >= 0))  /* a failed open has nothing to close */
-      sceIoClose(shot_fd);
+    {
+      /* a failed open has nothing to close; a close in flight is done */
+      int opening = (shot_state == SHOT_OPENING) || (shot_state == SHOT_WOPEN);
+      if((shot_state != SHOT_WCLOSE) && !(opening && (res < 0)))
+        sceIoClose(shot_fd);
+    }
   }
   shot_fd = -1;
   shot_state = SHOT_IDLE;
@@ -450,9 +455,53 @@ static void load_big_picture(void)
           shot_state = SHOT_IDLE;
           shot_reading = -1;
           if(res != 8)
+          {
             shot_failed = slot;
-          else
-            shot_done(slot);
+            return;
+          }
+          if(shot_for_big)
+            p.big_slot = slot;
+          if(shot_for_thumb)
+          {
+            /* the new .thm is written asynchronously too: a blocking write
+               cost a frame about 25 ms (PERF run) */
+            char path[MAX_PATH];
+
+            p.thumb_ok[slot] = 1;
+            get_slot_thumbnail_path(slot, path);
+            shot_fd = sceIoOpenAsync(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+            if(shot_fd >= 0)
+            {
+              shot_state = SHOT_WOPEN;
+              shot_reading = slot;
+            }
+            else
+              shot_fd = -1;
+          }
+          return;
+        case SHOT_WOPEN:
+          if(res < 0)
+          {
+            shot_fd = -1;
+            shot_state = SHOT_IDLE;
+            shot_reading = -1;
+            return;
+          }
+          {
+            u32 size;
+            const u8 *data = thumbnail_file_data(thumb(slot), THUMB_PITCH, shot_head, &size);
+            shot_state = SHOT_WRITE;
+            sceIoWriteAsync(shot_fd, data, size);
+          }
+          return;
+        case SHOT_WRITE:
+          shot_state = SHOT_WCLOSE;
+          sceIoCloseAsync(shot_fd);
+          return;
+        case SHOT_WCLOSE:
+          shot_fd = -1;
+          shot_state = SHOT_IDLE;
+          shot_reading = -1;
           return;
       }
     }

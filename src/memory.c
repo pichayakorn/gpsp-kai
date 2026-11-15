@@ -4037,14 +4037,12 @@ static void write_thumbnail_file(const char *savestate_path, const u16 *shot, co
   write_thumbnail_pixels(savestate_path, pixels, THM_W, save_time);
 }
 
-// The .thm of a savestate from its 60x40 picture (pitch in pixels).
-static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels, u32 pitch,
- const u8 *save_time)
+// The bytes of a .thm from its 60x40 picture (pitch in pixels); *size
+// gets their count. The buffer is static: valid until the next call.
+const u8 *thumbnail_file_data(const u16 *pixels, u32 pitch, const u8 *save_time, u32 *size)
 {
   static u8 thm[THM_HEADER + THM_W * THM_H * 2];
   u16 *out = (u16 *)(thm + THM_HEADER);
-  char thumbnail_path[MAX_PATH];
-  FILE_ID thumbnail_file;
   u32 y;
 
   memcpy(thm, "KTHM", 4);
@@ -4055,12 +4053,24 @@ static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels
   memcpy(thm + 8, save_time, 8);
   for(y = 0; y < THM_H; y++)
     memcpy(out + y * THM_W, pixels + y * pitch, THM_W * 2);
+  *size = sizeof(thm);
+  return thm;
+}
+
+// The .thm of a savestate from its 60x40 picture (pitch in pixels).
+static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels, u32 pitch,
+ const u8 *save_time)
+{
+  char thumbnail_path[MAX_PATH];
+  FILE_ID thumbnail_file;
+  u32 size;
+  const u8 *thm = thumbnail_file_data(pixels, pitch, save_time, &size);
 
   get_thumbnail_path(savestate_path, thumbnail_path);
   FILE_OPEN(thumbnail_file, thumbnail_path, WRITE);
   if(FILE_CHECK_VALID(thumbnail_file))
   {
-    if(FILE_WRITE(thumbnail_file, thm, sizeof(thm)) != (s32)sizeof(thm))
+    if(FILE_WRITE(thumbnail_file, thm, size) != (s32)size)
     {
       FILE_CLOSE(thumbnail_file);
       sceIoRemove(thumbnail_path);  // no half-written picture
@@ -4072,6 +4082,14 @@ static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels
 
 // The sidecar for slot's savestate, from its 60x40 picture and save time
 // already made (the 4.0 pause screen remaking an old or missing .thm).
+void get_slot_thumbnail_path(u32 slot, char *thumbnail_path)
+{
+  char savestate_path[MAX_PATH];
+
+  get_state_slot_path(slot, savestate_path);
+  get_thumbnail_path(savestate_path, thumbnail_path);
+}
+
 void write_slot_thumbnail(u32 slot, const u16 *pixels, u32 pitch, const u8 *save_time)
 {
   char savestate_path[MAX_PATH];
