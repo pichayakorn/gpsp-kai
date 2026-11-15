@@ -69,6 +69,8 @@ void ui_ground(void);
 void ui_door(int x, int y, int w, int h);
 void ui_checker(int x, int y, int w, int h, u16 color);
 void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h);
+void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h);
+void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, int w, int h);
 int ui_layer_begin(void);
 void ui_layer_end(void);
 void ui_layer_reset(void);

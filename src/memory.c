@@ -3983,8 +3983,10 @@ static void write_state_buffer(u16 *screen_capture)
                    picture whose time differs belongs to an older save
    16  u16[43][64] pixels, COLOR16 like the screenshot
 --------------------------------------------------------*/
-#define THM_W 64
-#define THM_H 43
+// 60x40: exactly 1/4 of the screenshot. A .thm of another size (64x43
+// before 4.0's pause polish) reads as missing and is made again.
+#define THM_W 60
+#define THM_H 40
 #define THM_HEADER 16
 #define SVS_SHOT_OFFSET (sizeof(g_state_str) + sizeof(g_state_ver))
 #define SVS_TIME_OFFSET (SVS_SHOT_OFFSET + 240 * 160 * 2)
@@ -3999,15 +4001,51 @@ static void get_thumbnail_path(const char *savestate_path, char *thumbnail_path)
     strcpy(thumbnail_path + len - 4, ".thm");
 }
 
+// 60x40 pictures from 240x160 screenshots: each pixel the average of its
+// 4x4 block (exactly 1/4, so every block is the same size). rows is a
+// multiple of 4 screenshot rows; out gets rows / 4 rows at out_pitch.
+void make_thumbnail_rows(const u16 *shot, u32 rows, u16 *out, u32 out_pitch)
+{
+  u32 x, y, sx, sy;
+
+  for(y = 0; y < rows / 4; y++)
+    for(x = 0; x < THM_W; x++)
+    {
+      u32 r = 0, g = 0, b = 0;
+      for(sy = y * 4; sy < y * 4 + 4; sy++)
+        for(sx = x * 4; sx < x * 4 + 4; sx++)
+        {
+          u16 c = shot[sy * 240 + sx];
+          r += c & 0x1F;
+          g += (c >> 5) & 0x1F;
+          b += (c >> 10) & 0x1F;
+        }
+      out[y * out_pitch + x] = COLOR16((r + 8) / 16, (g + 8) / 16, (b + 8) / 16);
+    }
+}
+
+static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels, u32 pitch,
+ const u8 *save_time);
+
 // Write the sidecar for a savestate: shot is its 240x160 screenshot and
 // save_time the 8 bytes of its save time.
 static void write_thumbnail_file(const char *savestate_path, const u16 *shot, const u8 *save_time)
+{
+  static u16 pixels[THM_W * THM_H];
+
+  make_thumbnail_rows(shot, 160, pixels, THM_W);
+  write_thumbnail_pixels(savestate_path, pixels, THM_W, save_time);
+}
+
+// The .thm of a savestate from its 60x40 picture (pitch in pixels).
+static void write_thumbnail_pixels(const char *savestate_path, const u16 *pixels, u32 pitch,
+ const u8 *save_time)
 {
   static u8 thm[THM_HEADER + THM_W * THM_H * 2];
   u16 *out = (u16 *)(thm + THM_HEADER);
   char thumbnail_path[MAX_PATH];
   FILE_ID thumbnail_file;
-  u32 x, y, sx, sy;
+  u32 y;
 
   memcpy(thm, "KTHM", 4);
   thm[4] = 1;
@@ -4015,26 +4053,8 @@ static void write_thumbnail_file(const char *savestate_path, const u16 *shot, co
   thm[6] = THM_H;
   thm[7] = 0;
   memcpy(thm + 8, save_time, 8);
-
-  // average each 240x160 -> 64x43 source box (3-4 px each way)
   for(y = 0; y < THM_H; y++)
-  {
-    u32 y0 = y * 160 / THM_H, y1 = (y + 1) * 160 / THM_H;
-    for(x = 0; x < THM_W; x++)
-    {
-      u32 x0 = x * 240 / THM_W, x1 = (x + 1) * 240 / THM_W;
-      u32 r = 0, g = 0, b = 0, n = (x1 - x0) * (y1 - y0);
-      for(sy = y0; sy < y1; sy++)
-        for(sx = x0; sx < x1; sx++)
-        {
-          u16 c = shot[sy * 240 + sx];
-          r += c & 0x1F;
-          g += (c >> 5) & 0x1F;
-          b += (c >> 10) & 0x1F;
-        }
-      out[y * THM_W + x] = COLOR16((r + n / 2) / n, (g + n / 2) / n, (b + n / 2) / n);
-    }
-  }
+    memcpy(out + y * THM_W, pixels + y * pitch, THM_W * 2);
 
   get_thumbnail_path(savestate_path, thumbnail_path);
   FILE_OPEN(thumbnail_file, thumbnail_path, WRITE);
@@ -4048,6 +4068,16 @@ static void write_thumbnail_file(const char *savestate_path, const u16 *shot, co
     }
     FILE_CLOSE(thumbnail_file);
   }
+}
+
+// The sidecar for slot's savestate, from its 60x40 picture and save time
+// already made (the 4.0 pause screen remaking an old or missing .thm).
+void write_slot_thumbnail(u32 slot, const u16 *pixels, u32 pitch, const u8 *save_time)
+{
+  char savestate_path[MAX_PATH];
+
+  get_state_slot_path(slot, savestate_path);
+  write_thumbnail_pixels(savestate_path, pixels, pitch, save_time);
 }
 
 // The sidecar for the savestate in savestate_write_buffer.

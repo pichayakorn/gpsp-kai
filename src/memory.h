@@ -242,6 +242,8 @@ extern u32 undo_state_files(const char *savestate_path);
 extern u32 state_no_question;
 extern char *state_error_text;
 extern void get_state_slot_path(u32 slot, char *savestate_path);
+extern void make_thumbnail_rows(const u16 *shot, u32 rows, u16 *out, u32 out_pitch);
+extern void write_slot_thumbnail(u32 slot, const u16 *pixels, u32 pitch, const u8 *save_time);
 extern u32 read_state_time(u32 slot, u64 *time);
 extern u32 read_state_thumbnail(u32 slot, u64 time, u16 *pixels);
 extern u32 read_state_shot(u32 slot, u16 *pixels, u32 make_thumbnail);

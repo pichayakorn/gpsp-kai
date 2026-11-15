@@ -16,8 +16,10 @@
 #define LAST_SLOT MEM_STATE_NUM
 #define BIG_W     144
 #define BIG_H     96
-#define SMALL_W   64
-#define SMALL_H   43
+#define SMALL_W   60          /* exactly 1/4 of the screenshot (the .thm) */
+#define SMALL_H   40
+#define THUMB_PITCH 64        /* a multiple of 8, for the GE */
+#define HALF_ROWS 80          /* the screenshot is read in two halves */
 #define STRIP_CX  240
 #define TILE_W    60
 #define TILE_H    62
@@ -108,9 +110,10 @@ static struct
   u64 time[SLOTS];
   u32 thumb_ok[SLOTS];
   u32 thumb_tried[SLOTS];
-  u16 *thumbs;               /* SLOTS x 64x43, in the UI pool */
-  u16 *shot;                 /* 240x160 of the selected slot, in the UI pool */
-  int shot_slot;
+  u16 *thumbs;               /* SLOTS x 60x40 at THUMB_PITCH, in the UI pool */
+  u16 *big;                  /* the selected slot box-filtered to 144x96 */
+  int big_slot;              /* the slot p.big shows, -1: none */
+  u16 *half;                 /* 240 x HALF_ROWS of a screenshot being read */
   int cur, pos, pos_from, pos_f;
   int row, tile, tile_from, tile_f;
   int open_f, close_f, closing;
@@ -128,6 +131,7 @@ static struct
   int bar_phase, bar_phases; /* a load after a save fills one bar */
   char game_toast[64];       /* said over the game after a load */
   int changed;               /* the machine state changed (load, restart) */
+  int layer_full;            /* the header and tiles at rest are in the ground */
 } p;
 
 /* ---- slots ------------------------------------------------------------- */
@@ -148,7 +152,16 @@ static int strip_position(int slot)
 
 static u16 *thumb(int slot)
 {
-  return p.thumbs + slot * SMALL_W * SMALL_H;
+  return p.thumbs + slot * THUMB_PITCH * SMALL_H;
+}
+
+/* A .thm is read packed (pitch 60); the strip keeps it at THUMB_PITCH. */
+static void thumb_spread(u16 *t)
+{
+  int y;
+
+  for(y = SMALL_H - 1; y > 0; y--)
+    memmove(t + y * THUMB_PITCH, t + y * SMALL_W, SMALL_W * 2);
 }
 
 /* the big picture's read, a slice a frame (load_big_picture) */
@@ -160,25 +173,97 @@ static void read_slot(int slot)
   p.has[slot] = read_state_time(slot, &p.time[slot]);
   p.thumb_ok[slot] = p.has[slot] && p.thumbs &&
    read_state_thumbnail(slot, p.time[slot], thumb(slot));
+  if(p.thumb_ok[slot])
+    thumb_spread(thumb(slot));
   p.thumb_tried[slot] = 0;
-  if(p.shot_slot == slot)
-    p.shot_slot = -1;
+  if(p.big_slot == slot)
+    p.big_slot = -1;
   if(shot_failed == slot)
     shot_failed = -1;  /* the file changed: try again */
 }
 
-/* The big picture: the full screenshot of the selected slot. Once the
- * cursor moves it is read with the PSP's asynchronous file calls (open,
- * then the 8-byte head and the picture), polled once a frame, so the frame
- * never waits for the Memory Stick and the picture is sharp by the time
- * the strip stops; the 64 x 43 picture stands in meanwhile. A read the
- * cursor has left is finished and dropped. Every other file action waits
- * for it first (shot_wait). A savestate without its .thm (from an older
- * kai) is read at once, which makes the .thm. */
-#define SHOT_BYTES (240 * 160 * 2)
-enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_PIXELS };
+/* The big picture is the selected slot's screenshot box-filtered once to
+ * 144 x 96 (5:3, every output pixel the area-weighted average of the
+ * pixels it covers) and then drawn 1:1, never nearest-sampled. Until it
+ * is there, the slot's 60 x 40 picture stands in, stretched by the GE with
+ * bilinear filtering. */
+static u8 box_i[144][3], box_w[144][3];  /* source index and weight in thirds */
+
+static void box_tables(void)
+{
+  int x, k;
+
+  for(x = 0; x < 144; x++)
+  {
+    int s0 = x * 5, s1 = s0 + 5;
+    for(k = 0; k < 3; k++)
+    {
+      int i = s0 / 3 + k, a = i * 3, b = a + 3;
+      if(a < s0) a = s0;
+      if(b > s1) b = s1;
+      box_i[x][k] = (i < 240) ? i : 239;
+      box_w[x][k] = (b > a) ? b - a : 0;
+    }
+  }
+}
+
+/* HALF_ROWS screenshot rows (240 wide) to the 48 matching rows of p.big. */
+static void shrink_half(const u16 *src, u16 *dst)
+{
+  static u16 sum[3][3][144];  /* the three source rows, 5x horizontal sums */
+  int y, x, k, c;
+
+  for(y = 0; y < HALF_ROWS * 3 / 5; y++)
+  {
+    for(k = 0; k < 3; k++)
+    {
+      const u16 *row = src + box_i[y][k] * 240;
+      if(!box_w[y][k])
+        continue;
+      for(x = 0; x < 144; x++)
+      {
+        u32 r = 0, g = 0, b = 0;
+        for(c = 0; c < 3; c++)
+        {
+          u16 px = row[box_i[x][c]];
+          u32 w = box_w[x][c];
+          r += (px & 0x1F) * w;
+          g += ((px >> 5) & 0x1F) * w;
+          b += ((px >> 10) & 0x1F) * w;
+        }
+        sum[k][0][x] = r;
+        sum[k][1][x] = g;
+        sum[k][2][x] = b;
+      }
+    }
+    for(x = 0; x < 144; x++)
+    {
+      u32 ch[3];
+      for(c = 0; c < 3; c++)
+      {
+        u32 t = 0;
+        for(k = 0; k < 3; k++)
+          if(box_w[y][k])
+            t += sum[k][c][x] * box_w[y][k];
+        ch[c] = (t + 12) / 25;
+      }
+      dst[y * 144 + x] = COLOR16(ch[0], ch[1], ch[2]);
+    }
+  }
+}
+
+/* Reading savestate pictures: the screenshot in two halves of HALF_ROWS
+ * rows, each box-filtered into p.big (when it is the selected slot) and
+ * made into the 60 x 40 picture (when the slot has no right .thm, which is
+ * then written). It runs with the PSP's asynchronous file calls, polled
+ * once a frame, so a frame never waits for the Memory Stick; the selected
+ * slot goes first, then any slot still without its picture. Every other
+ * file action waits for it first (shot_wait). */
+#define HALF_BYTES (240 * HALF_ROWS * 2)
+enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_HALF0, SHOT_HALF1, SHOT_TIME };
 
 static u8 shot_head[8] __attribute__((aligned(64)));
+static int shot_for_big, shot_for_thumb;
 
 /* Wait for the asynchronous call in flight, then close. */
 static void shot_wait(void)
@@ -198,45 +283,112 @@ static void shot_wait(void)
   shot_reading = -1;
 }
 
-/* The whole picture now (opening, and savestates without a .thm). */
+/* One half has arrived in p.half. */
+static void shot_take_half(int slot, int half)
+{
+  if(shot_for_big)
+    shrink_half(p.half, p.big + half * (HALF_ROWS * 3 / 5) * 144);
+  if(shot_for_thumb)
+    make_thumbnail_rows(p.half, HALF_ROWS, thumb(slot) + half * (HALF_ROWS / 4) * THUMB_PITCH,
+     THUMB_PITCH);
+}
+
+/* The whole picture has arrived (shot_head holds its save time). */
+static void shot_done(int slot)
+{
+  if(shot_for_big)
+    p.big_slot = slot;
+  if(shot_for_thumb)
+  {
+    write_slot_thumbnail(slot, thumb(slot), THUMB_PITCH, shot_head);
+    p.thumb_ok[slot] = 1;
+  }
+}
+
+static int shot_setup(int slot)
+{
+  shot_for_big = (slot == cur_slot()) && (p.big_slot != slot);
+  shot_for_thumb = (p.thumbs != NULL) && !p.thumb_ok[slot];
+  if(shot_for_thumb)
+    p.thumb_tried[slot] = 1;
+  if(shot_for_big)
+    p.big_slot = -1;  /* p.big is being written */
+  return shot_for_big || shot_for_thumb;
+}
+
+/* The selected slot now, before the first frame (the game is still on the
+ * LCD): the same steps without waiting a frame between them. */
 static void load_big_picture_now(void)
 {
-  int slot = cur_slot(), make_thm = !p.thumb_ok[slot] && !p.thumb_tried[slot];
+  int slot = cur_slot(), ok = 0, half;
+  char path[MAX_PATH];
+  SceUID fd;
 
   shot_wait();
-  if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot))
+  if(!p.big || !p.half || !p.has[slot] || (p.big_slot == slot) || !shot_setup(slot))
     return;
-  p.shot_slot = -1;
-  if(read_state_shot(slot, p.shot, make_thm))
-    p.shot_slot = slot;
+  get_state_slot_path(slot, path);
+  fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+  if(fd < 0)
+  {
+    shot_failed = slot;
+    return;
+  }
+  if((sceIoRead(fd, shot_head, 8) == 8) && !memcmp(shot_head, g_state_str, 4))
+  {
+    for(half = 0; half < 2; half++)
+    {
+      if(sceIoRead(fd, p.half, HALF_BYTES) != HALF_BYTES)
+        break;
+      shot_take_half(slot, half);
+    }
+    ok = (half == 2) && (sceIoRead(fd, shot_head, 8) == 8);
+  }
+  sceIoClose(fd);
+  if(ok)
+    shot_done(slot);
   else
     shot_failed = slot;
-  if(make_thm)
-  {
-    p.thumb_tried[slot] = 1;
-    p.thumb_ok[slot] = p.thumbs && read_state_thumbnail(slot, p.time[slot], thumb(slot));
-  }
 }
 
 static void shot_fail(int slot)
 {
   shot_wait();
   shot_failed = slot;
+  if(shot_for_thumb)
+    p.thumb_ok[slot] = 0;
 }
 
-/* Once a frame: start, advance or finish the read of the selected slot. */
+/* The next slot to read: the selected one for its big picture, else any
+ * slot still without its 60 x 40 picture. -1: nothing to do. */
+static int shot_next(void)
+{
+  int slot = cur_slot(), i;
+
+  if(p.has[slot] && (p.big_slot != slot) && (shot_failed != slot))
+    return slot;
+  for(i = 0; i < SLOTS; i++)
+    if(p.has[i] && !p.thumb_ok[i] && !p.thumb_tried[i] && (shot_failed != i))
+      return i;
+  return -1;
+}
+
+/* Once a frame: start, advance or finish a read. */
 static void load_big_picture(void)
 {
-  int slot = cur_slot();
   SceInt64 res;
+  int slot;
 
+  if(!p.big || !p.half)
+    return;
   if(shot_state != SHOT_IDLE)
   {
+    slot = shot_reading;
     if(sceIoPollAsync(shot_fd, &res) == 1)
       return;  /* still busy */
-    if(shot_reading != slot)
+    /* the cursor left a slot read only for its big picture: drop it */
+    if(shot_for_big && !shot_for_thumb && (slot != cur_slot()))
     {
-      /* the cursor moved on: this call is done, so close and start over */
       if((shot_state != SHOT_OPENING) || (res >= 0))
         sceIoClose(shot_fd);
       shot_fd = -1;
@@ -245,6 +397,8 @@ static void load_big_picture(void)
     }
     else
     {
+      if(shot_for_big && (slot != cur_slot()))
+        shot_for_big = 0;  /* still worth finishing for its 60 x 40 picture */
       switch(shot_state)
       {
         case SHOT_OPENING:
@@ -264,33 +418,45 @@ static void load_big_picture(void)
             shot_fail(slot);
             return;
           }
-          shot_state = SHOT_PIXELS;
-          p.shot_slot = -1;  /* p.shot is being written */
-          sceIoReadAsync(shot_fd, p.shot, SHOT_BYTES);
+          shot_state = SHOT_HALF0;
+          sceIoReadAsync(shot_fd, p.half, HALF_BYTES);
           return;
-        case SHOT_PIXELS:
-          if(res != SHOT_BYTES)
+        case SHOT_HALF0:
+        case SHOT_HALF1:
+          if(res != HALF_BYTES)
           {
             shot_fail(slot);
             return;
           }
+          shot_take_half(slot, shot_state - SHOT_HALF0);
+          if(shot_state == SHOT_HALF0)
+          {
+            shot_state = SHOT_HALF1;
+            sceIoReadAsync(shot_fd, p.half, HALF_BYTES);
+          }
+          else
+          {
+            shot_state = SHOT_TIME;
+            sceIoReadAsync(shot_fd, shot_head, 8);
+          }
+          return;
+        case SHOT_TIME:
           sceIoClose(shot_fd);
           shot_fd = -1;
           shot_state = SHOT_IDLE;
           shot_reading = -1;
-          p.shot_slot = slot;
+          if(res != 8)
+            shot_failed = slot;
+          else
+            shot_done(slot);
           return;
       }
     }
   }
 
-  if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot) || (shot_failed == slot))
+  slot = shot_next();
+  if((slot < 0) || !shot_setup(slot))
     return;
-  if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
-  {
-    load_big_picture_now();
-    return;
-  }
   {
     char path[MAX_PATH];
 
@@ -390,18 +556,33 @@ static void draw_icon1x(int x, int y, const u16 *bits, u16 color)
         ui_fill(x + i, y + j, 1, 1, color);
 }
 
-/* The static ground: the game picture as it was on the LCD, screen-doored. */
-static void build_layer(void)
-{
-  int x, y, w, h;
+static void draw_header(int hy);
+static void draw_tile(int i, int ty, int selected);
 
+/* The static ground: the game picture as it was on the LCD, screen-doored.
+ * Once the screen has opened (full), the header and the tiles at rest go
+ * in too, so a frame draws only what moves (spec section 6: repeated
+ * actions move little); opening and closing move them, so then they are
+ * drawn every frame. */
+static void build_layer(int full)
+{
+  int x, y, w, h, i;
+
+  p.layer_full = 0;
   if(!ui_layer_begin())
     return;
   ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
   get_game_rect(&x, &y, &w, &h);
   ui_blit_scaled(p.game, 240, 160, x, y, w, h);
   ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
+  if(full)
+  {
+    draw_header(6);
+    for(i = 0; i < TILE_COUNT; i++)
+      draw_tile(i, TILE_Y, 0);
+  }
   ui_layer_end();
+  p.layer_full = full;
 }
 
 static void draw_header(int hy)
@@ -531,16 +712,18 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   {
     int off = (ad >= 256) ? 116 + (ad - 256) * 76 / 256 : ad * 116 / 256;
     x = STRIP_CX + ((dd > 0) ? off : -off) - w / 2;
-    y = 72 + dy;
+    y = 74 + dy;  /* centred on the big picture (46-142) */
     ui_round_fill(x - 2, y - 2, w + 4, h + 4, 2, UI_COL_CARD);
   }
 
   if(p.has[slot])
   {
-    if(big && (p.shot_slot == slot))
-      ui_blit_scaled(p.shot, 240, 160, x, y, w, h);
+    if(big && (p.big_slot == slot))
+      ui_blit(p.big, BIG_W, x, y, BIG_W, BIG_H);  /* box-filtered once */
+    else if(big && p.thumb_ok[slot])
+      ui_stretch_smooth(thumb(slot), SMALL_W, SMALL_H, THUMB_PITCH, x, y, w, h);
     else if(p.thumb_ok[slot])
-      ui_blit_scaled(thumb(slot), SMALL_W, SMALL_H, x, y, w, h);
+      ui_blit(thumb(slot), THUMB_PITCH, x, y, SMALL_W, SMALL_H);
     else
     {
       ui_fill(x, y, w, h, UI_COL_PLUM);
@@ -761,7 +944,8 @@ static void draw_screen(int bar_fill)
   }
 
   motion(&hy, &dy, tile_dy, &done);
-  draw_header(hy);
+  if(!p.layer_full)
+    draw_header(hy);
   if(done && !p.closing)
     draw_status();
   PERF_SECTION(1);
@@ -795,8 +979,12 @@ static void draw_screen(int bar_fill)
   PERF_SECTION(3);
 
   for(i = 0; i < TILE_COUNT; i++)
-    if(tile_dy[i] < 999)
-      draw_tile(i, TILE_Y + tile_dy[i], (p.row == 1) && (i == p.tile) && done);
+  {
+    int sel = (p.row == 1) && (i == p.tile) && done;
+    /* at rest the tiles are in the ground; only the selected one is drawn */
+    if((tile_dy[i] < 999) && (!p.layer_full || sel))
+      draw_tile(i, TILE_Y + tile_dy[i], sel);
+  }
   if((p.row == 1) && done && !p.closing && !p.bar_text)
   {
     int tx = (p.tile_f < UI_F_CURSOR) ?
@@ -890,7 +1078,7 @@ static void show_toast(const char *text, u16 edge, int undo, int undo_slot)
 static void take_loaded_picture(void)
 {
   memcpy(p.game, savestate_write_buffer + 8, 240 * 160 * 2);
-  build_layer();
+  build_layer(0);
 }
 
 static void action_save(int slot)
@@ -898,7 +1086,7 @@ static void action_save(int slot)
   char name[MAX_FILE], text[48];
   int had = p.has[slot];
 
-  shot_wait();  /* the screenshot reader shares p.shot and the Memory Stick */
+  shot_wait();  /* the picture reader shares p.big and the Memory Stick */
   get_savestate_filename_noshot(slot, name);
   slot_name(slot, text);
   run_with_bar("Saving\xE2\x80\xA6", NULL);
@@ -909,10 +1097,11 @@ static void action_save(int slot)
   {
     char msg_text[64];
     /* the big picture is the screenshot just saved: no need to read it */
-    if(p.shot)
+    if(p.big)
     {
-      memcpy(p.shot, p.game, 240 * 160 * 2);
-      p.shot_slot = slot;
+      shrink_half(p.game, p.big);
+      shrink_half(p.game + 240 * HALF_ROWS, p.big + (HALF_ROWS * 3 / 5) * 144);
+      p.big_slot = slot;
     }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
     show_toast(msg_text, UI_COL_SKY, had ? UNDO_SAVE : UNDO_SAVE_NEW, slot);
@@ -1192,7 +1381,7 @@ u32 ui_pause(u16 *game_picture)
 
   memset(&p, 0, sizeof(p));
   p.game = game_picture;
-  p.shot_slot = -1;
+  p.big_slot = -1;
   p.toast_f = -1;
   shot_fd = -1;
   shot_state = 0;
@@ -1209,15 +1398,18 @@ u32 ui_pause(u16 *game_picture)
   video_resolution_keep(FRAME_MENU);  /* the game stays on the LCD meanwhile */
 
   mark = ui_pool_mark();
-  p.thumbs = ui_pool_alloc(SLOTS * SMALL_W * SMALL_H * 2);
-  p.shot = ui_pool_alloc(240 * 160 * 2);
+  p.thumbs = ui_pool_alloc(SLOTS * THUMB_PITCH * SMALL_H * 2);
+  p.big = ui_pool_alloc(BIG_W * BIG_H * 2);
+  p.half = ui_pool_alloc(240 * HALF_ROWS * 2);
+  if(!box_i[143][0])
+    box_tables();
   for(i = 0; i < SLOTS; i++)
     read_slot(i);
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
   load_big_picture_now();
   read_status();  /* while the game is still on the LCD */
-  build_layer();
+  build_layer(0);
   ui_input_init();
 #ifdef UI_PERF
   /* the script runs on the first pause only; later pauses take the pad,
@@ -1235,13 +1427,18 @@ u32 ui_pause(u16 *game_picture)
 
     if(p.closing)
     {
+      if(p.layer_full)
+        build_layer(0);  /* the header and tiles fall away: drawn again */
       if(++p.close_f > F_CLOSE)
         leave = LEAVE_RESUME;
     }
     else if(!opened)
     {
       if(++p.open_f >= F_OPEN)
+      {
         opened = 1;
+        build_layer(1);
+      }
     }
 
     if(opened && !p.closing)
