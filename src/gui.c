@@ -2106,6 +2106,62 @@ void note_game_left(void)
 }
 
 /*--------------------------------------------------------
+  Low battery
+  Once a second while a game runs: on battery at BATTERY_SAVE_PERCENT or
+  less, save the game into slot 10 once and say so. Charging or a level
+  above it arms the save again.
+--------------------------------------------------------*/
+#define BATTERY_SAVE_PERCENT 4
+
+void check_battery_save(void)
+{
+  static u32 frame = 0;
+  static u32 armed = 1;
+  int percent;
+  u16 *screen;
+  u32 saved;
+
+  if(++frame < 60)
+    return;
+  frame = 0;
+
+  if((gamepak_filename[0] == 0) || (scePowerIsBatteryExist() <= 0))
+    return;
+  percent = scePowerGetBatteryLifePercent();
+  if(percent < 0)
+    return;
+  if((scePowerIsBatteryCharging() > 0) || (percent > BATTERY_SAVE_PERCENT))
+  {
+    armed = 1;
+    return;
+  }
+  if(!armed)
+    return;
+  armed = 0;
+
+  screen = copy_screen();  // the savestate's picture, before the menu mode
+  if(screen == NULL)
+    return;
+
+  video_resolution(FRAME_MENU);
+  clear_screen(COLOR_BG);
+  saved = save_last_state(screen);
+  free(screen);
+  message_dialog(msg[saved ? MSG_BATTERY_LOW_SAVED : MSG_BATTERY_LOW_NOT_SAVED],
+   msg[MSG_BATTERY_LOW_CONTINUE]);
+  button_up_wait();  // the button that closed the message stays out of the game
+
+  clear_screen(0);
+  flip_screen();
+  clear_screen(0);
+  flip_screen();
+  video_resolution(FRAME_GAME);
+  real_frame_count = 0;
+  virtual_frame_count = 0;
+  pause_sound(0);
+}
+
+/*--------------------------------------------------------
   Save the per-game config file
 --------------------------------------------------------*/
 s32 save_game_config_file()

@@ -77,6 +77,7 @@ extern void update_progress(void);
 extern void show_progress(char *text);
 extern void scrollbar(u32 sx, u32 sy, u32 ex, u32 ey, u32 all,u32 view,u32 now);
 extern u32 yesno_dialog(char *text);
+extern void message_dialog(char *text, char *text2);
 extern void msg_screen_init(const char *title);
 extern void msg_screen_draw();
 extern void msg_printf(const char *text, ...);

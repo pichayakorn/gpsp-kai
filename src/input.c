@@ -276,6 +276,8 @@ u32 update_input()
 
   sceCtrlPeekBufferPositive(&ctrl_data, 1);
 
+  check_battery_save();
+
   {
     u32 speed = g_game_config.rapidfire_speed;
     u32 period = rapidfire_period[speed < 3 ? speed : RAPIDFIRE_FAST];
