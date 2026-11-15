@@ -95,6 +95,12 @@ static void draw_icon(int x, int y, const u16 *bits, u16 color)
         ui_fill(x + i, y + j, 1, 1, color);
 }
 
+/* The cartridge mark on its own (the per-game legend). */
+void ui_per_game_mark(int x, int y, u16 color)
+{
+  draw_icon(x, y, icon_rom, color);
+}
+
 /* Card row: a 20 px card with the label; selected rows take the group
  * colour and lift. Returns where the value goes: its right edge in *vx and
  * the row's top (lifted) in *vy. */
@@ -421,6 +427,99 @@ void ui_game_battery(int level, int on_battery)
   osd_chip_rect[3] = 16;
   osd_chip_rect[2] = w;  /* last: the chip shows from here */
 }
+
+static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
+
+/* The status chip, top right and as wide as its content: the clock (the
+ * PSP's 12/24-hour setting), then the battery: lime, tangerine at 20 % or
+ * less, pink with the % at 10 % or less, sky with a bolt while charging. */
+static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
+
+/* The battery and clock are read once a second, not every frame: each
+   scePower call asks the power chip and costs milliseconds (measured: the
+   header and chip took 10.5 ms of a 16 ms frame). */
+static int status_age;
+
+static ScePspDateTime status_now;
+static int status_level, status_format, status_battery, status_charging;
+
+/* Everything at once: when the screen opens, before its first frame. */
+void ui_status_read(void)
+{
+  status_level = scePowerGetBatteryLifePercent();
+  status_battery = scePowerIsBatteryExist() > 0;
+  status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  sceRtcGetCurrentClockLocalTime(&status_now);
+  status_format = 0;
+  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
+  status_age = 60;
+}
+
+void ui_status_chip(void)
+{
+  int shown_level;
+  char clock[16], pct[8];
+  int w, x, tx, i, j, critical = 0;
+  u16 color = UI_COL_LIME;
+
+  /* one call a frame, spread over the second, so no frame takes them all
+     (a frame with every call still missed its vblank) */
+  if(status_age <= 0)
+  {
+    /* the 12/24-hour setting is read in ui_status_read() only: reading the
+       system settings cost a frame 10-20 ms (PERF run) */
+    status_age = 60;
+    sceRtcGetCurrentClockLocalTime(&status_now);
+  }
+  else if(status_age == 45)
+    status_level = scePowerGetBatteryLifePercent();
+  else if(status_age == 30)
+    status_battery = scePowerIsBatteryExist() > 0;
+  else if(status_age == 15)
+    status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  status_age--;
+  shown_level = (status_level < 0) ? 0 : ((status_level > 100) ? 100 : status_level);
+  if(status_format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
+    sprintf(clock, "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? "AM" : "PM");
+  else
+    sprintf(clock, "%02d:%02d", status_now.hour, status_now.minute);
+  if(status_charging)
+    color = UI_COL_SKY;
+  else if(shown_level <= 10)
+  {
+    color = UI_COL_PINK;
+    critical = status_battery;
+  }
+  else if(shown_level <= 20)
+    color = UI_COL_TANGERINE;
+  sprintf(pct, "%d%%", shown_level);
+
+  w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
+   (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
+  x = 460 - w;
+  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
+  ui_text(x + 6, 9, clock, UI_COL_CREAM);
+  if(!status_battery)
+    return;
+  tx = x + 6 + ui_text_width(clock) + 4;
+  if(critical)
+  {
+    ui_text(tx, 9, pct, UI_COL_PINK);
+    tx += ui_text_width(pct) + 4;
+  }
+  if(status_charging)
+  {
+    for(j = 0; j < 7; j++)
+      for(i = 0; i < 5; i++)
+        if(bolt[j] & (0x10 >> i))
+          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
+    tx += 7;
+  }
+  /* the bitmap's first column is empty: one to the left */
+  draw_icon(tx - 1, 11, icon_battery, color);
+  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
+}
+
 
 /* Is the toast still up (Undo works while it is)? */
 int ui_toast_up(int f)

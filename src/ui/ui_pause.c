@@ -80,7 +80,6 @@ static const u32 icon20_exit[2][20] =
   { 0x00000, 0x00000, 0x00600, 0x00600, 0x00600, 0x00600, 0x0C630, 0x08610, 0x18618, 0x10608,
     0x10008, 0x10008, 0x10008, 0x18018, 0x0C030, 0x0E070, 0x079E0, 0x01F80, 0x00000, 0x00000 }
 };
-static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
 
 enum { TILE_RESUME, TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY,
        TILE_EXIT, TILE_COUNT };
@@ -599,16 +598,6 @@ static void draw_icon20(int x, int y, const u32 (*bits)[20], u16 fill)
     }
 }
 
-static void draw_icon1x(int x, int y, const u16 *bits, u16 color)
-{
-  int i, j;
-
-  for(j = 0; j < 11; j++)
-    for(i = 0; i < 11; i++)
-      if(bits[j] & (0x400 >> i))
-        ui_fill(x + i, y + j, 1, 1, color);
-}
-
 static void draw_header(int hy);
 static void draw_tile(int i, int ty, int selected);
 
@@ -656,95 +645,6 @@ static void draw_header(int hy)
   ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
 }
 
-/* The status chip, top right and as wide as its content: the clock (the
- * PSP's 12/24-hour setting), then the battery: lime, tangerine at 20 % or
- * less, pink with the % at 10 % or less, sky with a bolt while charging. */
-static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
-
-/* The battery and clock are read once a second, not every frame: each
-   scePower call asks the power chip and costs milliseconds (measured: the
-   header and chip took 10.5 ms of a 16 ms frame). */
-static int status_age;
-
-static ScePspDateTime status_now;
-static int status_level, status_format, status_battery, status_charging;
-
-/* Everything at once: when the screen opens, before its first frame. */
-static void read_status(void)
-{
-  status_level = scePowerGetBatteryLifePercent();
-  status_battery = scePowerIsBatteryExist() > 0;
-  status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
-  sceRtcGetCurrentClockLocalTime(&status_now);
-  status_format = 0;
-  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
-  status_age = 60;
-}
-
-static void draw_status(void)
-{
-  int shown_level;
-  char clock[16], pct[8];
-  int w, x, tx, i, j, critical = 0;
-  u16 color = UI_COL_LIME;
-
-  /* one call a frame, spread over the second, so no frame takes them all
-     (a frame with every call still missed its vblank) */
-  if(status_age <= 0)
-  {
-    /* the 12/24-hour setting is read in read_status() only: reading the
-       system settings cost a frame 10-20 ms (PERF run) */
-    status_age = 60;
-    sceRtcGetCurrentClockLocalTime(&status_now);
-  }
-  else if(status_age == 45)
-    status_level = scePowerGetBatteryLifePercent();
-  else if(status_age == 30)
-    status_battery = scePowerIsBatteryExist() > 0;
-  else if(status_age == 15)
-    status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
-  status_age--;
-  shown_level = (status_level < 0) ? 0 : ((status_level > 100) ? 100 : status_level);
-  if(status_format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
-    sprintf(clock, "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? "AM" : "PM");
-  else
-    sprintf(clock, "%02d:%02d", status_now.hour, status_now.minute);
-  if(status_charging)
-    color = UI_COL_SKY;
-  else if(shown_level <= 10)
-  {
-    color = UI_COL_PINK;
-    critical = status_battery;
-  }
-  else if(shown_level <= 20)
-    color = UI_COL_TANGERINE;
-  sprintf(pct, "%d%%", shown_level);
-
-  w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
-   (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
-  x = 460 - w;
-  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
-  ui_text(x + 6, 9, clock, UI_COL_CREAM);
-  if(!status_battery)
-    return;
-  tx = x + 6 + ui_text_width(clock) + 4;
-  if(critical)
-  {
-    ui_text(tx, 9, pct, UI_COL_PINK);
-    tx += ui_text_width(pct) + 4;
-  }
-  if(status_charging)
-  {
-    for(j = 0; j < 7; j++)
-      for(i = 0; i < 5; i++)
-        if(bolt[j] & (0x10 >> i))
-          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
-    tx += 7;
-  }
-  /* the bitmap's first column is empty: one to the left */
-  draw_icon1x(tx - 1, 11, icon_battery, color);
-  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
-}
 
 static void draw_slot(int slot, int dd, int dy, int selected)
 {
@@ -1003,7 +903,7 @@ static void draw_screen(int bar_fill)
   if(!p.layer_full)
     draw_header(hy);
   if(done && !p.closing)
-    draw_status();
+    ui_status_chip();
   PERF_SECTION(1);
 
   /* the strip: the selected slot big, its neighbours small */
@@ -1482,7 +1382,7 @@ u32 ui_pause(u16 *game_picture)
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
   load_big_picture_now();
-  read_status();  /* while the game is still on the LCD */
+  ui_status_read();  /* while the game is still on the LCD */
   build_layer(0);
   ui_input_init();
 #ifdef UI_PERF
@@ -1627,6 +1527,14 @@ u32 ui_pause(u16 *game_picture)
               p.closing = 1;
               break;
             case TILE_SETTINGS:
+              /* Settings draws its own ground; the pause screen's comes
+                 back after it */
+              shot_wait();
+              ui_settings();
+              build_layer(1);
+              ui_status_read();
+              ui_input_init();
+              break;
             case TILE_CHEATS:
             case TILE_LIBRARY:
               leave = LEAVE_OLD_MENU;
