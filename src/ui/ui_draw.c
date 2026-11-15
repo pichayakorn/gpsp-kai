@@ -273,6 +273,10 @@ int ui_glyph_width(u32 key)
   return key_symbol(key) ? UI_DISC : ui_text_width(key_label(key)) + 8;
 }
 
+/* Key colours: a cream key with plum marks; ui_glyph_inverted() swaps
+ * them (a plum pill on a cream toast). */
+static u16 glyph_bg = UI_COL_CREAM, glyph_fg = UI_COL_PLUM;
+
 int ui_glyph(int x, int y, u32 key)
 {
   const u8 *symbol = key_symbol(key);
@@ -285,21 +289,33 @@ int ui_glyph(int x, int y, u32 key)
       {
         int dx = i * 2 - (UI_DISC - 1), dy = j * 2 - (UI_DISC - 1);
         if(dx * dx + dy * dy <= UI_DISC * UI_DISC)
-          ui_fill(x + i, y + j, 1, 1, UI_COL_CREAM);
+          ui_fill(x + i, y + j, 1, 1, glyph_bg);
       }
     for(j = 0; j < 7; j++)
       for(i = 0; i < 7; i++)
         if(symbol[j] & (0x40 >> i))
-          ui_fill(x + 3 + i, y + 3 + j, 1, 1, UI_COL_PLUM);
+          ui_fill(x + 3 + i, y + 3 + j, 1, 1, glyph_fg);
   }
   else
   {
-    ui_fill(x + 1, y, w - 2, UI_DISC, UI_COL_CREAM);
-    ui_fill(x, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
-    ui_fill(x + w - 1, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
-    ui_text(x + 4, small_text_top(y, UI_DISC), key_label(key), UI_COL_PLUM);
+    ui_fill(x + 1, y, w - 2, UI_DISC, glyph_bg);
+    ui_fill(x, y + 1, 1, UI_DISC - 2, glyph_bg);
+    ui_fill(x + w - 1, y + 1, 1, UI_DISC - 2, glyph_bg);
+    ui_text(x + 4, small_text_top(y, UI_DISC), key_label(key), glyph_fg);
   }
   return x + w;
+}
+
+int ui_glyph_inverted(int x, int y, u32 key)
+{
+  int r;
+
+  glyph_bg = UI_COL_PLUM;
+  glyph_fg = UI_COL_CREAM;
+  r = ui_glyph(x, y, key);
+  glyph_bg = UI_COL_CREAM;
+  glyph_fg = UI_COL_PLUM;
+  return r;
 }
 
 /* Hint strip: glyph + verb, 14 px apart; keys that share a verb sit

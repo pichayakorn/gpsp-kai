@@ -75,6 +75,7 @@ void ui_card(int x, int y, int w, int h, u16 color, int lifted);
 int ui_text(int x, int y, char *str, u16 color);
 int ui_text_width(char *str);
 int ui_glyph(int x, int y, u32 key);
+int ui_glyph_inverted(int x, int y, u32 key);  /* plum pill, cream marks */
 int ui_glyph_width(u32 key);
 
 typedef struct
