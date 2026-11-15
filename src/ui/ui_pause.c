@@ -150,6 +150,10 @@ static u16 *thumb(int slot)
   return p.thumbs + slot * SMALL_W * SMALL_H;
 }
 
+/* the big picture's read, a slice a frame (load_big_picture) */
+static SceUID shot_fd = -1;
+static int shot_reading = -1, shot_done, shot_failed = -1;
+
 static void read_slot(int slot)
 {
   p.has[slot] = read_state_time(slot, &p.time[slot]);
@@ -158,79 +162,92 @@ static void read_slot(int slot)
   p.thumb_tried[slot] = 0;
   if(p.shot_slot == slot)
     p.shot_slot = -1;
+  if(shot_failed == slot)
+    shot_failed = -1;  /* the file changed: try again */
 }
 
-/* The big picture: the full screenshot of the selected slot, read in a
- * second thread as soon as the cursor moves, so it is sharp by the time the
- * strip stops (the 64 x 43 picture stands in meanwhile). One read runs at a
- * time; when the cursor has moved on, the next one starts after it. Every
- * other file access on this screen waits for it (shot_wait). A savestate
- * without its .thm (from an older kai) gets one from this read. */
-static SceUID shot_thread = -1;
-static volatile int shot_slot_reading, shot_make_thm, shot_ok, shot_running;
-
-static int shot_reader(SceSize args, void *argp)
-{
-  shot_ok = read_state_shot(shot_slot_reading, p.shot, shot_make_thm);
-  shot_running = 0;
-  return 0;
-}
-
-/* Collect a finished read; returns 1 when no read is running. */
-static int shot_collect(void)
-{
-  int slot;
-
-  if(shot_thread < 0)
-    return 1;
-  if(shot_running)
-    return 0;
-  sceKernelWaitThreadEnd(shot_thread, NULL);
-  sceKernelDeleteThread(shot_thread);
-  shot_thread = -1;
-  slot = shot_slot_reading;
-  if(shot_ok)
-  {
-    if(slot == cur_slot())
-      p.shot_slot = slot;
-    if(shot_make_thm)
-    {
-      p.thumb_tried[slot] = 1;
-      p.thumb_ok[slot] = p.thumbs && read_state_thumbnail(slot, p.time[slot], thumb(slot));
-    }
-  }
-  return 1;
-}
+/* The big picture: the full screenshot of the selected slot. Once the
+ * cursor moves, it is read a slice a frame on this thread (a second thread
+ * gave nothing on the PSP), so it is sharp by the time the strip stops; the
+ * 64 x 43 picture stands in meanwhile. Moving on drops the read. Every
+ * other file action closes it first (shot_wait). A savestate without its
+ * .thm (from an older kai) is read at once, which makes the .thm. */
+#define SHOT_BYTES (240 * 160 * 2)
+#define SHOT_SLICE (SHOT_BYTES / 8)
 
 static void shot_wait(void)
 {
-  while(!shot_collect())
-    sceKernelDelayThread(1000);
+  if(shot_fd >= 0)
+    sceIoClose(shot_fd);
+  shot_fd = -1;
+  shot_reading = -1;
 }
 
-/* Start reading the selected slot's screenshot if it is not shown yet. */
-static void load_big_picture(void)
+/* The whole picture now (opening, and savestates without a .thm). */
+static void load_big_picture_now(void)
 {
-  int slot = cur_slot();
+  int slot = cur_slot(), make_thm = !p.thumb_ok[slot] && !p.thumb_tried[slot];
 
-  if(!shot_collect())
-    return;  /* the next frame tries again */
+  shot_wait();
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot))
     return;
-  p.shot_slot = -1;  /* p.shot is being written */
-  shot_slot_reading = slot;
-  shot_make_thm = !p.thumb_ok[slot] && !p.thumb_tried[slot];
-  shot_running = 1;
-  shot_thread = sceKernelCreateThread("ui shot", shot_reader, 0x12, 0x4000, 0, NULL);
-  if((shot_thread < 0) || (sceKernelStartThread(shot_thread, 0, NULL) < 0))
+  p.shot_slot = -1;
+  if(read_state_shot(slot, p.shot, make_thm))
+    p.shot_slot = slot;
+  else
+    shot_failed = slot;
+  if(make_thm)
   {
-    if(shot_thread >= 0)
-      sceKernelDeleteThread(shot_thread);
-    shot_thread = -1;
-    shot_running = 0;
-    /* no thread: read it here */
-    if(read_state_shot(slot, p.shot, shot_make_thm))
-      p.shot_slot = slot;
+    p.thumb_tried[slot] = 1;
+    p.thumb_ok[slot] = p.thumbs && read_state_thumbnail(slot, p.time[slot], thumb(slot));
+  }
+}
+
+/* Once a frame: the next slice of the selected slot's picture. */
+static void load_big_picture(void)
+{
+  int slot = cur_slot(), n;
+
+  if((shot_fd >= 0) && (shot_reading != slot))
+    shot_wait();  /* the cursor moved on */
+  if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot) || (shot_failed == slot))
+    return;
+  if(shot_fd < 0)
+  {
+    char path[MAX_PATH];
+    u8 head[8];
+
+    if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
+    {
+      load_big_picture_now();
+      return;
+    }
+    get_state_slot_path(slot, path);
+    shot_fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+    if((shot_fd < 0) || (sceIoRead(shot_fd, head, 8) != 8) || memcmp(head, g_state_str, 4))
+    {
+      shot_wait();
+      shot_failed = slot;
+      return;
+    }
+    shot_reading = slot;
+    shot_done = 0;
+    p.shot_slot = -1;  /* p.shot is being written */
+  }
+  n = SHOT_BYTES - shot_done;
+  if(n > SHOT_SLICE)
+    n = SHOT_SLICE;
+  if(sceIoRead(shot_fd, (u8 *)p.shot + shot_done, n) != n)
+  {
+    shot_wait();
+    shot_failed = slot;
+    return;
+  }
+  shot_done += n;
+  if(shot_done == SHOT_BYTES)
+  {
+    shot_wait();
+    p.shot_slot = slot;
   }
 }
 
@@ -891,6 +908,9 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
+  shot_fd = -1;
+  shot_reading = -1;
+  shot_failed = -1;
   /* It opens on the slot last saved or loaded in this game (slot 0 at
      first); L jumps to Last, R to slot 0 (maintainer, 2026-11-15). */
   p.cur = strip_position((g_game_config.last_slot < SLOTS) ? g_game_config.last_slot : 0);
@@ -908,8 +928,7 @@ u32 ui_pause(u16 *game_picture)
     read_slot(i);
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
-  load_big_picture();
-  shot_wait();
+  load_big_picture_now();
   build_layer();
   ui_input_init();
 
