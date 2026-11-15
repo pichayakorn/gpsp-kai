@@ -261,6 +261,10 @@ static u32 __attribute__((aligned(16))) sharp_cmd[64];
 static float __attribute__((aligned(16))) sharp_vertex[32 * 5];
 static u32 *sharp_cmd_end;
 static u32 *sharp_texture_slot;  // pass 1's TBP0, TBW0 and TSIZE0
+#ifdef UI4
+#define GE_CMD_TFUNC 0xC9
+static u32 *sharp_tfunc_slot;   // pass 2's texture function (the resume fade)
+#endif
 static u32 sharp_active = 0;
 
 #define SHARP_CMD(cmd, operand)                                             \
@@ -342,6 +346,9 @@ static u32 sharp_setup(SPRITE *s)
   SHARP_CMD(SCISSOR2, (ih << 10) | iw);
   SHARP_CMD(REGION1, 0);
   SHARP_CMD(REGION2, (ih << 10) | iw);
+#ifdef UI4
+  SHARP_CMD(TFUNC, (GU_TCC_RGBA << 8) | GU_TFX_REPLACE);  /* pass 1 is never faded */
+#endif
   SHARP_CMD(PRIM, (6 << 16) | (sprites * 2));
 
   // Pass 2: back to the display buffer, the target with bilinear, in
@@ -382,6 +389,10 @@ static u32 sharp_setup(SPRITE *s)
       sprites++;
     }
   }
+#ifdef UI4
+  sharp_tfunc_slot = cmd_ptr;  /* replace, or modulate while the resume fade runs */
+  SHARP_CMD(TFUNC, (GU_TCC_RGBA << 8) | GU_TFX_REPLACE);
+#endif
   SHARP_CMD(PRIM, (6 << 16) | (sprites * 2));
 
   SHARP_CMD(FINISH, 0);
@@ -395,41 +406,66 @@ static u32 sharp_setup(SPRITE *s)
 }
 
 #ifdef UI4
-/* In-game overlay (4.0 UI): a small picture over the running game, such
- * as the toast after a load. The owner draws into osd_pixels (OSD_W x
- * OSD_H, 5551, alpha bit 0 is see-through) and sets osd_tick, which
- * flip_screen() calls once a frame for the position; it returns 0 when the
- * overlay is done.
+/* In-game overlay (4.0 UI): small pictures over the running game, and the
+ * fade back to the game after the pause screen.
+ *
+ * Two layers: the toast (osd_pixels, OSD_W x OSD_H, moved by osd_tick, which
+ * flip_screen() calls once a frame and which returns 0 when it is done) and
+ * the low-battery chip (osd_chip_pixels, OSD_CHIP_W x OSD_CHIP_H, shown at
+ * osd_chip_rect while its w is not 0). Both are 5551; alpha bit 0 is
+ * see-through.
  *
  * The LCD shows the buffer the GE draws into, so a picture drawn after the
  * game sprite would be missing whenever the LCD scans those rows between
- * the two draws. The overlay goes first instead and marks its pixels in the
+ * the two draws. The overlays go first instead and mark their pixels in the
  * stencil (the alpha bit of the 5551 display, which the GE reads as 0x00
  * or 0xFF and writes from the top bit of the value, so the reference is
- * 0xFF); the game sprite then skips
- * marked pixels and clears the mark, so each overlay pixel is written once
- * a frame, already final. The first frame only clears stale marks. Parts of
- * the last position outside the game picture are cleared to black, since
- * the game sprite does not redraw the LCD there. */
-#define GE_CMD_ATE  0x22
-#define GE_CMD_STE  0x24
-#define GE_CMD_ATST 0xDB
-#define GE_CMD_STST 0xDC
-#define GE_CMD_SOP  0xDD
+ * 0xFF); the game sprite then skips marked pixels and clears the mark, so
+ * each overlay pixel is written once a frame, already final. The first
+ * frame only clears stale marks. Parts of a last position outside the game
+ * picture are cleared to black, since the game sprite does not redraw the
+ * LCD there.
+ *
+ * The fade (osd_fade_start): for UI_F_RESUME_FADE frames the game sprite is
+ * multiplied by a grey going from 50 % to 100 % (texture function modulate
+ * with the material colour), so the pause screen's dim lifts over 8 frames
+ * instead of in one. With sharp bilinear only its second pass is
+ * multiplied (sharp_tfunc_slot). */
+#define GE_CMD_ATE   0x22
+#define GE_CMD_STE   0x24
+#define GE_CMD_AMC   0x55
+#define GE_CMD_AMA   0x58
+#define GE_CMD_ATST  0xDB
+#define GE_CMD_STST  0xDC
+#define GE_CMD_SOP   0xDD
 #define STENCIL_KEEP    0
 #define STENCIL_ZERO    1
 #define STENCIL_REPLACE 2
+#define TFUNC_REPLACE  ((GU_TCC_RGBA << 8) | GU_TFX_REPLACE)
+#define TFUNC_MODULATE ((GU_TCC_RGBA << 8) | GU_TFX_MODULATE)
+
+/* UI_EASE_OUT_CUBIC_8 (ui_tokens.h): 1/256 of the way from 50 % to 100 % */
+static const u16 osd_fade_curve[8] = { 84, 148, 194, 224, 242, 252, 256, 256 };
+#define OSD_FADE_FRAMES 8  /* UI_F_RESUME_FADE */
 
 u16 __attribute__((aligned(16))) osd_pixels[OSD_W * OSD_H];
 int (*osd_tick)(int *x, int *y, int *w, int *h) = NULL;
+u16 __attribute__((aligned(16))) osd_chip_pixels[OSD_CHIP_W * OSD_CHIP_H];
+int osd_chip_rect[4];
 static u16 __attribute__((aligned(16))) osd_black[8 * 8];
-static u32 __attribute__((aligned(16))) osd_cmd[64];
+static u32 __attribute__((aligned(16))) osd_cmd[96];
 static u32 __attribute__((aligned(16))) osd_end_cmd[8];
-static float __attribute__((aligned(16))) osd_vertex[10 * 5];
-static int osd_last[4];  /* x, y, w, h; w 0: nothing on the LCD */
-static int osd_frames;   /* frames since the overlay started */
-static int osd_active;   /* osd_before() enqueued a list this frame */
+static float __attribute__((aligned(16))) osd_vertex[12 * 10];
+static int osd_last[2][4];  /* x, y, w, h per layer; w 0: nothing on the LCD */
+static int osd_was_on;      /* a list went before the game sprite last frame */
+static int osd_active;      /* osd_before() enqueued a list this frame */
+static int osd_fade_f = -1; /* frame of the fade, -1: none */
 static u32 game_filter = GU_LINEAR;
+
+void osd_fade_start(void)
+{
+  osd_fade_f = 0;
+}
 
 static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
  int x, int y, int w, int h)
@@ -437,6 +473,39 @@ static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
   v[0] = u1; v[1] = v1; v[2] = x;     v[3] = y;     v[4] = 0;
   v[5] = u2; v[6] = v2; v[7] = x + w; v[8] = y + h; v[9] = 0;
   return v + 10;
+}
+
+/* Black bands over the parts of rect r outside the game picture. */
+static float *osd_erase(float *v, const int *r, int *n)
+{
+  int gx, gy, gw, gh, x1 = r[0], y1 = r[1], x2 = r[0] + r[2], y2 = r[1] + r[3];
+
+  get_game_rect(&gx, &gy, &gw, &gh);
+  if(y1 < gy)
+  {
+    v = osd_sprite(v, 0, 0, 8, 8, x1, y1, x2 - x1, ((y2 < gy) ? y2 : gy) - y1); (*n)++;
+  }
+  if(y2 > gy + gh)
+  {
+    int t = (y1 > gy + gh) ? y1 : gy + gh;
+    v = osd_sprite(v, 0, 0, 8, 8, x1, t, x2 - x1, y2 - t); (*n)++;
+  }
+  {
+    int t = (y1 > gy) ? y1 : gy, b = (y2 < gy + gh) ? y2 : gy + gh;
+    if(b > t)
+    {
+      if(x1 < gx)
+      {
+        v = osd_sprite(v, 0, 0, 8, 8, x1, t, ((x2 < gx) ? x2 : gx) - x1, b - t); (*n)++;
+      }
+      if(x2 > gx + gw)
+      {
+        int l = (x1 > gx + gw) ? x1 : gx + gw;
+        v = osd_sprite(v, 0, 0, 8, 8, l, t, x2 - l, b - t); (*n)++;
+      }
+    }
+  }
+  return v;
 }
 
 #define OSD_CMD(cmd, operand)                                               \
@@ -454,72 +523,68 @@ static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
   OSD_CMD(NOP, 0);                                                          \
   OSD_CMD(NOP, 0)                                                           \
 
-/* Before the game sprite: the black bands, the overlay, and the stencil
- * test the game sprite runs with. */
+/* Before the game sprite: the black bands, the overlays, the stencil test
+ * the game sprite runs with, and the fade. */
 static void osd_before(void)
 {
-  int now[4] = { 0, 0, 0, 0 }, on, i, n = 0, gx, gy, gw, gh;
-  float *v = osd_vertex;
+  int now[2][4], on[2], first, i, n = 0, fade = 0;
+  float *v = osd_vertex, *pv;
   u32 *c = osd_cmd;
 
   osd_active = 0;
-  if((osd_tick == NULL) || (video_draw_frame != FRAME_GAME) || video_out_mode)
+  if(sharp_tfunc_slot)
+    *sharp_tfunc_slot = (GE_CMD_TFUNC << 24) | TFUNC_REPLACE;
+  if((video_draw_frame != FRAME_GAME) || video_out_mode)
   {
-    osd_frames = 0;
+    osd_was_on = 0;
     return;
   }
-  on = osd_tick(&now[0], &now[1], &now[2], &now[3]);
-  if(!on)
+
+  memset(now, 0, sizeof(now));
+  on[0] = (osd_tick != NULL) && osd_tick(&now[0][0], &now[0][1], &now[0][2], &now[0][3]);
+  if(!on[0])
   {
     osd_tick = NULL;
-    now[2] = 0;
+    now[0][2] = 0;
   }
-  if(osd_frames++ == 0)
-    now[2] = 0;  /* the first frame clears stale marks only */
+  on[1] = osd_chip_rect[2] != 0;
+  if(on[1])
+    memcpy(now[1], osd_chip_rect, sizeof(now[1]));
+  if(osd_fade_f >= 0)
+  {
+    if(osd_fade_f < OSD_FADE_FRAMES)
+      fade = osd_fade_curve[osd_fade_f++];
+    else
+      osd_fade_f = -1;
+  }
+
+  if(!on[0] && !on[1] && !osd_last[0][2] && !osd_last[1][2] && !fade)
+  {
+    osd_was_on = 0;
+    return;
+  }
+  first = !osd_was_on;
+  if(first)  /* the first frame clears stale marks only */
+    now[0][2] = now[1][2] = 0;
 
   if(osd_black[0] == 0)
     for(i = 0; i < 8 * 8; i++)
       osd_black[i] = 0x8000;
 
-  /* the last position outside the game picture: up to four black bands */
-  if(osd_last[2] && memcmp(osd_last, now, sizeof(now)))
-  {
-    int x1 = osd_last[0], y1 = osd_last[1];
-    int x2 = x1 + osd_last[2], y2 = y1 + osd_last[3];
-
-    get_game_rect(&gx, &gy, &gw, &gh);
-    if(y1 < gy)
-    {
-      v = osd_sprite(v, 0, 0, 8, 8, x1, y1, x2 - x1, ((y2 < gy) ? y2 : gy) - y1); n++;
-    }
-    if(y2 > gy + gh)
-    {
-      int t = (y1 > gy + gh) ? y1 : gy + gh;
-      v = osd_sprite(v, 0, 0, 8, 8, x1, t, x2 - x1, y2 - t); n++;
-    }
-    {
-      int t = (y1 > gy) ? y1 : gy, b = (y2 < gy + gh) ? y2 : gy + gh;
-      if(b > t)
-      {
-        if(x1 < gx)
-        {
-          v = osd_sprite(v, 0, 0, 8, 8, x1, t, ((x2 < gx) ? x2 : gx) - x1, b - t); n++;
-        }
-        if(x2 > gx + gw)
-        {
-          int l = (x1 > gx + gw) ? x1 : gx + gw;
-          v = osd_sprite(v, 0, 0, 8, 8, l, t, x2 - l, b - t); n++;
-        }
-      }
-    }
-  }
-  if(now[2])
-    v = osd_sprite(v, 0, 0, now[2], now[3], now[0], now[1], now[2], now[3]);
+  for(i = 0; i < 2; i++)
+    if(osd_last[i][2] && memcmp(osd_last[i], now[i], sizeof(now[i])))
+      v = osd_erase(v, osd_last[i], &n);
+  pv = v;
+  if(now[0][2])
+    v = osd_sprite(v, 0, 0, now[0][2], now[0][3], now[0][0], now[0][1], now[0][2], now[0][3]);
+  if(now[1][2])
+    v = osd_sprite(v, 0, 0, now[1][2], now[1][3], now[1][0], now[1][1], now[1][2], now[1][3]);
 
   OSD_CMD(VTYPE, (1 << 23) | (3 << 7) | 3);
   OSD_CMD(BASE, ((u32)osd_vertex & 0xFF000000) >> 8);
   OSD_CMD(VADDR, (u32)osd_vertex & 0x00FFFFFF);
   OSD_CMD(TFILTER, (GU_NEAREST << 8) | GU_NEAREST);
+  OSD_CMD(TFUNC, TFUNC_REPLACE);
   OSD_CMD(STE, 1);
   if(n)
   {
@@ -528,15 +593,26 @@ static void osd_before(void)
     OSD_CMD(SOP, STENCIL_ZERO | (STENCIL_ZERO << 8) | (STENCIL_ZERO << 16));
     OSD_CMD(PRIM, (6 << 16) | (n * 2));
   }
-  if(now[2])
+  if(now[0][2] || now[1][2])
   {
-    /* the overlay's opaque pixels, marked */
-    OSD_TEXTURE(osd_pixels, OSD_W, (5 << 8) | 9);
+    /* the overlays' opaque pixels, marked */
     OSD_CMD(ATE, 1);
     OSD_CMD(ATST, GU_GREATER | (0 << 8) | (0xFF << 16));
     OSD_CMD(STST, GU_ALWAYS | (0xFF << 8) | (0xFF << 16));
     OSD_CMD(SOP, STENCIL_KEEP | (STENCIL_KEEP << 8) | (STENCIL_REPLACE << 16));
-    OSD_CMD(PRIM, (6 << 16) | 2);
+    if(now[0][2])
+    {
+      OSD_TEXTURE(osd_pixels, OSD_W, (5 << 8) | 9);
+      OSD_CMD(VADDR, (u32)pv & 0x00FFFFFF);
+      OSD_CMD(PRIM, (6 << 16) | 2);
+      pv += 10;
+    }
+    if(now[1][2])
+    {
+      OSD_TEXTURE(osd_chip_pixels, OSD_CHIP_W, (4 << 8) | 6);
+      OSD_CMD(VADDR, (u32)pv & 0x00FFFFFF);
+      OSD_CMD(PRIM, (6 << 16) | 2);
+    }
     OSD_CMD(ATE, 0);
     /* the game sprite: not on marked pixels; every mark is cleared */
     OSD_CMD(STST, GU_NOTEQUAL | (0xFF << 8) | (0xFF << 16));
@@ -547,15 +623,25 @@ static void osd_before(void)
   }
   OSD_CMD(SOP, STENCIL_ZERO | (STENCIL_ZERO << 8) | (STENCIL_ZERO << 16));
   OSD_CMD(TFILTER, (game_filter << 8) | game_filter);
+  if(fade)
+  {
+    u32 grey = 128 + (fade * 127) / 256;
+    OSD_CMD(AMC, grey | (grey << 8) | (grey << 16));
+    OSD_CMD(AMA, 0xFF);
+    OSD_CMD(TFUNC, TFUNC_MODULATE);
+    if(sharp_tfunc_slot)
+      *sharp_tfunc_slot = (GE_CMD_TFUNC << 24) | TFUNC_MODULATE;
+  }
   OSD_END();
 
   memcpy(osd_last, now, sizeof(now));
+  osd_was_on = 1;
   osd_active = 1;
   sceKernelDcacheWritebackAll();
   sceGeListEnQueue(osd_cmd, c, gecbid, NULL);
 }
 
-/* After the game sprite: the stencil test off again. */
+/* After the game sprite: the stencil test and the multiply off again. */
 static void osd_after(void)
 {
   u32 *c = osd_end_cmd;
@@ -563,6 +649,7 @@ static void osd_after(void)
   if(!osd_active)
     return;
   OSD_CMD(STE, 0);
+  OSD_CMD(TFUNC, TFUNC_REPLACE);
   OSD_END();
   sceKernelDcacheWritebackAll();
   sceGeListEnQueue(osd_end_cmd, c, gecbid, NULL);
@@ -588,9 +675,9 @@ void flip_screen()
     screen_address = (u16 *)flip_address_temp[screen_flip];
     screen_offset_address = (u16 *)flip_offset_address_temp[screen_flip];
 
+    osd_before();  /* may patch sharp_tfunc_slot */
     sceKernelDcacheWritebackAll();
 
-    osd_before();
     sceGeListEnQueue(sharp_cmd, sharp_cmd_end, gecbid, NULL);
     osd_after();
     return;

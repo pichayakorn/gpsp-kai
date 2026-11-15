@@ -47,6 +47,11 @@ void get_game_rect(int *x, int *y, int *w, int *h);
 #define OSD_H 32
 extern u16 osd_pixels[OSD_W * OSD_H];
 extern int (*osd_tick)(int *x, int *y, int *w, int *h);
+#define OSD_CHIP_W 64
+#define OSD_CHIP_H 16
+extern u16 osd_chip_pixels[OSD_CHIP_W * OSD_CHIP_H];
+extern int osd_chip_rect[4];  /* x, y, w, h; w 0: hidden */
+void osd_fade_start(void);
 #endif
 void flip_screen();
 void video_read_mem_savestate(u32 ver);

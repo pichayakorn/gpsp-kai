@@ -342,23 +342,67 @@ static void draw_header(int hy)
   ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
 }
 
+/* The status chip, top right and as wide as its content: the clock (the
+ * PSP's 12/24-hour setting), then the battery: lime, tangerine at 20 % or
+ * less, pink with the % at 10 % or less, sky with a bolt while charging. */
+static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
+
 static void draw_status(void)
 {
   ScePspDateTime now;
-  char clock[16];
-  int level = scePowerGetBatteryLifePercent();
+  char clock[16], pct[8];
+  int level = scePowerGetBatteryLifePercent(), format = 0, battery, charging;
+  int w, x, tx, i, j, critical = 0;
+  u16 color = UI_COL_LIME;
 
   sceRtcGetCurrentClockLocalTime(&now);
-  sprintf(clock, "%02d:%02d", now.hour, now.minute);
-  ui_round_fill(UI_SCREEN_W - 20 - 66, 8, 66, 16, 2, UI_COL_CARD);
-  ui_text(UI_SCREEN_W - 20 - 66 + 6, 9, clock, UI_COL_CREAM);
-  if(scePowerIsBatteryExist() > 0)
+  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &format);
+  if(format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
+    sprintf(clock, "%d:%02d %s", (now.hour + 11) % 12 + 1, now.minute, (now.hour < 12) ? "AM" : "PM");
+  else
+    sprintf(clock, "%02d:%02d", now.hour, now.minute);
+
+  battery = scePowerIsBatteryExist() > 0;
+  charging = battery && (scePowerIsBatteryCharging() > 0);
+  if(level < 0)
+    level = 0;
+  if(level > 100)
+    level = 100;
+  if(charging)
+    color = UI_COL_SKY;
+  else if(level <= 10)
   {
-    int bx = UI_SCREEN_W - 20 - 18, by = 11;
-    draw_icon1x(bx, by, icon_battery, UI_COL_LIME);
-    if(level > 0)
-      ui_fill(bx + 2, by + 3, 7 * (level > 100 ? 100 : level) / 100, 3, UI_COL_LIME);
+    color = UI_COL_PINK;
+    critical = battery;
   }
+  else if(level <= 20)
+    color = UI_COL_TANGERINE;
+  sprintf(pct, "%d%%", level);
+
+  w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
+   (charging ? 7 : 0) + (battery ? 11 + 5 : 2);
+  x = 460 - w;
+  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
+  ui_text(x + 6, 9, clock, UI_COL_CREAM);
+  if(!battery)
+    return;
+  tx = x + 6 + ui_text_width(clock) + 4;
+  if(critical)
+  {
+    ui_text(tx, 9, pct, UI_COL_PINK);
+    tx += ui_text_width(pct) + 4;
+  }
+  if(charging)
+  {
+    for(j = 0; j < 7; j++)
+      for(i = 0; i < 5; i++)
+        if(bolt[j] & (0x10 >> i))
+          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
+    tx += 7;
+  }
+  /* the bitmap's first column is empty: one to the left */
+  draw_icon1x(tx - 1, 11, icon_battery, color);
+  ui_fill(tx + 1, 14, 7 * level / 100, 3, color);
 }
 
 static void draw_slot(int slot, int dd, int dy, int selected)
@@ -1094,17 +1138,21 @@ u32 ui_pause(u16 *game_picture)
   if(leave == LEAVE_OLD_MENU)
     return menu(p.game) | p.changed;
 
-  /* The last frame is the game as it will be shown, without the door, so
-     going back to the game needs no black frames. */
+  /* The last frame is the game where it will be shown, still doored, on
+     black: no black frames on the way back. The game then comes back
+     multiplied from 50 % to 100 % over UI_F_RESUME_FADE frames, so the dim
+     lifts instead of vanishing in one frame. */
   {
     int x, y, w, h;
     ui_frame_begin();
     ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
     get_game_rect(&x, &y, &w, &h);
     ui_blit_scaled(p.game, 240, 160, x, y, w, h);
+    ui_door(x, y, w, h);
     ui_frame_end();
   }
   video_resolution_keep(FRAME_GAME);
+  osd_fade_start();
   if(p.game_toast[0])
     ui_game_toast(p.game_toast, UI_COL_SKY);
   set_cpu_clock(g_game_config.clock_speed_number);
