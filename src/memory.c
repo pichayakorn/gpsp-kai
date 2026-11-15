@@ -198,6 +198,7 @@ char gamepak_code[5];
 char gamepak_maker[3];
 char gamepak_filename[MAX_FILE];
 char gamepak_filename_full_path[MAX_PATH];
+char gamepak_path[MAX_PATH];  // the running game's file, for the Recent list
 u32 gamepak_crc32;
 
 u32 mem_save_flag;
@@ -2629,6 +2630,7 @@ s32 load_gamepak(char *name)
     gamepak_size = (file_size + 0x7FFF) & ~0x7FFF;
 
     strcpy(gamepak_filename, name);
+    path_printf(gamepak_path, sizeof(gamepak_path), "%s/%s", rom_path, name);
 //    strncpy(backup_filename, name, MAX_FILE);
     change_ext(gamepak_filename, backup_filename, ".sav");
 

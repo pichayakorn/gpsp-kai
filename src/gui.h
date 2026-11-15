@@ -70,6 +70,8 @@ typedef struct
   // Appended field: an older game config file is shorter, so it keeps the
   // default from init_game_config().
   u32 rapidfire_speed;     // RAPIDFIRE_SLOW, RAPIDFIRE_MEDIUM or RAPIDFIRE_FAST
+  u32 play_seconds;        // time spent in the game, menus not counted
+  u32 last_played;         // when the game was last left, Unix time (UTC); 0 = never
 } game_config_t;
 
 #define ASM_CORE 0
@@ -96,6 +98,7 @@ void button_up_wait();
 void load_game_config_file(void);
 s32 load_config_file();
 s32 save_game_config_file();
+void note_game_left(void);
 s32 save_config_file();
 
 u32 menu(u16 *original_screen);
