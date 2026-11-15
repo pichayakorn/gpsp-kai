@@ -575,7 +575,10 @@ static void set_resolution(u32 frame, u32 keep)
     TSIZE0_temp  = ((GE_CMD_TSIZE0) << 24) | ((current_parameter->texture_bit.x << 8) | current_parameter->texture_bit.y);
 
     sceGuStart(GU_DIRECT, display_list);
-    sceGuDispBuffer(current_parameter->screen_size.width, current_parameter->screen_size.height, (void*)0, FRAME_LINE_SIZE);
+    /* sceGuDispBuffer() calls sceDisplaySetMode(), which blanks the LCD for
+       a moment; on the PSP's own screen the size never changes. */
+    if(!keep)
+      sceGuDispBuffer(current_parameter->screen_size.width, current_parameter->screen_size.height, (void*)0, FRAME_LINE_SIZE);
     sceGuOffset(2048 - (current_parameter->screen_size.width / 2), 2048 - (current_parameter->screen_size.height / 2));
     sceGuViewport(2048, 2048, current_parameter->screen_size.width, current_parameter->screen_size.height);
     sceGuScissor(current_parameter->view.x, current_parameter->view.y, current_parameter->view.width, current_parameter->view.height);
