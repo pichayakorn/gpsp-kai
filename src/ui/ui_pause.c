@@ -486,6 +486,15 @@ static void end_bar(void)
 
 /* ---- actions ------------------------------------------------------------- */
 
+static void move_tile(int to);
+
+/* After a load the cursor goes to Resume, so one confirm plays on. */
+static void cursor_to_resume(void)
+{
+  p.row = 1;
+  move_tile(TILE_RESUME);
+}
+
 static void show_toast(const char *text, u16 edge, int undo, int undo_slot)
 {
   snprintf(p.toast, sizeof(p.toast), "%s", text);
@@ -589,6 +598,7 @@ static void action_load(int slot)
     slot_name(slot, text);
     sprintf(msg_text, "Loaded %s", text);
     show_toast(msg_text, UI_COL_SKY, undo, LAST_SLOT);
+    cursor_to_resume();
   }
   else
     show_toast(state_error_text ? state_error_text : "Loading failed", UI_COL_PINK, UNDO_NONE, 0);
@@ -625,6 +635,7 @@ static void action_undo(void)
         p.changed = 1;
         take_loaded_picture();
         show_toast("Back where you were", UI_COL_SKY, UNDO_NONE, 0);
+        cursor_to_resume();
       }
       break;
   }
