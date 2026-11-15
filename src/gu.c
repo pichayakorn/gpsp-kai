@@ -446,10 +446,15 @@ void video_resolution(u32 frame)
 /* Switches like video_resolution() but without showing black frames: the
  * LCD keeps the last picture until the next flip_screen(), so a screen that
  * draws its own first frame (the 4.0 pause screen) opens and closes without
- * a blink. TV output keeps the black frames. */
+ * a blink. With a TV cable connected it keeps the black frames. (PSP-2000
+ * and later all count as PSP_2000, and video.cfg ships with kai, so
+ * use_video_out alone does not mean a TV is connected.) */
 void video_resolution_keep(u32 frame)
 {
-  set_resolution(frame, (psp_model != PSP_2000) || (use_video_out == 0));
+  u32 tv = (psp_model == PSP_2000) && (use_video_out == 1) &&
+   (pspDveMgrCheckVideoOut() != 0);
+
+  set_resolution(frame, !tv);
 }
 
 static void set_resolution(u32 frame, u32 keep)
@@ -523,15 +528,17 @@ static void set_resolution(u32 frame, u32 keep)
     if(old_parameter != current_parameter)
     {
       old_parameter = current_parameter;
-      if((psp_model == PSP_2000) && (use_video_out == 1))
+      /* Setting the output again (the same LCD mode for game and menu)
+         re-syncs the display, which blanks it for a moment. */
+      if(keep)
+        ;
+      else if((psp_model == PSP_2000) && (use_video_out == 1))
       {
         pspDveMgrSetVideoOut(current_parameter->video_out.u, current_parameter->video_out.displaymode, current_parameter->video_out.width,
             current_parameter->video_out.height, current_parameter->video_out.x, current_parameter->video_out.y, current_parameter->video_out.z);
       }
-      else if(!keep)
+      else
       {
-        /* the LCD mode never changes; setting it again re-syncs the
-           display, which blanks it for a moment */
         sceDisplaySetMode(0, PSP_SCREEN_WIDTH, PSP_SCREEN_HEIGHT);
       }
     }
