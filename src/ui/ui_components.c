@@ -115,15 +115,17 @@ void ui_components(void)
         tab_f = 0;
       }
 
-      if(ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
       {
-        int step = ui_repeat(PSP_CTRL_DOWN) ? 1 : ROW_COUNT - 1;
-        cursor_from = ui_ease_out_back(cursor_from, ROWS_Y + cursor * UI_ROW_PITCH,
-         cursor_f, UI_F_CURSOR);
-        cursor = (cursor + step) % ROW_COUNT;
-        if(cursor == ROW_DISABLED)  /* the cursor skips a disabled row */
-          cursor = (cursor + step) % ROW_COUNT;
-        cursor_f = 0;
+        int to = ui_step(cursor, ROW_COUNT, PSP_CTRL_UP, PSP_CTRL_DOWN);
+        if(to == ROW_DISABLED)  /* the cursor skips a disabled row */
+          to += to - cursor;
+        if(to != cursor)
+        {
+          cursor_from = ui_ease_out_back(cursor_from, ROWS_Y + cursor * UI_ROW_PITCH,
+           cursor_f, UI_F_CURSOR);
+          cursor = to;
+          cursor_f = 0;
+        }
       }
 
       if(ui_repeat(PSP_CTRL_RIGHT)) dir = 1;

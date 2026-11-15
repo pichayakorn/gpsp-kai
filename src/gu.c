@@ -436,7 +436,28 @@ void flip_screen()
   sceGeListEnQueue(ge_cmd, ge_cmd_ptr, gecbid, NULL);
 }
 
+static void set_resolution(u32 frame, u32 keep);
+
 void video_resolution(u32 frame)
+{
+  set_resolution(frame, 0);
+}
+
+/* Switches like video_resolution() but without showing black frames: the
+ * LCD keeps the last picture until the next flip_screen(), so a screen that
+ * draws its own first frame (the 4.0 pause screen) opens and closes without
+ * a blink. With a TV cable connected it keeps the black frames. (PSP-2000
+ * and later all count as PSP_2000, and video.cfg ships with kai, so
+ * use_video_out alone does not mean a TV is connected.) */
+void video_resolution_keep(u32 frame)
+{
+  u32 tv = (psp_model == PSP_2000) && (use_video_out == 1) &&
+   (pspDveMgrCheckVideoOut() != 0);
+
+  set_resolution(frame, !tv);
+}
+
+static void set_resolution(u32 frame, u32 keep)
 {
   static u32 first_load = 0;
   static SCREEN_PARAMETER *old_parameter = NULL;
@@ -449,7 +470,7 @@ void video_resolution(u32 frame)
     first_load = 1;
     current_parameter = &screen_parameter_psp_menu;
   }
-  else
+  else if(!keep)
   {
     flip_screen();
     clear_screen(0);
@@ -507,7 +528,11 @@ void video_resolution(u32 frame)
     if(old_parameter != current_parameter)
     {
       old_parameter = current_parameter;
-      if((psp_model == PSP_2000) && (use_video_out == 1))
+      /* Setting the output again (the same LCD mode for game and menu)
+         re-syncs the display, which blanks it for a moment. */
+      if(keep)
+        ;
+      else if((psp_model == PSP_2000) && (use_video_out == 1))
       {
         pspDveMgrSetVideoOut(current_parameter->video_out.u, current_parameter->video_out.displaymode, current_parameter->video_out.width,
             current_parameter->video_out.height, current_parameter->video_out.x, current_parameter->video_out.y, current_parameter->video_out.z);
@@ -557,7 +582,10 @@ void video_resolution(u32 frame)
     TSIZE0_temp  = ((GE_CMD_TSIZE0) << 24) | ((current_parameter->texture_bit.x << 8) | current_parameter->texture_bit.y);
 
     sceGuStart(GU_DIRECT, display_list);
-    sceGuDispBuffer(current_parameter->screen_size.width, current_parameter->screen_size.height, (void*)0, FRAME_LINE_SIZE);
+    /* sceGuDispBuffer() calls sceDisplaySetMode(), which blanks the LCD for
+       a moment; on the PSP's own screen the size never changes. */
+    if(!keep)
+      sceGuDispBuffer(current_parameter->screen_size.width, current_parameter->screen_size.height, (void*)0, FRAME_LINE_SIZE);
     sceGuOffset(2048 - (current_parameter->screen_size.width / 2), 2048 - (current_parameter->screen_size.height / 2));
     sceGuViewport(2048, 2048, current_parameter->screen_size.width, current_parameter->screen_size.height);
     sceGuScissor(current_parameter->view.x, current_parameter->view.y, current_parameter->view.width, current_parameter->view.height);
@@ -568,11 +596,14 @@ void video_resolution(u32 frame)
     sceGuFinish();
     sceGuSync(0, 0);
 
-    flip_screen();
-    clear_screen(0);
-    flip_screen();
-    clear_screen(0);
-    flip_screen();
+    if(!keep)
+    {
+      flip_screen();
+      clear_screen(0);
+      flip_screen();
+      clear_screen(0);
+      flip_screen();
+    }
   }
 }
 

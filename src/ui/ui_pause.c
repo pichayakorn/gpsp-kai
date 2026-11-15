@@ -82,6 +82,20 @@ static struct
 
 /* ---- slots ------------------------------------------------------------- */
 
+/* The strip, left to right: Last first, so it is one press from slot 0
+ * (maintainer, 2026-11-15), then slots 0-9. p.cur is a strip position. */
+static const int strip_slot[SLOTS] = { LAST_SLOT, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+
+static int cur_slot(void)
+{
+  return strip_slot[p.cur];
+}
+
+static int strip_position(int slot)
+{
+  return (slot == LAST_SLOT) ? 0 : slot + 1;
+}
+
 static u16 *thumb(int slot)
 {
   return p.thumbs + slot * SMALL_W * SMALL_H;
@@ -95,6 +109,8 @@ static void read_slot(int slot)
   p.thumb_tried[slot] = 0;
   if(p.shot_slot == slot)
     p.shot_slot = -1;
+  if(slot == cur_slot())
+    p.rest = 0;  /* the big picture loads again once the cursor rests */
 }
 
 /* A savestate without its .thm (from before them, or saved by an older
@@ -102,7 +118,7 @@ static void read_slot(int slot)
  * screenshot is read for the big picture anyway. */
 static void load_big_picture(void)
 {
-  int slot = p.cur;
+  int slot = cur_slot();
 
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot))
     return;
@@ -325,7 +341,7 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
 
 static void draw_hints(int done)
 {
-  ui_hint_t hints[4];
+  ui_hint_t hints[6];
   int n = 0;
 
   if(p.bar_text || !done || p.closing)
@@ -344,6 +360,8 @@ static void draw_hints(int done)
     hints[n].keys = PSP_CTRL_SELECT;
     hints[n++].verb = (ui_toast_up(p.toast_f) && p.toast_undo) ? "Undo" : "Save \xC2\xB7 hold: Delete";
     hints[n].keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0); hints[n++].verb = "Resume";
+    hints[n].keys = PSP_CTRL_LTRIGGER; hints[n++].verb = "Last";
+    hints[n].keys = PSP_CTRL_RTRIGGER; hints[n++].verb = "Slot 0";
   }
   else
   {
@@ -415,14 +433,14 @@ static void draw_screen(int bar_fill)
     int pos = (p.pos_f < UI_F_SCROLL) ?
      ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
     for(i = 0; i < SLOTS; i++)
-      draw_slot(i, i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
+      draw_slot(strip_slot[i], i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
   }
   if(done && !p.closing)
   {
-    slot_name(p.cur, info);
-    if(p.has[p.cur])
+    slot_name(cur_slot(), info);
+    if(p.has[cur_slot()])
     {
-      format_time(p.time[p.cur], when);
+      format_time(p.time[cur_slot()], when);
       strcat(info, " \xC2\xB7 ");
       strcat(info, when);
     }
@@ -526,8 +544,15 @@ static void action_save(int slot)
   if(p.has[slot])
   {
     char msg_text[64];
+    /* the big picture is the screenshot just saved: no need to read it */
+    if(p.shot)
+    {
+      memcpy(p.shot, p.game, 240 * 160 * 2);
+      p.shot_slot = slot;
+    }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
     show_toast(msg_text, UI_COL_SKY, had ? UNDO_SAVE : UNDO_SAVE_NEW, slot);
+    g_game_config.last_slot = slot;
   }
   else
     show_toast(state_error_text ? state_error_text : "Saving failed", UI_COL_PINK, UNDO_NONE, 0);
@@ -597,6 +622,7 @@ static void action_load(int slot)
     take_loaded_picture();
     slot_name(slot, text);
     sprintf(msg_text, "Loaded %s", text);
+    g_game_config.last_slot = slot;
     show_toast(msg_text, UI_COL_SKY, undo, LAST_SLOT);
     cursor_to_resume();
   }
@@ -671,7 +697,8 @@ static void move_slot(int to)
 
 static void move_tile(int to)
 {
-  to = (to + TILE_COUNT) % TILE_COUNT;
+  if(to == p.tile)
+    return;
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
    ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
   p.tile = to;
@@ -689,19 +716,25 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
-  p.cur = (g_savestate_slot_num < SLOTS) ? g_savestate_slot_num : 0;
+  /* It opens on the slot last saved or loaded in this game (slot 0 at
+     first); L jumps to Last, R to slot 0 (maintainer, 2026-11-15). */
+  p.cur = strip_position((g_game_config.last_slot < SLOTS) ? g_game_config.last_slot : 0);
   p.pos_f = UI_F_SCROLL;
   p.tile_f = UI_F_CURSOR;
 
   pause_sound(1);
   set_cpu_clock(10);  /* menus run at 222 MHz */
-  video_resolution(FRAME_MENU);
+  video_resolution_keep(FRAME_MENU);  /* the game stays on the LCD meanwhile */
 
   mark = ui_pool_mark();
   p.thumbs = ui_pool_alloc(SLOTS * SMALL_W * SMALL_H * 2);
   p.shot = ui_pool_alloc(240 * 160 * 2);
   for(i = 0; i < SLOTS; i++)
     read_slot(i);
+  /* the big picture is sharp from the first frame: it loads while the game
+     is still on the LCD */
+  load_big_picture();
+  p.rest = SHOT_REST + UI_F_SCROLL;
   build_layer();
   ui_input_init();
 
@@ -736,21 +769,22 @@ u32 ui_pause(u16 *game_picture)
         p.closing = 1;
       else if(p.row == 0)
       {
-        if(ui_repeat(PSP_CTRL_LEFT)) move_slot(p.cur - 1);
-        if(ui_repeat(PSP_CTRL_RIGHT)) move_slot(p.cur + 1);
+        move_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
+        if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
+        if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
         if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
 
         if(ui_pressed(ui_key_confirm))
-          action_load(p.cur);
+          action_load(cur_slot());
 
         /* SELECT: Undo while the toast offers it, else save; hold: delete */
-        if(p.has[p.cur] && !(ui_toast_up(p.toast_f) && p.toast_undo))
+        if(p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo))
         {
           ui_hold_step(&p.hold, PSP_CTRL_SELECT);
           if(p.hold.done)
           {
             p.hold.p = 0;
-            action_delete(p.cur);
+            action_delete(cur_slot());
           }
         }
         else
@@ -760,14 +794,19 @@ u32 ui_pause(u16 *game_picture)
           if(ui_toast_up(p.toast_f) && p.toast_undo)
             action_undo();
           else
-            action_save(p.cur);
+            action_save(cur_slot());
         }
       }
       else
       {
-        if(ui_repeat(PSP_CTRL_LEFT)) move_tile(p.tile - 1);
-        if(ui_repeat(PSP_CTRL_RIGHT)) move_tile(p.tile + 1);
+        move_tile(ui_step(p.tile, TILE_COUNT, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_UP)) p.row = 0;
+        /* L and R go up to the strip, onto Last or slot 0 */
+        if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
+        {
+          p.row = 0;
+          move_slot(strip_position(ui_pressed(PSP_CTRL_LTRIGGER) ? LAST_SLOT : 0));
+        }
         if(ui_tap(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
           action_undo();
 
@@ -821,11 +860,17 @@ u32 ui_pause(u16 *game_picture)
   if(leave == LEAVE_OLD_MENU)
     return menu(p.game) | p.changed;
 
-  clear_screen(0);
-  flip_screen();
-  clear_screen(0);
-  flip_screen();
-  video_resolution(FRAME_GAME);
+  /* The last frame is the game as it will be shown, without the door, so
+     going back to the game needs no black frames. */
+  {
+    int x, y, w, h;
+    ui_frame_begin();
+    ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
+    get_game_rect(&x, &y, &w, &h);
+    ui_blit_scaled(p.game, 240, 160, x, y, w, h);
+    ui_frame_end();
+  }
+  video_resolution_keep(FRAME_GAME);
   set_cpu_clock(g_game_config.clock_speed_number);
   pause_sound(0);
   real_frame_count = 0;
