@@ -697,7 +697,8 @@ static void move_slot(int to)
 
 static void move_tile(int to)
 {
-  to = (to + TILE_COUNT) % TILE_COUNT;
+  if(to == p.tile)
+    return;
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
    ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
   p.tile = to;
@@ -764,8 +765,7 @@ u32 ui_pause(u16 *game_picture)
         p.closing = 1;
       else if(p.row == 0)
       {
-        if(ui_repeat(PSP_CTRL_LEFT)) move_slot(p.cur - 1);
-        if(ui_repeat(PSP_CTRL_RIGHT)) move_slot(p.cur + 1);
+        move_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
         if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
         if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
@@ -795,8 +795,7 @@ u32 ui_pause(u16 *game_picture)
       }
       else
       {
-        if(ui_repeat(PSP_CTRL_LEFT)) move_tile(p.tile - 1);
-        if(ui_repeat(PSP_CTRL_RIGHT)) move_tile(p.tile + 1);
+        move_tile(ui_step(p.tile, TILE_COUNT, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_UP)) p.row = 0;
         /* L and R go up to the strip, onto Last or slot 0 */
         if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))

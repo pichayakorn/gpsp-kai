@@ -92,6 +92,22 @@ u32 ui_down(u32 mask)     { return keys_now & mask; }
 u32 ui_pressed(u32 mask)  { return keys_now & ~keys_prev & mask; }
 u32 ui_released(u32 mask) { return keys_prev & ~keys_now & mask; }
 u32 ui_repeat(u32 mask)   { return keys_repeat & mask; }
+
+int ui_step(int i, int count, u32 less, u32 more)
+{
+  int to = i;
+
+  if(ui_repeat(less)) to--;
+  if(ui_repeat(more)) to++;
+  if((to < 0) || (to >= count))
+  {
+    /* a fresh press wraps to the other end; a repeat stops at the end */
+    if(!ui_pressed(less | more))
+      return i;
+    to = (to + count) % count;
+  }
+  return to;
+}
 u32 ui_held(u32 mask)     { return keys_held & mask; }
 
 u32 ui_tap(u32 mask)

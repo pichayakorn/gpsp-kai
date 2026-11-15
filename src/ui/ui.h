@@ -27,6 +27,10 @@ u32 ui_repeat(u32 mask);     /* d-pad: on press, then after 18 f every 4 f */
 u32 ui_tap(u32 mask);        /* released before a hold completed */
 u32 ui_held(u32 mask);       /* a hold completed this frame (UI_F_HOLD) */
 u32 ui_hold_frames(u32 key); /* frames one key has been down */
+/* Moves index i of a list or strip of count items by the less/more keys
+ * (with repeat). A fresh press wraps to the other end; a repeat stops at
+ * the end, so the next fresh press wraps. */
+int ui_step(int i, int count, u32 less, u32 more);
 extern u32 ui_key_confirm;   /* × or ○, from the PSP's Enter setting */
 extern u32 ui_key_back;
 
