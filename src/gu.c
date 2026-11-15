@@ -404,7 +404,9 @@ static u32 sharp_setup(SPRITE *s)
  * The LCD shows the buffer the GE draws into, so a picture drawn after the
  * game sprite would be missing whenever the LCD scans those rows between
  * the two draws. The overlay goes first instead and marks its pixels in the
- * stencil (the alpha bit of the 5551 display); the game sprite then skips
+ * stencil (the alpha bit of the 5551 display, which the GE reads as 0x00
+ * or 0xFF and writes from the top bit of the value, so the reference is
+ * 0xFF); the game sprite then skips
  * marked pixels and clears the mark, so each overlay pixel is written once
  * a frame, already final. The first frame only clears stale marks. Parts of
  * the last position outside the game picture are cleared to black, since
@@ -532,12 +534,12 @@ static void osd_before(void)
     OSD_TEXTURE(osd_pixels, OSD_W, (5 << 8) | 9);
     OSD_CMD(ATE, 1);
     OSD_CMD(ATST, GU_GREATER | (0 << 8) | (0xFF << 16));
-    OSD_CMD(STST, GU_ALWAYS | (1 << 8) | (0xFF << 16));
+    OSD_CMD(STST, GU_ALWAYS | (0xFF << 8) | (0xFF << 16));
     OSD_CMD(SOP, STENCIL_KEEP | (STENCIL_KEEP << 8) | (STENCIL_REPLACE << 16));
     OSD_CMD(PRIM, (6 << 16) | 2);
     OSD_CMD(ATE, 0);
     /* the game sprite: not on marked pixels; every mark is cleared */
-    OSD_CMD(STST, GU_NOTEQUAL | (1 << 8) | (0xFF << 16));
+    OSD_CMD(STST, GU_NOTEQUAL | (0xFF << 8) | (0xFF << 16));
   }
   else
   {

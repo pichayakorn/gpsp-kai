@@ -387,7 +387,8 @@ static void draw_bar_card(int fill_256)
 {
   int w = 332, h = 76, x = (UI_SCREEN_W - w) / 2, y = 98, k = (30 * fill_256 + 128) / 256 - 1;
 
-  ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
+  /* no dim behind it: a second door over the screen-doored game reads as
+     noise (maintainer, 2026-11-15) */
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CARD);
   ui_fill(x, y + 4, 4, h - 8, UI_COL_PINK);
