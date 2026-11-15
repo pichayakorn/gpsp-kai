@@ -363,6 +363,6 @@ enum MSG
 };
 
 extern char *msg[MSG_END];
-extern char msg_data[16 * 1024]; // 16 KB buffer holding the message strings
+extern char *msg_data; // the message strings, sized from the .msg file at load
 
 #endif
