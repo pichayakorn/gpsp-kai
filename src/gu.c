@@ -528,8 +528,10 @@ static void set_resolution(u32 frame, u32 keep)
         pspDveMgrSetVideoOut(current_parameter->video_out.u, current_parameter->video_out.displaymode, current_parameter->video_out.width,
             current_parameter->video_out.height, current_parameter->video_out.x, current_parameter->video_out.y, current_parameter->video_out.z);
       }
-      else
+      else if(!keep)
       {
+        /* the LCD mode never changes; setting it again re-syncs the
+           display, which blanks it for a moment */
         sceDisplaySetMode(0, PSP_SCREEN_WIDTH, PSP_SCREEN_HEIGHT);
       }
     }
