@@ -398,6 +398,8 @@ int ui_hold_step(ui_hold_t *h, u32 key)
   h->done = 0;
   if(ui_down(key))
   {
+    if(frames >= UI_F_HOLD_SHOW)
+      h->shown = 1;
     if(frames >= UI_F_HOLD)
     {
       if(!h->fired)
@@ -419,6 +421,8 @@ int ui_hold_step(ui_hold_t *h, u32 key)
       if(h->p < 0)
         h->p = 0;
     }
+    if(h->p == 0)
+      h->shown = 0;
   }
   return h->p;
 }

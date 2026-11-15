@@ -115,7 +115,9 @@ u32 ui_tap(u32 mask)
   u32 i, bit, released = ui_released(mask);
 
   for(i = 0, bit = 1; i < 32; i++, bit <<= 1)
-    if((released & bit) && (last_hold[i] < UI_F_HOLD))
+    /* a tap is a release within UI_F_HOLD_SHOW; held longer, the press is a
+       hold, and letting go before it fills does nothing */
+    if((released & bit) && (last_hold[i] < UI_F_HOLD_SHOW))
       return 1;
   return 0;
 }

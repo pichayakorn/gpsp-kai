@@ -49,6 +49,8 @@
 #define UI_F_POPUP_OUT      8  /* in-cubic */
 #define UI_F_PAUSE_OPEN    20  /* out-back */
 #define UI_F_PAUSE_CLOSE   10  /* in-cubic */
+#define UI_F_RESUME_FADE    8  /* out-cubic */
+#define UI_F_HOLD_SHOW     12  /* step */
 #define UI_F_FLASH          8  /* linear */
 #define UI_F_HOLD          60  /* linear */
 #define UI_F_HOLD_DRAIN    10  /* linear */
@@ -69,5 +71,7 @@ static const unsigned short UI_EASE_OUT_BACK_14[14] UI_TOKENS_UNUSED = { 73, 132
 static const unsigned short UI_EASE_OUT_BACK_20[20] UI_TOKENS_UNUSED = { 53, 98, 138, 171, 198, 221, 239, 252, 262, 269, 273, 274, 274, 272, 269, 265, 262, 259, 257, 256 };
 static const unsigned short UI_EASE_IN_CUBIC_8[8] UI_TOKENS_UNUSED = { 0, 4, 14, 32, 62, 108, 172, 256 };
 static const unsigned short UI_EASE_IN_CUBIC_10[10] UI_TOKENS_UNUSED = { 0, 2, 7, 16, 32, 55, 88, 131, 187, 256 };
+static const unsigned short UI_EASE_OUT_CUBIC_8[8] UI_TOKENS_UNUSED = { 84, 148, 194, 224, 242, 252, 256, 256 };
+static const unsigned short UI_EASE_OUT_CUBIC_10[10] UI_TOKENS_UNUSED = { 69, 125, 168, 201, 224, 240, 249, 254, 256, 256 };
 
 #endif
