@@ -31,6 +31,8 @@ jobs:
     # tested. To update it, pick a newer monthly tag of pspdev/pspdev, check
     # that the build has no new warnings, and test the result on a PSP.
     container: pspdev/pspdev:v20261101
+    env:
+      CFW_SDK_COMMIT: d871f3f57a718cfdc0a0687da608f787b1445ad7
     steps:
       - name: Install build tools
         run: apk add --no-cache zip python3 curl
@@ -43,17 +45,33 @@ jobs:
       - name: Trust the checkout
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install psp-cfw-sdk (kubridge, systemctrl)
+      # kai links only two psp-cfw-sdk stub libraries. They are built from a
+      # fixed upstream commit (upstream only publishes a "latest" zip that
+      # changes on every push) and cached, so the build runs once per commit.
+      # To update: set a newer commit, check the build, test on a PSP.
+      - name: Cache psp-cfw-sdk (kubridge, systemctrl)
+        id: cfw-sdk
+        uses: actions/cache@v6
+        with:
+          path: /tmp/psp-cfw-sdk
+          key: psp-cfw-sdk-${{ env.CFW_SDK_COMMIT }}-pspdev-v20261101
+
+      - name: Build psp-cfw-sdk (kubridge, systemctrl)
+        if: steps.cfw-sdk.outputs.cache-hit != 'true'
         run: |
-          curl -sSL -o /tmp/psp-cfw-sdk.zip \
-            https://github.com/pspdev/psp-cfw-sdk/releases/download/latest/psp-cfw-sdk.zip
-          # psp-cfw-sdk only publishes a moving "latest" release, so check
-          # that it is still the tested file; update the hash on purpose.
-          echo "f7e4432595528b7824c473899884df6696ecddd0186ea2e60c9fc9da3edc18ad  /tmp/psp-cfw-sdk.zip" \
-            | sha256sum -c -
+          mkdir -p /tmp/cfw-src /tmp/psp-cfw-sdk/lib
+          curl -fsSL "https://codeload.github.com/pspdev/psp-cfw-sdk/tar.gz/$CFW_SDK_COMMIT" \
+            | tar xz -C /tmp/cfw-src --strip-components=1
+          make -C /tmp/cfw-src/src/KUBridge
+          make -C /tmp/cfw-src/src/SystemCtrlForUser
+          cp /tmp/cfw-src/src/KUBridge/libpspkubridge.a \
+             /tmp/cfw-src/src/SystemCtrlForUser/libpspsystemctrl_user.a /tmp/psp-cfw-sdk/lib/
+          cp -r /tmp/cfw-src/include /tmp/psp-cfw-sdk/include
           # systemctrl_adrenaline.h is a symlink in the image; keep it.
-          unzip -qo /tmp/psp-cfw-sdk.zip -d / \
-            -x 'usr/local/pspdev/psp/sdk/include/systemctrl_adrenaline.h'
+          rm -f /tmp/psp-cfw-sdk/include/systemctrl_adrenaline.h
+
+      - name: Install psp-cfw-sdk (kubridge, systemctrl)
+        run: cp -r /tmp/psp-cfw-sdk/lib /tmp/psp-cfw-sdk/include /usr/local/pspdev/psp/sdk/
 
       - name: Check messages, build and package
         id: build
