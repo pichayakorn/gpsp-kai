@@ -82,6 +82,20 @@ static struct
 
 /* ---- slots ------------------------------------------------------------- */
 
+/* The strip, left to right: Last first, so it is one press from slot 0
+ * (maintainer, 2026-11-15), then slots 0-9. p.cur is a strip position. */
+static const int strip_slot[SLOTS] = { LAST_SLOT, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+
+static int cur_slot(void)
+{
+  return strip_slot[p.cur];
+}
+
+static int strip_position(int slot)
+{
+  return (slot == LAST_SLOT) ? 0 : slot + 1;
+}
+
 static u16 *thumb(int slot)
 {
   return p.thumbs + slot * SMALL_W * SMALL_H;
@@ -95,6 +109,8 @@ static void read_slot(int slot)
   p.thumb_tried[slot] = 0;
   if(p.shot_slot == slot)
     p.shot_slot = -1;
+  if(slot == cur_slot())
+    p.rest = 0;  /* the big picture loads again once the cursor rests */
 }
 
 /* A savestate without its .thm (from before them, or saved by an older
@@ -102,7 +118,7 @@ static void read_slot(int slot)
  * screenshot is read for the big picture anyway. */
 static void load_big_picture(void)
 {
-  int slot = p.cur;
+  int slot = cur_slot();
 
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot))
     return;
@@ -415,14 +431,14 @@ static void draw_screen(int bar_fill)
     int pos = (p.pos_f < UI_F_SCROLL) ?
      ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
     for(i = 0; i < SLOTS; i++)
-      draw_slot(i, i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
+      draw_slot(strip_slot[i], i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
   }
   if(done && !p.closing)
   {
-    slot_name(p.cur, info);
-    if(p.has[p.cur])
+    slot_name(cur_slot(), info);
+    if(p.has[cur_slot()])
     {
-      format_time(p.time[p.cur], when);
+      format_time(p.time[cur_slot()], when);
       strcat(info, " \xC2\xB7 ");
       strcat(info, when);
     }
@@ -526,6 +542,12 @@ static void action_save(int slot)
   if(p.has[slot])
   {
     char msg_text[64];
+    /* the big picture is the screenshot just saved: no need to read it */
+    if(p.shot)
+    {
+      memcpy(p.shot, p.game, 240 * 160 * 2);
+      p.shot_slot = slot;
+    }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
     show_toast(msg_text, UI_COL_SKY, had ? UNDO_SAVE : UNDO_SAVE_NEW, slot);
   }
@@ -689,7 +711,7 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
-  p.cur = (g_savestate_slot_num < SLOTS) ? g_savestate_slot_num : 0;
+  p.cur = strip_position((g_savestate_slot_num < SLOTS) ? g_savestate_slot_num : 0);
   p.pos_f = UI_F_SCROLL;
   p.tile_f = UI_F_CURSOR;
 
@@ -741,16 +763,16 @@ u32 ui_pause(u16 *game_picture)
         if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
 
         if(ui_pressed(ui_key_confirm))
-          action_load(p.cur);
+          action_load(cur_slot());
 
         /* SELECT: Undo while the toast offers it, else save; hold: delete */
-        if(p.has[p.cur] && !(ui_toast_up(p.toast_f) && p.toast_undo))
+        if(p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo))
         {
           ui_hold_step(&p.hold, PSP_CTRL_SELECT);
           if(p.hold.done)
           {
             p.hold.p = 0;
-            action_delete(p.cur);
+            action_delete(cur_slot());
           }
         }
         else
@@ -760,7 +782,7 @@ u32 ui_pause(u16 *game_picture)
           if(ui_toast_up(p.toast_f) && p.toast_undo)
             action_undo();
           else
-            action_save(p.cur);
+            action_save(cur_slot());
         }
       }
       else
