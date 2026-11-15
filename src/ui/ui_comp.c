@@ -309,17 +309,22 @@ int ui_toast(const char *text, u16 edge, const char *undo, int f)
   else
     return 0;
 
+  /* cream, so it stands out from the cards and tiles it sits on
+     (maintainer, 2026-11-16) */
   ui_round_fill(x + 3, y + 3, w, 26, 2, UI_COL_SHADE);
-  ui_round_fill(x, y, w, 26, 2, UI_COL_CARD);
+  ui_round_fill(x, y, w, 26, 2, UI_COL_CREAM);
   ui_fill(x, y + 3, 4, 20, edge);
   if(undo)
   {
-    int ex = body_text(x + 12, y + 5, text, UI_COL_CREAM, 0);
-    int gx = ui_glyph(ex + 10, y + 7, PSP_CTRL_SELECT) + 4;
-    small_text(gx, y + 6, undo, UI_COL_LIME);
+    int ex = body_text(x + 12, y + 5, text, UI_COL_PLUM, 0);
+    int gx = ui_glyph_inverted(ex + 10, y + 7, PSP_CTRL_SELECT) + 4;
+    if(ui_font_loaded())
+      ui_print(gx, y + 5, undo, UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+    else
+      small_text(gx, y + 6, undo, UI_COL_PLUM);
   }
   else
-    body_text(x + 14, y + 5, text, UI_COL_CREAM, 0);
+    body_text(x + 14, y + 5, text, UI_COL_PLUM, 0);
   return 1;
 }
 
@@ -398,6 +403,8 @@ int ui_hold_step(ui_hold_t *h, u32 key)
   h->done = 0;
   if(ui_down(key))
   {
+    if(frames >= UI_F_HOLD_SHOW)
+      h->shown = 1;
     if(frames >= UI_F_HOLD)
     {
       if(!h->fired)
@@ -419,6 +426,8 @@ int ui_hold_step(ui_hold_t *h, u32 key)
       if(h->p < 0)
         h->p = 0;
     }
+    if(h->p == 0)
+      h->shown = 0;
   }
   return h->p;
 }

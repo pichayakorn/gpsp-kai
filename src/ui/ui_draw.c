@@ -273,6 +273,10 @@ int ui_glyph_width(u32 key)
   return key_symbol(key) ? UI_DISC : ui_text_width(key_label(key)) + 8;
 }
 
+/* Key colours: a cream key with plum marks; ui_glyph_inverted() swaps
+ * them (a plum pill on a cream toast). */
+static u16 glyph_bg = UI_COL_CREAM, glyph_fg = UI_COL_PLUM;
+
 int ui_glyph(int x, int y, u32 key)
 {
   const u8 *symbol = key_symbol(key);
@@ -285,21 +289,33 @@ int ui_glyph(int x, int y, u32 key)
       {
         int dx = i * 2 - (UI_DISC - 1), dy = j * 2 - (UI_DISC - 1);
         if(dx * dx + dy * dy <= UI_DISC * UI_DISC)
-          ui_fill(x + i, y + j, 1, 1, UI_COL_CREAM);
+          ui_fill(x + i, y + j, 1, 1, glyph_bg);
       }
     for(j = 0; j < 7; j++)
       for(i = 0; i < 7; i++)
         if(symbol[j] & (0x40 >> i))
-          ui_fill(x + 3 + i, y + 3 + j, 1, 1, UI_COL_PLUM);
+          ui_fill(x + 3 + i, y + 3 + j, 1, 1, glyph_fg);
   }
   else
   {
-    ui_fill(x + 1, y, w - 2, UI_DISC, UI_COL_CREAM);
-    ui_fill(x, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
-    ui_fill(x + w - 1, y + 1, 1, UI_DISC - 2, UI_COL_CREAM);
-    ui_text(x + 4, small_text_top(y, UI_DISC), key_label(key), UI_COL_PLUM);
+    ui_fill(x + 1, y, w - 2, UI_DISC, glyph_bg);
+    ui_fill(x, y + 1, 1, UI_DISC - 2, glyph_bg);
+    ui_fill(x + w - 1, y + 1, 1, UI_DISC - 2, glyph_bg);
+    ui_text(x + 4, small_text_top(y, UI_DISC), key_label(key), glyph_fg);
   }
   return x + w;
+}
+
+int ui_glyph_inverted(int x, int y, u32 key)
+{
+  int r;
+
+  glyph_bg = UI_COL_PLUM;
+  glyph_fg = UI_COL_CREAM;
+  r = ui_glyph(x, y, key);
+  glyph_bg = UI_COL_CREAM;
+  glyph_fg = UI_COL_PLUM;
+  return r;
 }
 
 /* Hint strip: glyph + verb, 14 px apart; keys that share a verb sit
@@ -326,6 +342,51 @@ void ui_hint_strip(const ui_hint_t *hints, int count)
       if(keys & bit)
         x = ui_glyph(x, y, bit) + 2;
     x = ui_text(x + 2, small_text_top(y, UI_DISC), hints[n].verb, UI_COL_CREAM) + 14;
+  }
+}
+
+/* One hint for the column strip: glyphs 4 px apart, the verb 4 px after
+ * them and 10 px after the verb (spec: 10 px on the pause screen). With
+ * draw 0 it only measures. */
+static int hint_column_one(int x, int y, const ui_hint_t *h, int draw)
+{
+  static const u32 pairs[2] = { PSP_CTRL_UP | PSP_CTRL_DOWN, PSP_CTRL_LEFT | PSP_CTRL_RIGHT };
+  u32 keys = h->keys, bit;
+  int j;
+
+  for(j = 0; j < 2; j++)
+    if((keys & pairs[j]) == pairs[j])
+    {
+      x = (draw ? ui_glyph(x, y, pairs[j]) : x + ui_glyph_width(pairs[j])) + 4;
+      keys &= ~pairs[j];
+    }
+  for(bit = 1; bit; bit <<= 1)
+    if(keys & bit)
+      x = (draw ? ui_glyph(x, y, bit) : x + ui_glyph_width(bit)) + 4;
+  if(h->verb && h->verb[0])
+    x = (draw ? ui_text(x, small_text_top(y, UI_DISC), h->verb, UI_COL_CREAM) :
+     x + ui_text_width(h->verb)) + 10;
+  return x;
+}
+
+void ui_hint_columns(const ui_hint_col_t *cols, int count)
+{
+  int n, k, x = UI_MARGIN, y = UI_STRIP_Y + (UI_STRIP_H - UI_DISC) / 2;
+
+  ui_fill(0, UI_STRIP_Y, UI_SCREEN_W, UI_STRIP_H, UI_COL_SHADE);
+  for(n = 0; n < count; n++)
+  {
+    int w = 0;
+
+    for(k = 0; k < cols[n].count; k++)
+    {
+      int vw = hint_column_one(0, y, &cols[n].variants[k], 0);
+      if(vw > w)
+        w = vw;
+    }
+    if((cols[n].shown >= 0) && (cols[n].shown < cols[n].count))
+      hint_column_one(x, y, &cols[n].variants[cols[n].shown], 1);
+    x += w;
   }
 }
 

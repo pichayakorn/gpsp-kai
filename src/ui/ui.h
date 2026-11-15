@@ -24,7 +24,7 @@ u32 ui_down(u32 mask);       /* held now */
 u32 ui_pressed(u32 mask);    /* went down this frame */
 u32 ui_released(u32 mask);   /* went up this frame */
 u32 ui_repeat(u32 mask);     /* d-pad: on press, then after 18 f every 4 f */
-u32 ui_tap(u32 mask);        /* released before a hold completed */
+u32 ui_tap(u32 mask);        /* released within UI_F_HOLD_SHOW: not a hold */
 u32 ui_held(u32 mask);       /* a hold completed this frame (UI_F_HOLD) */
 u32 ui_hold_frames(u32 key); /* frames one key has been down */
 /* Moves index i of a list or strip of count items by the less/more keys
@@ -75,6 +75,7 @@ void ui_card(int x, int y, int w, int h, u16 color, int lifted);
 int ui_text(int x, int y, char *str, u16 color);
 int ui_text_width(char *str);
 int ui_glyph(int x, int y, u32 key);
+int ui_glyph_inverted(int x, int y, u32 key);  /* plum pill, cream marks */
 int ui_glyph_width(u32 key);
 
 typedef struct
@@ -83,6 +84,16 @@ typedef struct
   char *verb;
 } ui_hint_t;
 void ui_hint_strip(const ui_hint_t *hints, int count);
+/* Hints in fixed columns (the pause screen): each column is as wide as its
+ * widest variant, so a changing verb never moves the others; shown -1
+ * leaves the column empty. */
+typedef struct
+{
+  const ui_hint_t *variants;
+  int count;
+  int shown;
+} ui_hint_col_t;
+void ui_hint_columns(const ui_hint_col_t *cols, int count);
 
 /* Easing: value at frame f (1..n) of an n-frame out-back or in-cubic move
  * from a to b. */
@@ -121,6 +132,7 @@ typedef struct
   int p;      /* progress, 1/256 */
   int fired;  /* the hold completed and the key is still down */
   int done;   /* the hold completed this frame */
+  int shown;  /* held past UI_F_HOLD_SHOW: its card shows until it drains */
 } ui_hold_t;
 int ui_hold_step(ui_hold_t *h, u32 key);
 void ui_hold_bar(int x, int y, int w, int p, u16 color);

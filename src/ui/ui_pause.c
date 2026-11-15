@@ -21,18 +21,61 @@
 #define STRIP_CX  240
 #define TILE_W    60
 #define TILE_H    62
-#define TILE_Y    166
+#define TILE_Y    176         /* 10 px above the hint strip */
 #define F_OPEN    UI_F_PAUSE_OPEN
 #define F_CLOSE   UI_F_PAUSE_CLOSE
-#define SHOT_REST 4           /* frames the cursor rests before the big picture loads */
 
-static const u16 icon_play[11]    = { 0x000, 0x100, 0x180, 0x1C0, 0x1E0, 0x1F0, 0x1E0, 0x1C0, 0x180, 0x100, 0x000 };
-static const u16 icon_gear[11]    = { 0x020, 0x174, 0x0F8, 0x38E, 0x18C, 0x707, 0x18C, 0x38E, 0x0F8, 0x174, 0x020 };
-static const u16 icon_cheats[11]  = { 0x020, 0x020, 0x070, 0x7DF, 0x202, 0x104, 0x124, 0x252, 0x28A, 0x306, 0x000 };
-static const u16 icon_camera[11]  = { 0x000, 0x0E0, 0x3FE, 0x202, 0x272, 0x28A, 0x28A, 0x272, 0x3FE, 0x000, 0x000 };
-static const u16 icon_restart[11] = { 0x000, 0x078, 0x084, 0x102, 0x207, 0x202, 0x200, 0x102, 0x084, 0x078, 0x000 };
-static const u16 icon_folder[11]  = { 0x000, 0x3C0, 0x27C, 0x204, 0x3FE, 0x202, 0x202, 0x202, 0x3FE, 0x000, 0x000 };
-static const u16 icon_exit[11]    = { 0x020, 0x124, 0x222, 0x421, 0x401, 0x401, 0x202, 0x104, 0x0F8, 0x000, 0x000 };
+/* 20 x 20 two-tone tile icons, from gpsp-kai-design app-ui/scripts/icons20.py:
+ * per row, ink then fill, bit 19 the left pixel. */
+static const u32 icon20_play[2][20] =
+{
+  { 0x00000, 0x00000, 0x00000, 0x0C000, 0x0B000, 0x08C00, 0x08300, 0x080C0, 0x08030, 0x0800C,
+    0x0800C, 0x08030, 0x080C0, 0x08300, 0x08C00, 0x0B000, 0x0C000, 0x00000, 0x00000, 0x00000 },
+  { 0x00000, 0x00000, 0x00000, 0x00000, 0x04000, 0x07000, 0x07C00, 0x07F00, 0x07FC0, 0x07FF0,
+    0x07FF0, 0x07FC0, 0x07F00, 0x07C00, 0x07000, 0x04000, 0x00000, 0x00000, 0x00000, 0x00000 }
+};
+static const u32 icon20_gear[2][20] =
+{
+  { 0x00600, 0x00900, 0x08910, 0x14928, 0x230C4, 0x10008, 0x08610, 0x08910, 0x7108E, 0x82081,
+    0x82081, 0x7108E, 0x08F10, 0x08010, 0x10008, 0x230C4, 0x14928, 0x08910, 0x00900, 0x00600 },
+  { 0x00000, 0x00600, 0x00600, 0x08610, 0x1CF38, 0x0FFF0, 0x079E0, 0x070E0, 0x0E070, 0x7C07E,
+    0x7C07E, 0x0E070, 0x070E0, 0x07FE0, 0x0FFF0, 0x1CF38, 0x08610, 0x00600, 0x00600, 0x00000 }
+};
+static const u32 icon20_cheats[2][20] =
+{
+  { 0x00000, 0x00600, 0x00900, 0x00900, 0x01080, 0x01080, 0x7F0FE, 0x20004, 0x10008, 0x08010,
+    0x04020, 0x04020, 0x08010, 0x08910, 0x11088, 0x12048, 0x24024, 0x3801C, 0x00000, 0x00000 },
+  { 0x00000, 0x00000, 0x00600, 0x00600, 0x00F00, 0x00F00, 0x00F00, 0x1FFF8, 0x0FFF0, 0x07FE0,
+    0x03FC0, 0x03FC0, 0x07FE0, 0x070E0, 0x0E070, 0x0C030, 0x18018, 0x00000, 0x00000, 0x00000 }
+};
+static const u32 icon20_camera[2][20] =
+{
+  { 0x00000, 0x00000, 0x00000, 0x07E00, 0x04200, 0x1C3F8, 0x20004, 0x20034, 0x20F04, 0x21084,
+    0x22044, 0x22644, 0x22644, 0x22044, 0x21084, 0x20F04, 0x1FFF8, 0x00000, 0x00000, 0x00000 },
+  { 0x00000, 0x00000, 0x00000, 0x00000, 0x03C00, 0x03C00, 0x1FFF8, 0x1FFC8, 0x1F0F8, 0x1EF78,
+    0x1DFB8, 0x1D9B8, 0x1D9B8, 0x1DFB8, 0x1EF78, 0x1F0F8, 0x00000, 0x00000, 0x00000, 0x00000 }
+};
+static const u32 icon20_restart[2][20] =
+{
+  { 0x00000, 0x00100, 0x00140, 0x03F20, 0x04010, 0x09F20, 0x12140, 0x12180, 0x24018, 0x24024,
+    0x24024, 0x24024, 0x24024, 0x24024, 0x12048, 0x11088, 0x08F10, 0x06060, 0x01F80, 0x00000 },
+  { 0x00000, 0x00000, 0x00080, 0x000C0, 0x03FE0, 0x060C0, 0x0C080, 0x0C000, 0x18000, 0x18018,
+    0x18018, 0x18018, 0x18018, 0x18018, 0x0C030, 0x0E070, 0x070E0, 0x01F80, 0x00000, 0x00000 }
+};
+static const u32 icon20_folder[2][20] =
+{
+  { 0x00000, 0x00000, 0x00000, 0x00000, 0x3F800, 0x20400, 0x203F8, 0x20004, 0x20004, 0x20004,
+    0x20004, 0x20004, 0x20004, 0x20004, 0x20004, 0x20004, 0x1FFF8, 0x00000, 0x00000, 0x00000 },
+  { 0x00000, 0x00000, 0x00000, 0x00000, 0x00000, 0x1F800, 0x1FC00, 0x1FFF8, 0x1FFF8, 0x1FFF8,
+    0x1FFF8, 0x1FFF8, 0x1FFF8, 0x1FFF8, 0x1FFF8, 0x1FFF8, 0x00000, 0x00000, 0x00000, 0x00000 }
+};
+static const u32 icon20_exit[2][20] =
+{
+  { 0x00000, 0x00F00, 0x00900, 0x00900, 0x00900, 0x0C930, 0x12948, 0x14928, 0x24924, 0x28914,
+    0x28F14, 0x28014, 0x28014, 0x24024, 0x12048, 0x11988, 0x08610, 0x06060, 0x01F80, 0x00000 },
+  { 0x00000, 0x00000, 0x00600, 0x00600, 0x00600, 0x00600, 0x0C630, 0x08610, 0x18618, 0x10608,
+    0x10008, 0x10008, 0x10008, 0x18018, 0x0C030, 0x0E070, 0x079E0, 0x01F80, 0x00000, 0x00000 }
+};
 static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
 
 enum { TILE_RESUME, TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY,
@@ -41,19 +84,19 @@ enum { TILE_RESUME, TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LI
 typedef struct
 {
   const char *label;
-  const u16 *icon;
+  const u32 (*icon)[20];
   u16 color;
 } tile_t;
 
 static const tile_t tiles[TILE_COUNT] =
 {
-  { "Resume",     icon_play,    UI_COL_LIME },
-  { "Settings",   icon_gear,    UI_COL_LIME },
-  { "Cheats",     icon_cheats,  UI_COL_LIME },
-  { "Screenshot", icon_camera,  UI_COL_SKY },
-  { "Restart",    icon_restart, UI_COL_TANGERINE },
-  { "Library",    icon_folder,  UI_COL_TANGERINE },
-  { "Exit",       icon_exit,    UI_COL_PINK },
+  { "Resume",     icon20_play,    UI_COL_LIME },
+  { "Settings",   icon20_gear,    UI_COL_LIME },
+  { "Cheats",     icon20_cheats,  UI_COL_LIME },
+  { "Screenshot", icon20_camera,  UI_COL_SKY },
+  { "Restart",    icon20_restart, UI_COL_TANGERINE },
+  { "Library",    icon20_folder,  UI_COL_TANGERINE },
+  { "Exit",       icon20_exit,    UI_COL_PINK },
 };
 
 enum { UNDO_NONE, UNDO_SAVE, UNDO_SAVE_NEW, UNDO_DELETE };
@@ -68,7 +111,7 @@ static struct
   u16 *thumbs;               /* SLOTS x 64x43, in the UI pool */
   u16 *shot;                 /* 240x160 of the selected slot, in the UI pool */
   int shot_slot;
-  int cur, pos, pos_from, pos_f, rest;
+  int cur, pos, pos_from, pos_f;
   int row, tile, tile_from, tile_f;
   int open_f, close_f, closing;
   char toast[64];
@@ -107,6 +150,10 @@ static u16 *thumb(int slot)
   return p.thumbs + slot * SMALL_W * SMALL_H;
 }
 
+/* the big picture's read, a slice a frame (load_big_picture) */
+static SceUID shot_fd = -1;
+static int shot_reading = -1, shot_done, shot_failed = -1;
+
 static void read_slot(int slot)
 {
   p.has[slot] = read_state_time(slot, &p.time[slot]);
@@ -115,27 +162,92 @@ static void read_slot(int slot)
   p.thumb_tried[slot] = 0;
   if(p.shot_slot == slot)
     p.shot_slot = -1;
-  if(slot == cur_slot())
-    p.rest = 0;  /* the big picture loads again once the cursor rests */
+  if(shot_failed == slot)
+    shot_failed = -1;  /* the file changed: try again */
 }
 
-/* A savestate without its .thm (from before them, or saved by an older
- * kai) gets one the first time the cursor rests on it. The full
- * screenshot is read for the big picture anyway. */
-static void load_big_picture(void)
-{
-  int slot = cur_slot();
+/* The big picture: the full screenshot of the selected slot. Once the
+ * cursor moves, it is read a slice a frame on this thread (a second thread
+ * gave nothing on the PSP), so it is sharp by the time the strip stops; the
+ * 64 x 43 picture stands in meanwhile. Moving on drops the read. Every
+ * other file action closes it first (shot_wait). A savestate without its
+ * .thm (from an older kai) is read at once, which makes the .thm. */
+#define SHOT_BYTES (240 * 160 * 2)
+#define SHOT_SLICE (SHOT_BYTES / 8)
 
+static void shot_wait(void)
+{
+  if(shot_fd >= 0)
+    sceIoClose(shot_fd);
+  shot_fd = -1;
+  shot_reading = -1;
+}
+
+/* The whole picture now (opening, and savestates without a .thm). */
+static void load_big_picture_now(void)
+{
+  int slot = cur_slot(), make_thm = !p.thumb_ok[slot] && !p.thumb_tried[slot];
+
+  shot_wait();
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot))
     return;
-  if(read_state_shot(slot, p.shot, !p.thumb_ok[slot] && !p.thumb_tried[slot]))
-  {
+  p.shot_slot = -1;
+  if(read_state_shot(slot, p.shot, make_thm))
     p.shot_slot = slot;
+  else
+    shot_failed = slot;
+  if(make_thm)
+  {
+    p.thumb_tried[slot] = 1;
+    p.thumb_ok[slot] = p.thumbs && read_state_thumbnail(slot, p.time[slot], thumb(slot));
+  }
+}
+
+/* Once a frame: the next slice of the selected slot's picture. */
+static void load_big_picture(void)
+{
+  int slot = cur_slot(), n;
+
+  if((shot_fd >= 0) && (shot_reading != slot))
+    shot_wait();  /* the cursor moved on */
+  if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot) || (shot_failed == slot))
+    return;
+  if(shot_fd < 0)
+  {
+    char path[MAX_PATH];
+    u8 head[8];
+
     if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
     {
-      p.thumb_tried[slot] = 1;
-      p.thumb_ok[slot] = p.thumbs && read_state_thumbnail(slot, p.time[slot], thumb(slot));
+      load_big_picture_now();
+      return;
     }
+    get_state_slot_path(slot, path);
+    shot_fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+    if((shot_fd < 0) || (sceIoRead(shot_fd, head, 8) != 8) || memcmp(head, g_state_str, 4))
+    {
+      shot_wait();
+      shot_failed = slot;
+      return;
+    }
+    shot_reading = slot;
+    shot_done = 0;
+    p.shot_slot = -1;  /* p.shot is being written */
+  }
+  n = SHOT_BYTES - shot_done;
+  if(n > SHOT_SLICE)
+    n = SHOT_SLICE;
+  if(sceIoRead(shot_fd, (u8 *)p.shot + shot_done, n) != n)
+  {
+    shot_wait();
+    shot_failed = slot;
+    return;
+  }
+  shot_done += n;
+  if(shot_done == SHOT_BYTES)
+  {
+    shot_wait();
+    p.shot_slot = slot;
   }
 }
 
@@ -168,14 +280,24 @@ static void format_time(u64 tick, char *out)
 
 /* ---- drawing ------------------------------------------------------------- */
 
-static void draw_icon2x(int x, int y, const u16 *bits, u16 color)
+/* A 20 x 20 tile icon at its real size: a 1 px plum shadow down-right,
+ * then the plum ink and the fill. */
+static void draw_icon20(int x, int y, const u32 (*bits)[20], u16 fill)
 {
   int i, j;
 
-  for(j = 0; j < 11; j++)
-    for(i = 0; i < 11; i++)
-      if(bits[j] & (0x400 >> i))
-        ui_fill(x + i * 2, y + j * 2, 2, 2, color);
+  for(j = 0; j < 20; j++)
+    for(i = 0; i < 20; i++)
+      if((bits[0][j] | bits[1][j]) & (0x80000 >> i))
+        ui_fill(x + i + 1, y + j + 1, 1, 1, UI_COL_PLUM);
+  for(j = 0; j < 20; j++)
+    for(i = 0; i < 20; i++)
+    {
+      if(bits[0][j] & (0x80000 >> i))
+        ui_fill(x + i, y + j, 1, 1, UI_COL_PLUM);
+      else if(bits[1][j] & (0x80000 >> i))
+        ui_fill(x + i, y + j, 1, 1, fill);
+    }
 }
 
 static void draw_icon1x(int x, int y, const u16 *bits, u16 color)
@@ -250,7 +372,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   if(big)
   {
     x = STRIP_CX - w / 2 + dd * 116 / 256;
-    y = 40 + dy;
+    y = 46 + dy;  /* 10 px under the header */
     ui_round_fill(x + 3, y + 3, w + 8, h + 8, 3, UI_COL_SHADE);
     ui_round_fill(x - 4, y - 4, w + 8, h + 8, 3, UI_COL_SKY);
   }
@@ -258,7 +380,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   {
     int off = (ad >= 256) ? 116 + (ad - 256) * 76 / 256 : ad * 116 / 256;
     x = STRIP_CX + ((dd > 0) ? off : -off) - w / 2;
-    y = 66 + dy;
+    y = 72 + dy;
     ui_round_fill(x - 2, y - 2, w + 4, h + 4, 2, UI_COL_CARD);
   }
 
@@ -286,6 +408,25 @@ static void draw_slot(int slot, int dd, int dy, int selected)
     }
   }
 
+  /* a hold past 12 f (delete, or load with the save off): the picture is
+     screen-doored and a card names the action over its bar */
+  if(big && p.has[slot] && (p.hold.shown || p.load_hold.shown))
+  {
+    ui_hold_t *hd = p.hold.shown ? &p.hold : &p.load_hold;
+    const char *verb = p.hold.shown ? "Delete (hold)" : "Load (hold)";
+    int cw = ui_text_width((char *)verb) + 20, cx, cy;
+
+    if(cw < 96)
+      cw = 96;
+    cx = x + (w - cw) / 2;
+    cy = y + (h - 34) / 2;
+    ui_checker(x, y, w, h, UI_COL_SHADE);
+    ui_round_fill(cx + 2, cy + 2, cw, 34, 2, UI_COL_SHADE);
+    ui_round_fill(cx, cy, cw, 34, 2, UI_COL_CARD);
+    ui_text(cx + (cw - ui_text_width((char *)verb)) / 2, cy + 3, (char *)verb, UI_COL_CREAM);
+    ui_hold_bar(cx + 8, cy + 22, cw - 16, hd->p, p.hold.shown ? UI_COL_PINK : UI_COL_LIME);
+  }
+
   if(slot == LAST_SLOT)
     strcpy(label, "Last");
   else
@@ -293,10 +434,6 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   ui_round_fill(x + 2, y + h - 14, ui_text_width(label) + 8, 13, 2, UI_COL_PLUM);
   ui_text(x + 6, y + h - 15, label, UI_COL_CREAM);
 
-  if(big && (p.hold.p > 0) && p.has[slot])  /* hold SELECT: delete */
-    ui_fill(x, y + h + 1, w * p.hold.p / 256, 3, UI_COL_PINK);
-  if(big && (p.load_hold.p > 0) && p.has[slot])  /* hold confirm: load */
-    ui_fill(x, y + h + 1, w * p.load_hold.p / 256, 3, UI_COL_LIME);
   if(selected)
     ui_cursor_frame(x - 6, y - 6, w + 12, h + 12);
 }
@@ -312,7 +449,7 @@ static void draw_tile(int i, int ty, int selected)
   tx -= lift;
   ty -= lift;
   ui_round_fill(tx + 16, ty + 6, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
-  draw_icon2x(tx + 19, ty + 9, tiles[i].icon, UI_COL_PLUM);
+  draw_icon20(tx + 19, ty + 9, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
   for(j = 0; j < 2; j++)
     if(ui_wrap_line(tiles[i].label, j, 56, UI_FONT_SMALL, line[j], sizeof(line[j])))
       lines++;
@@ -349,37 +486,59 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
 
 static void draw_hints(int done)
 {
-  ui_hint_t hints[6];
-  int n = 0;
+  ui_hint_t c1[4], c2[3], c3[1], c4[1], c5[1];
+  ui_hint_col_t cols[5];
+  u32 resume_keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0);
+  int i, full = p.has[cur_slot()];
 
   if(p.bar_text || !done || p.closing)
   {
-    ui_hint_strip(hints, 0);  /* nothing to press while saving */
+    ui_hint_strip(c1, 0);  /* nothing to press while saving */
     return;
   }
   if(p.exit_holding)
   {
-    hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: quit";
-    hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
+    c1[0].keys = ui_key_confirm; c1[0].verb = "Hold: quit";
+    c1[1].keys = ui_key_back;    c1[1].verb = "Back";
+    ui_hint_strip(c1, 2);
+    return;
   }
-  else if(p.row == 0)
+
+  /* fixed columns, each as wide as its widest variant, so a changing verb
+     never moves the others (spec section 2, hint strip) */
+  for(i = 0; i < 4; i++)
+    c1[i].keys = ui_key_confirm;
+  c1[0].verb = "Save";
+  c1[1].verb = "Load";
+  c1[2].verb = "Load (hold)";
+  c1[3].verb = "Open";
+  c2[0].keys = PSP_CTRL_SELECT; c2[0].verb = "Save \xC2\xB7 hold: Delete";
+  c2[1].keys = PSP_CTRL_SELECT; c2[1].verb = "Undo";
+  c2[2].keys = PSP_CTRL_UP;     c2[2].verb = "Savestates";
+  c3[0].keys = resume_keys;       c3[0].verb = "Resume";
+  c4[0].keys = PSP_CTRL_LTRIGGER; c4[0].verb = "Last";
+  c5[0].keys = PSP_CTRL_RTRIGGER; c5[0].verb = "Slot 0";
+
+  cols[0].variants = c1; cols[0].count = 4;
+  cols[1].variants = c2; cols[1].count = 3;
+  cols[2].variants = c3; cols[2].count = 1; cols[2].shown = 0;
+  cols[3].variants = c4; cols[3].count = 1;
+  cols[4].variants = c5; cols[4].count = 1;
+  if(p.row == 0)
   {
-    hints[n].keys = ui_key_confirm;
-    hints[n++].verb = !p.has[cur_slot()] ? "Save" :
-     (g_gpsp_config.save_on_leave ? "Load" : "Load (hold)");
-    hints[n].keys = PSP_CTRL_SELECT;
-    hints[n++].verb = (ui_toast_up(p.toast_f) && p.toast_undo) ? "Undo" : "Save \xC2\xB7 hold: Delete";
-    hints[n].keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0); hints[n++].verb = "Resume";
-    hints[n].keys = PSP_CTRL_LTRIGGER; hints[n++].verb = "Last";
-    hints[n].keys = PSP_CTRL_RTRIGGER; hints[n++].verb = "Slot 0";
+    cols[0].shown = !full ? 0 : (g_gpsp_config.save_on_leave ? 1 : 2);
+    cols[1].shown = (ui_toast_up(p.toast_f) && p.toast_undo) ? 1 : 0;
+    cols[3].shown = 0;
+    cols[4].shown = 0;
   }
   else
   {
-    hints[n].keys = ui_key_confirm; hints[n++].verb = "Open";
-    hints[n].keys = PSP_CTRL_UP;    hints[n++].verb = "Savestates";
-    hints[n].keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0); hints[n++].verb = "Resume";
+    cols[0].shown = 3;
+    cols[1].shown = 2;
+    cols[3].shown = -1;  /* L and R columns stay empty on the tile row */
+    cols[4].shown = -1;
   }
-  ui_hint_strip(hints, n);
+  ui_hint_columns(cols, 5);
 }
 
 /* The saving card: a title, 30 blocks and a note (spec "exit"). */
@@ -460,8 +619,8 @@ static void draw_screen(int bar_fill)
     /* on a plum pill: cream text alone is lost on a busy game picture */
     {
       int iw = ui_text_width(info);
-      ui_round_fill(STRIP_CX - iw / 2 - 6, 145, iw + 12, 15, 2, UI_COL_PLUM);
-      ui_text(STRIP_CX - iw / 2, 146, info, UI_COL_CREAM);
+      ui_round_fill(STRIP_CX - iw / 2 - 6, 152, iw + 12, 15, 2, UI_COL_PLUM);
+      ui_text(STRIP_CX - iw / 2, 153, info, UI_COL_CREAM);
     }
   }
 
@@ -548,6 +707,7 @@ static void action_save(int slot)
   char name[MAX_FILE], text[48];
   int had = p.has[slot];
 
+  shot_wait();  /* the screenshot reader shares p.shot and the Memory Stick */
   get_savestate_filename_noshot(slot, name);
   slot_name(slot, text);
   run_with_bar("Saving\xE2\x80\xA6", NULL);
@@ -575,6 +735,7 @@ static void action_delete(int slot)
 {
   char path[MAX_PATH], text[48], msg_text[64];
 
+  shot_wait();
   if(slot == LAST_SLOT)
     delete_last_state();
   else
@@ -616,6 +777,7 @@ static int action_load(int slot)
   int keep = g_gpsp_config.save_on_leave, swap = keep && (slot == LAST_SLOT);
   u32 ok;
 
+  shot_wait();
   if(!p.has[slot])
     return 0;
   if(slot == LAST_SLOT)
@@ -670,6 +832,7 @@ static void action_undo(void)
   char path[MAX_PATH];
   int slot = p.undo_slot;
 
+  shot_wait();
   switch(p.undo)
   {
     case UNDO_SAVE:
@@ -695,6 +858,7 @@ static void action_undo(void)
 
 static int action_exit(void)
 {
+  shot_wait();
   if(!g_gpsp_config.save_on_leave)
   {
     p.exit_holding = 1;
@@ -717,9 +881,10 @@ static void move_slot(int to)
    ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
   p.cur = to;
   p.pos_f = 0;
-  p.rest = 0;
   p.hold.p = 0;
+  p.hold.shown = 0;
   p.load_hold.p = 0;
+  p.load_hold.shown = 0;
 }
 
 static void move_tile(int to)
@@ -743,6 +908,9 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
+  shot_fd = -1;
+  shot_reading = -1;
+  shot_failed = -1;
   /* It opens on the slot last saved or loaded in this game (slot 0 at
      first); L jumps to Last, R to slot 0 (maintainer, 2026-11-15). */
   p.cur = strip_position((g_game_config.last_slot < SLOTS) ? g_game_config.last_slot : 0);
@@ -760,8 +928,7 @@ u32 ui_pause(u16 *game_picture)
     read_slot(i);
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
-  load_big_picture();
-  p.rest = SHOT_REST + UI_F_SCROLL;
+  load_big_picture_now();
   build_layer();
   ui_input_init();
 
@@ -809,12 +976,14 @@ u32 ui_pause(u16 *game_picture)
           if(p.load_hold.done)
           {
             p.load_hold.p = 0;
+            p.load_hold.shown = 0;
             action_load(cur_slot());
           }
         }
         else
         {
           p.load_hold.p = 0;
+          p.load_hold.shown = 0;
           if(ui_pressed(ui_key_confirm))
           {
             if(p.has[cur_slot()])
@@ -824,24 +993,41 @@ u32 ui_pause(u16 *game_picture)
           }
         }
 
-        /* SELECT: Undo while the toast offers it, else save; hold: delete */
-        if(p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo))
+        /* SELECT: Undo while the toast offers it, else save; hold: delete.
+           Where it can hold, only a release within 12 f is a tap: a longer
+           press is a hold, and letting go early does nothing. */
         {
-          ui_hold_step(&p.hold, PSP_CTRL_SELECT);
-          if(p.hold.done)
+          int can_hold = p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo);
+          int tap;
+
+          if(can_hold)
+          {
+            ui_hold_step(&p.hold, PSP_CTRL_SELECT);
+            if(p.hold.done)
+            {
+              p.hold.p = 0;
+              p.hold.shown = 0;
+              action_delete(cur_slot());
+            }
+            tap = ui_tap(PSP_CTRL_SELECT);
+          }
+          else
           {
             p.hold.p = 0;
-            action_delete(cur_slot());
+            p.hold.shown = 0;
+            /* no hold here: any release is a tap, except the one ending
+               the hold that just deleted this slot */
+            tap = ui_released(PSP_CTRL_SELECT) && !p.hold.fired;
+            if(!ui_down(PSP_CTRL_SELECT))
+              p.hold.fired = 0;
           }
-        }
-        else
-          p.hold.p = 0;
-        if(ui_tap(PSP_CTRL_SELECT))
-        {
-          if(ui_toast_up(p.toast_f) && p.toast_undo)
-            action_undo();
-          else
-            action_save(cur_slot());
+          if(tap)
+          {
+            if(ui_toast_up(p.toast_f) && p.toast_undo)
+              action_undo();
+            else
+              action_save(cur_slot());
+          }
         }
       }
       else
@@ -854,7 +1040,7 @@ u32 ui_pause(u16 *game_picture)
           p.row = 0;
           move_slot(strip_position(ui_pressed(PSP_CTRL_LTRIGGER) ? LAST_SLOT : 0));
         }
-        if(ui_tap(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
+        if(ui_released(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
           action_undo();
 
         if(ui_pressed(ui_key_confirm))
@@ -870,6 +1056,7 @@ u32 ui_pause(u16 *game_picture)
               leave = LEAVE_OLD_MENU;
               break;
             case TILE_SHOT:
+              shot_wait();
               save_ss_bmp(p.game);
               show_toast("Screenshot saved", UI_COL_SKY, UNDO_NONE, 0);
               break;
@@ -890,8 +1077,7 @@ u32 ui_pause(u16 *game_picture)
 
     if(p.pos_f < UI_F_SCROLL) p.pos_f++;
     if(p.tile_f < UI_F_CURSOR) p.tile_f++;
-    if(++p.rest == SHOT_REST + UI_F_SCROLL)
-      load_big_picture();
+    load_big_picture();
 
     draw_screen(0);
     if(p.toast_f >= 0)
@@ -899,6 +1085,7 @@ u32 ui_pause(u16 *game_picture)
     ui_frame_end();
   }
 
+  shot_wait();
   ui_layer_reset();
   ui_pool_release(mark);
 
