@@ -52,7 +52,7 @@
 #define UI_F_RESUME_FADE    8  /* out-cubic */
 #define UI_F_HOLD_SHOW     12  /* step */
 #define UI_F_FLASH          8  /* linear */
-#define UI_F_HOLD          45  /* linear; 0.75 s (maintainer, 2026-11-16) */
+#define UI_F_HOLD          60  /* linear; 1 s (maintainer, 2026-11-16) */
 #define UI_F_HOLD_DRAIN    10  /* linear */
 #define UI_F_SAVING        30  /* linear */
 #define UI_F_TIP_DELAY     18  /* step */
