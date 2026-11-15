@@ -51,9 +51,18 @@ void ui_input_init(void)
   memset(last_hold, 0, sizeof(last_hold));
 }
 
+#ifdef UI_PERF
+u32 (*ui_input_script)(void) = NULL;
+#endif
+
 void ui_input_update(void)
 {
   u32 i, bit, now = read_keys();
+
+#ifdef UI_PERF
+  if(ui_input_script)
+    now = ui_input_script();
+#endif
 
   keys_ignored &= now;
   now &= ~keys_ignored;

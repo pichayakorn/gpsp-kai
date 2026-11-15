@@ -192,7 +192,7 @@ void ui_bench(void)
       ui_text(tx + 6, 208 - UI_LIFT + 9, "Saved to slot 3", UI_COL_CREAM);
     }
 
-    /* hold bar: fills in 60 f while SELECT is down */
+    /* hold bar: fills in UI_F_HOLD frames while SELECT is down */
     {
       u32 held = ui_hold_frames(PSP_CTRL_SELECT);
       if(held > UI_F_HOLD) held = UI_F_HOLD;

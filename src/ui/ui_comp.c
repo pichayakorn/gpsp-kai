@@ -379,6 +379,49 @@ void ui_game_toast(const char *text, u16 edge)
   osd_tick = game_toast_tick;
 }
 
+/* In a game the battery shows only at 10 % or less, on battery: a pink
+ * chip bottom right (the 4 % save to Last says the rest). Called once a
+ * second while a game runs; it redraws the chip only when it changes. */
+void ui_game_battery(int level, int on_battery)
+{
+  static int shown = -1;
+  u16 *saved = ui_fb;
+  u32 saved_pitch = ui_fb_pitch, i;
+  char pct[8];
+  int w;
+
+  if(!on_battery || (level < 0) || (level > 10))
+  {
+    osd_chip_rect[2] = 0;
+    shown = -1;
+    return;
+  }
+  if(level == shown)
+    return;
+  shown = level;
+
+  sprintf(pct, "%d%%", level);
+  w = ui_text_width(pct) + 26;
+  if(w > OSD_CHIP_W)
+    w = OSD_CHIP_W;
+  for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
+    osd_chip_pixels[i] = GAME_TOAST_KEY;
+  ui_fb = osd_chip_pixels;
+  ui_fb_pitch = OSD_CHIP_W;
+  ui_round_fill(0, 0, w, 16, 2, UI_COL_PINK);
+  ui_fill(6, 5, 9, 6, UI_COL_PLUM);
+  ui_text(20, 1, pct, UI_COL_PLUM);
+  ui_fb = saved;
+  ui_fb_pitch = saved_pitch;
+  for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
+    osd_chip_pixels[i] = (osd_chip_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_chip_pixels[i] | 0x8000);
+
+  osd_chip_rect[0] = 466 - w;
+  osd_chip_rect[1] = UI_SCREEN_H - 6 - 16;
+  osd_chip_rect[3] = 16;
+  osd_chip_rect[2] = w;  /* last: the chip shows from here */
+}
+
 /* Is the toast still up (Undo works while it is)? */
 int ui_toast_up(int f)
 {

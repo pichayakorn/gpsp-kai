@@ -87,6 +87,12 @@ ifeq ($(SIM_PSP1000), 1)
 CFLAGS          += -DSIM_PSP1000
 endif
 
+# make UI4=1 PERF=1: the pause screen runs a fixed input script and writes
+# its frame times to perf_pause.csv (a measuring build, never released)
+ifeq ($(PERF), 1)
+CFLAGS          += -DUI_PERF
+endif
+
 ifeq ($(PSP_LARGE_MEMORY), 0)
 CFLAGS          += -DUSE_EXT_MEM
 endif
@@ -161,7 +167,7 @@ endif
 # Options given on the command line (make UI4=1) don't touch Makefile.set,
 # so they are written to build_options.stamp, rewritten only when they
 # change.
-BUILD_OPTIONS := $(USE_DEBUG) $(USE_ADHOC) $(USE_C_CORE) $(PSP_LARGE_MEMORY) $(UI4) $(SIM_PSP1000)
+BUILD_OPTIONS := $(USE_DEBUG) $(USE_ADHOC) $(USE_C_CORE) $(PSP_LARGE_MEMORY) $(UI4) $(SIM_PSP1000) $(PERF)
 $(shell [ "$$(cat build_options.stamp 2>/dev/null)" = "$(BUILD_OPTIONS)" ] || echo "$(BUILD_OPTIONS)" > build_options.stamp)
 EXTRA_CLEAN     += build_options.stamp
 $(OBJS): ../version.txt ../version.mk ../Makefile.set build_options.stamp

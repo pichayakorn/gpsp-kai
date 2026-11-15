@@ -176,12 +176,20 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
 
   if((w <= 0) || (h <= 0) || !clip(&x0, &y0, &cw, &ch))
     return;
-  row = fb + y0 * fb_pitch;
-  for(j = y0; j < y0 + ch; j++, row += fb_pitch)
+  /* 16.16 steps: no division per pixel (the PSP's divide is slow) */
   {
-    const u16 *line = src + ((j - y) * sh / h) * sw;
-    for(i = x0; i < x0 + cw; i++)
-      row[i] = line[(i - x) * sw / w];
+    u32 sx = ((u32)sw << 16) / w, sy = ((u32)sh << 16) / h;
+    u32 u0 = (x0 - x) * sx, v = (y0 - y) * sy;
+
+    row = fb + y0 * fb_pitch;
+    for(j = 0; j < ch; j++, row += fb_pitch, v += sy)
+    {
+      const u16 *line = src + (v >> 16) * sw;
+      u16 *out = row + x0;
+      u32 u = u0;
+      for(i = 0; i < cw; i++, u += sx)
+        out[i] = line[u >> 16];
+    }
   }
 }
 
@@ -284,13 +292,19 @@ int ui_glyph(int x, int y, u32 key)
 
   if(symbol)
   {
+    /* the disc a row at a time */
     for(j = 0; j < UI_DISC; j++)
-      for(i = 0; i < UI_DISC; i++)
+    {
+      int dy = j * 2 - (UI_DISC - 1), i0 = 0;
+      while(i0 < UI_DISC / 2)
       {
-        int dx = i * 2 - (UI_DISC - 1), dy = j * 2 - (UI_DISC - 1);
+        int dx = i0 * 2 - (UI_DISC - 1);
         if(dx * dx + dy * dy <= UI_DISC * UI_DISC)
-          ui_fill(x + i, y + j, 1, 1, glyph_bg);
+          break;
+        i0++;
       }
+      ui_fill(x + i0, y + j, UI_DISC - i0 * 2, 1, glyph_bg);
+    }
     for(j = 0; j < 7; j++)
       for(i = 0; i < 7; i++)
         if(symbol[j] & (0x40 >> i))

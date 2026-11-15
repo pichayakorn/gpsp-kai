@@ -19,6 +19,9 @@
  */
 
 #include "common.h"
+#ifdef UI4
+#include "ui/ui.h"
+#endif
 
 #define STATUS_ROWS 0
 #define CURRENT_DIR_ROWS 1
@@ -2131,6 +2134,9 @@ void check_battery_save(void)
   percent = scePowerGetBatteryLifePercent();
   if(percent < 0)
     return;
+#ifdef UI4
+  ui_game_battery(percent, scePowerIsBatteryCharging() <= 0);
+#endif
   if((scePowerIsBatteryCharging() > 0) || (percent > BATTERY_SAVE_PERCENT))
   {
     armed = 1;

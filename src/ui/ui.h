@@ -27,6 +27,9 @@ u32 ui_repeat(u32 mask);     /* d-pad: on press, then after 18 f every 4 f */
 u32 ui_tap(u32 mask);        /* released within UI_F_HOLD_SHOW: not a hold */
 u32 ui_held(u32 mask);       /* a hold completed this frame (UI_F_HOLD) */
 u32 ui_hold_frames(u32 key); /* frames one key has been down */
+#ifdef UI_PERF
+extern u32 (*ui_input_script)(void);  /* keys from a script instead of the pad */
+#endif
 /* Moves index i of a list or strip of count items by the less/more keys
  * (with repeat). A fresh press wraps to the other end; a repeat stops at
  * the end, so the next fresh press wraps. */
@@ -126,6 +129,7 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f);
 int ui_toast(const char *text, u16 edge, const char *undo, int f);
 int ui_toast_up(int f);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
+void ui_game_battery(int level, int on_battery);  /* once a second in a game */
 
 typedef struct
 {

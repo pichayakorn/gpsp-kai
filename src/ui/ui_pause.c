@@ -117,6 +117,7 @@ static struct
   char toast[64];
   u16 toast_edge;
   int toast_f, toast_undo;
+  int undo_ended;            /* the cursor moved: the toast leaves, no Undo */
   int undo, undo_slot;
   ui_hold_t hold;
   ui_hold_t load_hold;       /* hold confirm: load with the save off */
@@ -152,7 +153,7 @@ static u16 *thumb(int slot)
 
 /* the big picture's read, a slice a frame (load_big_picture) */
 static SceUID shot_fd = -1;
-static int shot_reading = -1, shot_done, shot_failed = -1;
+static int shot_state, shot_reading = -1, shot_failed = -1;
 
 static void read_slot(int slot)
 {
@@ -167,19 +168,33 @@ static void read_slot(int slot)
 }
 
 /* The big picture: the full screenshot of the selected slot. Once the
- * cursor moves, it is read a slice a frame on this thread (a second thread
- * gave nothing on the PSP), so it is sharp by the time the strip stops; the
- * 64 x 43 picture stands in meanwhile. Moving on drops the read. Every
- * other file action closes it first (shot_wait). A savestate without its
- * .thm (from an older kai) is read at once, which makes the .thm. */
+ * cursor moves it is read with the PSP's asynchronous file calls (open,
+ * then the 8-byte head and the picture), polled once a frame, so the frame
+ * never waits for the Memory Stick and the picture is sharp by the time
+ * the strip stops; the 64 x 43 picture stands in meanwhile. A read the
+ * cursor has left is finished and dropped. Every other file action waits
+ * for it first (shot_wait). A savestate without its .thm (from an older
+ * kai) is read at once, which makes the .thm. */
 #define SHOT_BYTES (240 * 160 * 2)
-#define SHOT_SLICE (SHOT_BYTES / 8)
+enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_PIXELS };
 
+static u8 shot_head[8] __attribute__((aligned(64)));
+
+/* Wait for the asynchronous call in flight, then close. */
 static void shot_wait(void)
 {
+  SceInt64 res;
+
+  if(shot_state == SHOT_IDLE)
+    return;
   if(shot_fd >= 0)
-    sceIoClose(shot_fd);
+  {
+    sceIoWaitAsync(shot_fd, &res);
+    if((shot_state != SHOT_OPENING) || (res >= 0))  /* a failed open has nothing to close */
+      sceIoClose(shot_fd);
+  }
   shot_fd = -1;
+  shot_state = SHOT_IDLE;
   shot_reading = -1;
 }
 
@@ -203,51 +218,92 @@ static void load_big_picture_now(void)
   }
 }
 
-/* Once a frame: the next slice of the selected slot's picture. */
+static void shot_fail(int slot)
+{
+  shot_wait();
+  shot_failed = slot;
+}
+
+/* Once a frame: start, advance or finish the read of the selected slot. */
 static void load_big_picture(void)
 {
-  int slot = cur_slot(), n;
+  int slot = cur_slot();
+  SceInt64 res;
 
-  if((shot_fd >= 0) && (shot_reading != slot))
-    shot_wait();  /* the cursor moved on */
+  if(shot_state != SHOT_IDLE)
+  {
+    if(sceIoPollAsync(shot_fd, &res) == 1)
+      return;  /* still busy */
+    if(shot_reading != slot)
+    {
+      /* the cursor moved on: this call is done, so close and start over */
+      if((shot_state != SHOT_OPENING) || (res >= 0))
+        sceIoClose(shot_fd);
+      shot_fd = -1;
+      shot_state = SHOT_IDLE;
+      shot_reading = -1;
+    }
+    else
+    {
+      switch(shot_state)
+      {
+        case SHOT_OPENING:
+          if(res < 0)
+          {
+            shot_fd = -1;
+            shot_state = SHOT_IDLE;
+            shot_failed = slot;
+            return;
+          }
+          shot_state = SHOT_HEAD;
+          sceIoReadAsync(shot_fd, shot_head, 8);
+          return;
+        case SHOT_HEAD:
+          if((res != 8) || memcmp(shot_head, g_state_str, 4))
+          {
+            shot_fail(slot);
+            return;
+          }
+          shot_state = SHOT_PIXELS;
+          p.shot_slot = -1;  /* p.shot is being written */
+          sceIoReadAsync(shot_fd, p.shot, SHOT_BYTES);
+          return;
+        case SHOT_PIXELS:
+          if(res != SHOT_BYTES)
+          {
+            shot_fail(slot);
+            return;
+          }
+          sceIoClose(shot_fd);
+          shot_fd = -1;
+          shot_state = SHOT_IDLE;
+          shot_reading = -1;
+          p.shot_slot = slot;
+          return;
+      }
+    }
+  }
+
   if((p.shot == NULL) || !p.has[slot] || (p.shot_slot == slot) || (shot_failed == slot))
     return;
-  if(shot_fd < 0)
+  if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
+  {
+    load_big_picture_now();
+    return;
+  }
   {
     char path[MAX_PATH];
-    u8 head[8];
 
-    if(!p.thumb_ok[slot] && !p.thumb_tried[slot])
-    {
-      load_big_picture_now();
-      return;
-    }
     get_state_slot_path(slot, path);
-    shot_fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
-    if((shot_fd < 0) || (sceIoRead(shot_fd, head, 8) != 8) || memcmp(head, g_state_str, 4))
+    shot_fd = sceIoOpenAsync(path, PSP_O_RDONLY, 0777);
+    if(shot_fd < 0)
     {
-      shot_wait();
+      shot_fd = -1;
       shot_failed = slot;
       return;
     }
+    shot_state = SHOT_OPENING;
     shot_reading = slot;
-    shot_done = 0;
-    p.shot_slot = -1;  /* p.shot is being written */
-  }
-  n = SHOT_BYTES - shot_done;
-  if(n > SHOT_SLICE)
-    n = SHOT_SLICE;
-  if(sceIoRead(shot_fd, (u8 *)p.shot + shot_done, n) != n)
-  {
-    shot_wait();
-    shot_failed = slot;
-    return;
-  }
-  shot_done += n;
-  if(shot_done == SHOT_BYTES)
-  {
-    shot_wait();
-    p.shot_slot = slot;
   }
 }
 
@@ -285,6 +341,30 @@ static void format_time(u64 tick, char *out)
 static void draw_icon20(int x, int y, const u32 (*bits)[20], u16 fill)
 {
   int i, j;
+
+  /* on screen (always, but for the edges of a motion): straight into the
+     frame, without a clipped fill per pixel */
+  if((x >= 0) && (y >= 0) && (x + 21 <= UI_SCREEN_W) && (y + 21 <= UI_SCREEN_H))
+  {
+    u16 *row = ui_fb + y * ui_fb_pitch + x;
+    for(j = 0; j < 20; j++, row += ui_fb_pitch)
+    {
+      u32 any = bits[0][j] | bits[1][j];
+      for(i = 0; i < 20; i++)
+        if(any & (0x80000 >> i))
+          row[ui_fb_pitch + i + 1] = UI_COL_PLUM;
+    }
+    row = ui_fb + y * ui_fb_pitch + x;
+    for(j = 0; j < 20; j++, row += ui_fb_pitch)
+      for(i = 0; i < 20; i++)
+      {
+        if(bits[0][j] & (0x80000 >> i))
+          row[i] = UI_COL_PLUM;
+        else if(bits[1][j] & (0x80000 >> i))
+          row[i] = fill;
+      }
+    return;
+  }
 
   for(j = 0; j < 20; j++)
     for(i = 0; i < 20; i++)
@@ -342,23 +422,94 @@ static void draw_header(int hy)
   ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
 }
 
+/* The status chip, top right and as wide as its content: the clock (the
+ * PSP's 12/24-hour setting), then the battery: lime, tangerine at 20 % or
+ * less, pink with the % at 10 % or less, sky with a bolt while charging. */
+static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
+
+/* The battery and clock are read once a second, not every frame: each
+   scePower call asks the power chip and costs milliseconds (measured: the
+   header and chip took 10.5 ms of a 16 ms frame). */
+static int status_age;
+
+static ScePspDateTime status_now;
+static int status_level, status_format, status_battery, status_charging;
+
+/* Everything at once: when the screen opens, before its first frame. */
+static void read_status(void)
+{
+  status_level = scePowerGetBatteryLifePercent();
+  status_battery = scePowerIsBatteryExist() > 0;
+  status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  sceRtcGetCurrentClockLocalTime(&status_now);
+  status_format = 0;
+  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
+  status_age = 60;
+}
+
 static void draw_status(void)
 {
-  ScePspDateTime now;
-  char clock[16];
-  int level = scePowerGetBatteryLifePercent();
+  int shown_level;
+  char clock[16], pct[8];
+  int w, x, tx, i, j, critical = 0;
+  u16 color = UI_COL_LIME;
 
-  sceRtcGetCurrentClockLocalTime(&now);
-  sprintf(clock, "%02d:%02d", now.hour, now.minute);
-  ui_round_fill(UI_SCREEN_W - 20 - 66, 8, 66, 16, 2, UI_COL_CARD);
-  ui_text(UI_SCREEN_W - 20 - 66 + 6, 9, clock, UI_COL_CREAM);
-  if(scePowerIsBatteryExist() > 0)
+  /* one call a frame, spread over the second, so no frame takes them all
+     (a frame with every call still missed its vblank) */
+  if(status_age <= 0)
   {
-    int bx = UI_SCREEN_W - 20 - 18, by = 11;
-    draw_icon1x(bx, by, icon_battery, UI_COL_LIME);
-    if(level > 0)
-      ui_fill(bx + 2, by + 3, 7 * (level > 100 ? 100 : level) / 100, 3, UI_COL_LIME);
+    /* the 12/24-hour setting is read in read_status() only: reading the
+       system settings cost a frame 10-20 ms (PERF run) */
+    status_age = 60;
+    sceRtcGetCurrentClockLocalTime(&status_now);
   }
+  else if(status_age == 45)
+    status_level = scePowerGetBatteryLifePercent();
+  else if(status_age == 30)
+    status_battery = scePowerIsBatteryExist() > 0;
+  else if(status_age == 15)
+    status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  status_age--;
+  shown_level = (status_level < 0) ? 0 : ((status_level > 100) ? 100 : status_level);
+  if(status_format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
+    sprintf(clock, "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? "AM" : "PM");
+  else
+    sprintf(clock, "%02d:%02d", status_now.hour, status_now.minute);
+  if(status_charging)
+    color = UI_COL_SKY;
+  else if(shown_level <= 10)
+  {
+    color = UI_COL_PINK;
+    critical = status_battery;
+  }
+  else if(shown_level <= 20)
+    color = UI_COL_TANGERINE;
+  sprintf(pct, "%d%%", shown_level);
+
+  w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
+   (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
+  x = 460 - w;
+  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
+  ui_text(x + 6, 9, clock, UI_COL_CREAM);
+  if(!status_battery)
+    return;
+  tx = x + 6 + ui_text_width(clock) + 4;
+  if(critical)
+  {
+    ui_text(tx, 9, pct, UI_COL_PINK);
+    tx += ui_text_width(pct) + 4;
+  }
+  if(status_charging)
+  {
+    for(j = 0; j < 7; j++)
+      for(i = 0; i < 5; i++)
+        if(bolt[j] & (0x10 >> i))
+          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
+    tx += 7;
+  }
+  /* the bitmap's first column is empty: one to the left */
+  draw_icon1x(tx - 1, 11, icon_battery, color);
+  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
 }
 
 static void draw_slot(int slot, int dd, int dy, int selected)
@@ -484,6 +635,8 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
   *done = p.open_f >= F_OPEN;
 }
 
+static int undo_offered(void);
+
 static void draw_hints(int done)
 {
   ui_hint_t c1[4], c2[3], c3[1], c4[1], c5[1];
@@ -527,7 +680,7 @@ static void draw_hints(int done)
   if(p.row == 0)
   {
     cols[0].shown = !full ? 0 : (g_gpsp_config.save_on_leave ? 1 : 2);
-    cols[1].shown = (ui_toast_up(p.toast_f) && p.toast_undo) ? 1 : 0;
+    cols[1].shown = (undo_offered()) ? 1 : 0;
     cols[3].shown = 0;
     cols[4].shown = 0;
   }
@@ -576,13 +729,27 @@ static void draw_exit_hold(void)
   ui_round_fill(462 - 18, y + 56, 10, 6, 1, UI_COL_CARD);  /* tail toward the Exit tile */
 }
 
+#ifdef UI_PERF
+/* draw_screen() sections, in microseconds: ground, header and status,
+   strip, slot line, tiles, cards and toast, hints */
+#define PERF_SECTIONS 7
+static u32 perf_sec[PERF_SECTIONS], perf_mark;
+#define PERF_SECTION(k) do { u32 t_ = sceKernelGetSystemTimeLow(); perf_sec[k] = t_ - perf_mark; perf_mark = t_; } while(0)
+#else
+#define PERF_SECTION(k) do { } while(0)
+#endif
+
 static void draw_screen(int bar_fill)
 {
   int hy, dy, tile_dy[TILE_COUNT], done, i;
   char info[48], when[16];
 
+#ifdef UI_PERF
+  perf_mark = sceKernelGetSystemTimeLow();
+#endif
   ui_frame_begin();
   ui_ground();
+  PERF_SECTION(0);
   if(!ui_layer_ready())
   {
     /* no pool memory: the game picture is drawn every frame */
@@ -597,6 +764,7 @@ static void draw_screen(int bar_fill)
   draw_header(hy);
   if(done && !p.closing)
     draw_status();
+  PERF_SECTION(1);
 
   /* the strip: the selected slot big, its neighbours small */
   {
@@ -605,6 +773,7 @@ static void draw_screen(int bar_fill)
     for(i = 0; i < SLOTS; i++)
       draw_slot(strip_slot[i], i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
   }
+  PERF_SECTION(2);
   if(done && !p.closing)
   {
     slot_name(cur_slot(), info);
@@ -623,6 +792,7 @@ static void draw_screen(int bar_fill)
       ui_text(STRIP_CX - iw / 2, 153, info, UI_COL_CREAM);
     }
   }
+  PERF_SECTION(3);
 
   for(i = 0; i < TILE_COUNT; i++)
     if(tile_dy[i] < 999)
@@ -633,6 +803,7 @@ static void draw_screen(int bar_fill)
      ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
     ui_cursor_frame(tx - 2, TILE_Y - 2, TILE_W, TILE_H);
   }
+  PERF_SECTION(4);
 
   if(p.exit_holding)
     draw_exit_hold();
@@ -643,7 +814,9 @@ static void draw_screen(int bar_fill)
   }
   if(p.bar_text)
     draw_bar_card(bar_fill);
+  PERF_SECTION(5);
   draw_hints(done);
+  PERF_SECTION(6);
 }
 
 /* ---- saving with a moving bar -------------------------------------------- */
@@ -685,8 +858,26 @@ static void end_bar(void)
 
 /* ---- actions ------------------------------------------------------------- */
 
+/* Is Undo on offer? While it is, SELECT means Undo. Moving the cursor
+ * ends it (maintainer, 2026-11-16): the toast slides out and SELECT saves
+ * again at once; staying put keeps it for the toast's 2 s. */
+static int undo_offered(void)
+{
+  return ui_toast_up(p.toast_f) && p.toast_undo && !p.undo_ended;
+}
+
+static void end_undo(void)
+{
+  if(!undo_offered())
+    return;
+  p.undo_ended = 1;
+  if(p.toast_f < UI_F_TOAST_IN + UI_F_TOAST_HOLD)
+    p.toast_f = UI_F_TOAST_IN + UI_F_TOAST_HOLD;
+}
+
 static void show_toast(const char *text, u16 edge, int undo, int undo_slot)
 {
+  p.undo_ended = 0;
   snprintf(p.toast, sizeof(p.toast), "%s", text);
   p.toast_edge = edge;
   p.toast_undo = (undo != UNDO_NONE);
@@ -877,6 +1068,7 @@ static void move_slot(int to)
 {
   if((to < 0) || (to >= SLOTS) || (to == p.cur))
     return;
+  end_undo();
   p.pos_from = (p.pos_f < UI_F_SCROLL) ?
    ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
   p.cur = to;
@@ -891,11 +1083,105 @@ static void move_tile(int to)
 {
   if(to == p.tile)
     return;
+  end_undo();
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
    ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
   p.tile = to;
   p.tile_f = 0;
 }
+
+#ifdef UI_PERF
+/* Measuring build (make UI4=1 PERF=1): once the pause screen has opened it
+ * drives itself through a fixed script, logs every frame and closes, then
+ * writes <kai>/perf_pause.csv. */
+static const struct
+{
+  const char *name;
+  int frames;
+  u32 keys;
+  int tap_every;  /* 0: held the whole phase */
+} perf_phases[] =
+{
+  { "still",      120, 0,              0 },
+  { "tap_right",  200, PSP_CTRL_RIGHT, 20 },
+  { "hold_right", 150, PSP_CTRL_RIGHT, 0 },
+  { "hold_left",  150, PSP_CTRL_LEFT,  0 },
+  { "still_end",   60, 0,              0 },
+};
+#define PERF_PHASES (int)(sizeof(perf_phases) / sizeof(perf_phases[0]))
+#define PERF_MAX 800
+
+static struct
+{
+  u8 phase;
+  u32 io, draw, period;
+  u16 sec[PERF_SECTIONS];
+} perf_log[PERF_MAX];
+static int perf_phase, perf_f, perf_n, perf_on, perf_done;
+
+static u32 perf_script(void)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return 0;
+  if(perf_phases[perf_phase].tap_every)
+    return ((perf_f % perf_phases[perf_phase].tap_every) < 3) ? perf_phases[perf_phase].keys : 0;
+  return perf_phases[perf_phase].keys;
+}
+
+static void perf_step(u32 io, u32 draw, u32 period)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return;
+  if(perf_n < PERF_MAX)
+  {
+    perf_log[perf_n].phase = perf_phase;
+    perf_log[perf_n].io = io;
+    perf_log[perf_n].draw = draw;
+    perf_log[perf_n].period = period;
+    {
+      int k;
+      for(k = 0; k < PERF_SECTIONS; k++)
+        perf_log[perf_n].sec[k] = (perf_sec[k] > 0xFFFF) ? 0xFFFF : perf_sec[k];
+    }
+    perf_n++;
+  }
+  if(++perf_f >= perf_phases[perf_phase].frames)
+  {
+    perf_f = 0;
+    if(++perf_phase >= PERF_PHASES)
+      p.closing = 1;
+  }
+}
+
+static void perf_write(void)
+{
+  char path[MAX_PATH], line[128];
+  SceUID fd;
+  int i, saved = 0;
+
+  for(i = 0; i < SLOTS; i++)
+    saved += p.has[i] ? 1 : 0;
+  path_printf(path, sizeof(path), "%s/perf_pause.csv", main_path);
+  fd = sceIoOpen(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+  if(fd < 0)
+    return;
+  sprintf(line, "# cpu %d MHz, bus %d MHz, filter %d, saved slots %d, frames %d\n",
+   scePowerGetCpuClockFrequency(), scePowerGetBusClockFrequency(),
+   (int)g_gpsp_config.screen_filter, saved, perf_n);
+  sceIoWrite(fd, line, strlen(line));
+  strcpy(line, "phase,frame,io_us,draw_us,period_us,ground,header,strip,slotline,tiles,cards,hints\n");
+  sceIoWrite(fd, line, strlen(line));
+  for(i = 0; i < perf_n; i++)
+  {
+    sprintf(line, "%s,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n", perf_phases[perf_log[i].phase].name, i,
+     (unsigned)perf_log[i].io, (unsigned)perf_log[i].draw, (unsigned)perf_log[i].period,
+     perf_log[i].sec[0], perf_log[i].sec[1], perf_log[i].sec[2], perf_log[i].sec[3],
+     perf_log[i].sec[4], perf_log[i].sec[5], perf_log[i].sec[6]);
+    sceIoWrite(fd, line, strlen(line));
+  }
+  sceIoClose(fd);
+}
+#endif
 
 enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_QUIT };
 
@@ -909,6 +1195,7 @@ u32 ui_pause(u16 *game_picture)
   p.shot_slot = -1;
   p.toast_f = -1;
   shot_fd = -1;
+  shot_state = 0;
   shot_reading = -1;
   shot_failed = -1;
   /* It opens on the slot last saved or loaded in this game (slot 0 at
@@ -929,8 +1216,18 @@ u32 ui_pause(u16 *game_picture)
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
   load_big_picture_now();
+  read_status();  /* while the game is still on the LCD */
   build_layer();
   ui_input_init();
+#ifdef UI_PERF
+  /* the script runs on the first pause only; later pauses take the pad,
+     so the game can still be left with Exit */
+  if(!perf_done)
+  {
+    perf_phase = perf_f = perf_n = perf_on = 0;
+    ui_input_script = perf_script;
+  }
+#endif
 
   while(leave == LEAVE_NONE)
   {
@@ -966,7 +1263,11 @@ u32 ui_pause(u16 *game_picture)
         move_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
         if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
-        if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
+        if(ui_pressed(PSP_CTRL_DOWN))
+        {
+          p.row = 1;
+          end_undo();
+        }
 
         /* confirm: save into an empty slot, load a full one; with the
            save off a load needs a hold, and a tap does nothing */
@@ -997,7 +1298,7 @@ u32 ui_pause(u16 *game_picture)
            Where it can hold, only a release within 12 f is a tap: a longer
            press is a hold, and letting go early does nothing. */
         {
-          int can_hold = p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo);
+          int can_hold = p.has[cur_slot()] && !(undo_offered());
           int tap;
 
           if(can_hold)
@@ -1023,7 +1324,7 @@ u32 ui_pause(u16 *game_picture)
           }
           if(tap)
           {
-            if(ui_toast_up(p.toast_f) && p.toast_undo)
+            if(undo_offered())
               action_undo();
             else
               action_save(cur_slot());
@@ -1033,14 +1334,18 @@ u32 ui_pause(u16 *game_picture)
       else
       {
         move_tile(ui_step(p.tile, TILE_COUNT, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
-        if(ui_pressed(PSP_CTRL_UP)) p.row = 0;
+        if(ui_pressed(PSP_CTRL_UP))
+        {
+          p.row = 0;
+          end_undo();
+        }
         /* L and R go up to the strip, onto Last or slot 0 */
         if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
         {
           p.row = 0;
           move_slot(strip_position(ui_pressed(PSP_CTRL_LTRIGGER) ? LAST_SLOT : 0));
         }
-        if(ui_released(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
+        if(ui_released(PSP_CTRL_SELECT) && undo_offered())
           action_undo();
 
         if(ui_pressed(ui_key_confirm))
@@ -1077,15 +1382,43 @@ u32 ui_pause(u16 *game_picture)
 
     if(p.pos_f < UI_F_SCROLL) p.pos_f++;
     if(p.tile_f < UI_F_CURSOR) p.tile_f++;
+#ifdef UI_PERF
+    {
+      static u32 last;
+      u32 t0 = sceKernelGetSystemTimeLow(), t1, t2;
+
+      if(opened && !perf_on && !perf_done)
+      {
+        perf_on = 1;
+        last = t0;
+      }
+      load_big_picture();
+      t1 = sceKernelGetSystemTimeLow();
+      draw_screen(0);
+      t2 = sceKernelGetSystemTimeLow();
+      perf_step(t1 - t0, t2 - t1, t0 - last);
+      last = t0;
+    }
+#else
     load_big_picture();
 
     draw_screen(0);
+#endif
     if(p.toast_f >= 0)
       p.toast_f++;
     ui_frame_end();
   }
 
   shot_wait();
+#ifdef UI_PERF
+  ui_input_script = NULL;
+  if(perf_on)
+  {
+    perf_write();
+    perf_on = 0;
+    perf_done = 1;
+  }
+#endif
   ui_layer_reset();
   ui_pool_release(mark);
 
@@ -1094,17 +1427,21 @@ u32 ui_pause(u16 *game_picture)
   if(leave == LEAVE_OLD_MENU)
     return menu(p.game) | p.changed;
 
-  /* The last frame is the game as it will be shown, without the door, so
-     going back to the game needs no black frames. */
+  /* The last frame is the game where it will be shown, still doored, on
+     black: no black frames on the way back. The game then comes back
+     multiplied from 50 % to 100 % over UI_F_RESUME_FADE frames, so the dim
+     lifts instead of vanishing in one frame. */
   {
     int x, y, w, h;
     ui_frame_begin();
     ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
     get_game_rect(&x, &y, &w, &h);
     ui_blit_scaled(p.game, 240, 160, x, y, w, h);
+    ui_door(x, y, w, h);
     ui_frame_end();
   }
   video_resolution_keep(FRAME_GAME);
+  osd_fade_start();
   if(p.game_toast[0])
     ui_game_toast(p.game_toast, UI_COL_SKY);
   set_cpu_clock(g_game_config.clock_speed_number);
