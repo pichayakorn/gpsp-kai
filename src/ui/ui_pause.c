@@ -711,7 +711,8 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
-  p.cur = strip_position((g_savestate_slot_num < SLOTS) ? g_savestate_slot_num : 0);
+  /* It opens on slot 0, with Last one press to the left (maintainer). */
+  p.cur = strip_position(0);
   p.pos_f = UI_F_SCROLL;
   p.tile_f = UI_F_CURSOR;
 
