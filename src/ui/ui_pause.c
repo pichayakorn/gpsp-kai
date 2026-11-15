@@ -19,7 +19,9 @@
 #define SMALL_W   60          /* exactly 1/4 of the screenshot (the .thm) */
 #define SMALL_H   40
 #define THUMB_PITCH 64        /* a multiple of 8, for the GE */
-#define HALF_ROWS 80          /* the screenshot is read in two halves */
+#define CHUNK_ROWS 20         /* the screenshot is read 20 rows at a time: whole
+                                 steps of both filters (4 for the .thm, 5 for 5:3) */
+#define CHUNKS (160 / CHUNK_ROWS)
 #define STRIP_CX  240
 #define TILE_W    60
 #define TILE_H    62
@@ -113,7 +115,7 @@ static struct
   u16 *thumbs;               /* SLOTS x 60x40 at THUMB_PITCH, in the UI pool */
   u16 *big;                  /* the selected slot box-filtered to 144x96 */
   int big_slot;              /* the slot p.big shows, -1: none */
-  u16 *half;                 /* 240 x HALF_ROWS of a screenshot being read */
+  u16 *chunk;                /* 240 x CHUNK_ROWS of a screenshot being read */
   int cur, pos, pos_from, pos_f;
   int row, tile, tile_from, tile_f;
   int open_f, close_f, closing;
@@ -207,13 +209,13 @@ static void box_tables(void)
   }
 }
 
-/* HALF_ROWS screenshot rows (240 wide) to the 48 matching rows of p.big. */
-static void shrink_half(const u16 *src, u16 *dst)
+/* CHUNK_ROWS screenshot rows (240 wide) to the matching rows of p.big. */
+static void shrink_rows(const u16 *src, int rows, u16 *dst)
 {
   static u16 sum[3][3][144];  /* the three source rows, 5x horizontal sums */
   int y, x, k, c;
 
-  for(y = 0; y < HALF_ROWS * 3 / 5; y++)
+  for(y = 0; y < rows * 3 / 5; y++)
   {
     for(k = 0; k < 3; k++)
     {
@@ -252,15 +254,17 @@ static void shrink_half(const u16 *src, u16 *dst)
   }
 }
 
-/* Reading savestate pictures: the screenshot in two halves of HALF_ROWS
- * rows, each box-filtered into p.big (when it is the selected slot) and
+/* Reading savestate pictures: the screenshot in chunks of CHUNK_ROWS rows
+ * (a 9.4 KB buffer, so the pictures fit the UI pool with the Korean font),
+ * each box-filtered into p.big (when it is the selected slot) and
  * made into the 60 x 40 picture (when the slot has no right .thm, which is
  * then written). It runs with the PSP's asynchronous file calls, polled
  * once a frame, so a frame never waits for the Memory Stick; the selected
  * slot goes first, then any slot still without its picture. Every other
  * file action waits for it first (shot_wait). */
-#define HALF_BYTES (240 * HALF_ROWS * 2)
-enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_HALF0, SHOT_HALF1, SHOT_TIME };
+#define CHUNK_BYTES (240 * CHUNK_ROWS * 2)
+enum { SHOT_IDLE, SHOT_OPENING, SHOT_HEAD, SHOT_CHUNK, SHOT_TIME };
+static int shot_chunk;  /* the chunk being read */
 
 static u8 shot_head[8] __attribute__((aligned(64)));
 static int shot_for_big, shot_for_thumb;
@@ -283,13 +287,13 @@ static void shot_wait(void)
   shot_reading = -1;
 }
 
-/* One half has arrived in p.half. */
-static void shot_take_half(int slot, int half)
+/* Chunk n has arrived in p.chunk. */
+static void shot_take_chunk(int slot, int n)
 {
   if(shot_for_big)
-    shrink_half(p.half, p.big + half * (HALF_ROWS * 3 / 5) * 144);
+    shrink_rows(p.chunk, CHUNK_ROWS, p.big + n * (CHUNK_ROWS * 3 / 5) * 144);
   if(shot_for_thumb)
-    make_thumbnail_rows(p.half, HALF_ROWS, thumb(slot) + half * (HALF_ROWS / 4) * THUMB_PITCH,
+    make_thumbnail_rows(p.chunk, CHUNK_ROWS, thumb(slot) + n * (CHUNK_ROWS / 4) * THUMB_PITCH,
      THUMB_PITCH);
 }
 
@@ -320,12 +324,12 @@ static int shot_setup(int slot)
  * LCD): the same steps without waiting a frame between them. */
 static void load_big_picture_now(void)
 {
-  int slot = cur_slot(), ok = 0, half;
+  int slot = cur_slot(), ok = 0, n;
   char path[MAX_PATH];
   SceUID fd;
 
   shot_wait();
-  if(!p.big || !p.half || !p.has[slot] || (p.big_slot == slot) || !shot_setup(slot))
+  if(!p.big || !p.chunk || !p.has[slot] || (p.big_slot == slot) || !shot_setup(slot))
     return;
   get_state_slot_path(slot, path);
   fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
@@ -336,13 +340,13 @@ static void load_big_picture_now(void)
   }
   if((sceIoRead(fd, shot_head, 8) == 8) && !memcmp(shot_head, g_state_str, 4))
   {
-    for(half = 0; half < 2; half++)
+    for(n = 0; n < CHUNKS; n++)
     {
-      if(sceIoRead(fd, p.half, HALF_BYTES) != HALF_BYTES)
+      if(sceIoRead(fd, p.chunk, CHUNK_BYTES) != CHUNK_BYTES)
         break;
-      shot_take_half(slot, half);
+      shot_take_chunk(slot, n);
     }
-    ok = (half == 2) && (sceIoRead(fd, shot_head, 8) == 8);
+    ok = (n == CHUNKS) && (sceIoRead(fd, shot_head, 8) == 8);
   }
   sceIoClose(fd);
   if(ok)
@@ -379,7 +383,7 @@ static void load_big_picture(void)
   SceInt64 res;
   int slot;
 
-  if(!p.big || !p.half)
+  if(!p.big || !p.chunk)
     return;
   if(shot_state != SHOT_IDLE)
   {
@@ -418,22 +422,19 @@ static void load_big_picture(void)
             shot_fail(slot);
             return;
           }
-          shot_state = SHOT_HALF0;
-          sceIoReadAsync(shot_fd, p.half, HALF_BYTES);
+          shot_state = SHOT_CHUNK;
+          shot_chunk = 0;
+          sceIoReadAsync(shot_fd, p.chunk, CHUNK_BYTES);
           return;
-        case SHOT_HALF0:
-        case SHOT_HALF1:
-          if(res != HALF_BYTES)
+        case SHOT_CHUNK:
+          if(res != CHUNK_BYTES)
           {
             shot_fail(slot);
             return;
           }
-          shot_take_half(slot, shot_state - SHOT_HALF0);
-          if(shot_state == SHOT_HALF0)
-          {
-            shot_state = SHOT_HALF1;
-            sceIoReadAsync(shot_fd, p.half, HALF_BYTES);
-          }
+          shot_take_chunk(slot, shot_chunk);
+          if(++shot_chunk < CHUNKS)
+            sceIoReadAsync(shot_fd, p.chunk, CHUNK_BYTES);
           else
           {
             shot_state = SHOT_TIME;
@@ -1099,8 +1100,7 @@ static void action_save(int slot)
     /* the big picture is the screenshot just saved: no need to read it */
     if(p.big)
     {
-      shrink_half(p.game, p.big);
-      shrink_half(p.game + 240 * HALF_ROWS, p.big + (HALF_ROWS * 3 / 5) * 144);
+      shrink_rows(p.game, 160, p.big);
       p.big_slot = slot;
     }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
@@ -1400,7 +1400,7 @@ u32 ui_pause(u16 *game_picture)
   mark = ui_pool_mark();
   p.thumbs = ui_pool_alloc(SLOTS * THUMB_PITCH * SMALL_H * 2);
   p.big = ui_pool_alloc(BIG_W * BIG_H * 2);
-  p.half = ui_pool_alloc(240 * HALF_ROWS * 2);
+  p.chunk = ui_pool_alloc(CHUNK_BYTES);
   if(!box_i[143][0])
     box_tables();
   for(i = 0; i < SLOTS; i++)
