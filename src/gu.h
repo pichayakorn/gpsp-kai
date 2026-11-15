@@ -40,6 +40,14 @@ void clear_screen(u16 color);
 void blit_to_screen(u16 *src, u32 w, u32 h, u32 x, u32 y);
 u16 *copy_screen();
 void get_game_rect(int *x, int *y, int *w, int *h);
+
+#ifdef UI4
+/* In-game overlay; see gu.c. Row pitch OSD_W. */
+#define OSD_W 512
+#define OSD_H 32
+extern u16 osd_pixels[OSD_W * OSD_H];
+extern int (*osd_tick)(int *x, int *y, int *w, int *h);
+#endif
 void flip_screen();
 void video_read_mem_savestate(u32 ver);
 void video_write_mem_savestate(u32 ver);

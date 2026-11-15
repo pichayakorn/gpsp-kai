@@ -1,8 +1,11 @@
 /* The 4.0 pause screen (spec section 4, "Pause"; step 3). The menu button
  * opens it over the screen-doored game: the savestate strip on top (slots
- * 0-9 and Last as pictures), tiles below. SELECT saves at once, hold
- * SELECT deletes, confirm loads, and a toast offers Undo for each (load
- * only while "Save when leaving a game" is on). Exit saves to Last first.
+ * 0-9 and Last as pictures), tiles below. SELECT saves at once and hold
+ * SELECT deletes, with Undo on a toast. Confirm saves into an empty slot
+ * and loads a full one, never saving over a savestate. A load goes straight
+ * back to the game: with "Save when leaving a game" on, the game before is
+ * kept in Last first (loading Last swaps the two); with it off, the load is
+ * a hold, since nothing keeps the game before. Exit saves to Last first.
  * Settings, Cheats and Library still open the old menu until their 4.0
  * screens exist. Texts are English placeholders until they move to the
  * .msg files. */
@@ -53,7 +56,7 @@ static const tile_t tiles[TILE_COUNT] =
   { "Exit",       icon_exit,    UI_COL_PINK },
 };
 
-enum { UNDO_NONE, UNDO_SAVE, UNDO_SAVE_NEW, UNDO_DELETE, UNDO_LOAD };
+enum { UNDO_NONE, UNDO_SAVE, UNDO_SAVE_NEW, UNDO_DELETE };
 
 static struct
 {
@@ -73,10 +76,13 @@ static struct
   int toast_f, toast_undo;
   int undo, undo_slot;
   ui_hold_t hold;
+  ui_hold_t load_hold;       /* hold confirm: load with the save off */
   ui_hold_t exit_hold;
   int exit_holding;
   const char *bar_text;      /* the saving card while a save runs */
   const char *bar_note;
+  int bar_phase, bar_phases; /* a load after a save fills one bar */
+  char game_toast[64];       /* said over the game after a load */
   int changed;               /* the machine state changed (load, restart) */
 } p;
 
@@ -274,8 +280,8 @@ static void draw_slot(int slot, int dd, int dy, int selected)
     ui_checker(x, y, w, h, UI_COL_CARD);
     if(big)
     {
-      int gw = ui_glyph_width(PSP_CTRL_SELECT) + 4 + ui_print_width("Save", UI_FONT_BODY, 0);
-      int gx = ui_glyph(x + (w - gw) / 2, y + h / 2 - 6, PSP_CTRL_SELECT) + 4;
+      int gw = ui_glyph_width(ui_key_confirm) + 4 + ui_print_width("Save", UI_FONT_BODY, 0);
+      int gx = ui_glyph(x + (w - gw) / 2, y + h / 2 - 6, ui_key_confirm) + 4;
       ui_print(gx, y + h / 2 - 8, "Save", UI_COL_CREAM, UI_FONT_BODY, 0);
     }
   }
@@ -289,6 +295,8 @@ static void draw_slot(int slot, int dd, int dy, int selected)
 
   if(big && (p.hold.p > 0) && p.has[slot])  /* hold SELECT: delete */
     ui_fill(x, y + h + 1, w * p.hold.p / 256, 3, UI_COL_PINK);
+  if(big && (p.load_hold.p > 0) && p.has[slot])  /* hold confirm: load */
+    ui_fill(x, y + h + 1, w * p.load_hold.p / 256, 3, UI_COL_LIME);
   if(selected)
     ui_cursor_frame(x - 6, y - 6, w + 12, h + 12);
 }
@@ -356,7 +364,9 @@ static void draw_hints(int done)
   }
   else if(p.row == 0)
   {
-    hints[n].keys = ui_key_confirm;  hints[n++].verb = "Load";
+    hints[n].keys = ui_key_confirm;
+    hints[n++].verb = !p.has[cur_slot()] ? "Save" :
+     (g_gpsp_config.save_on_leave ? "Load" : "Load (hold)");
     hints[n].keys = PSP_CTRL_SELECT;
     hints[n++].verb = (ui_toast_up(p.toast_f) && p.toast_undo) ? "Undo" : "Save \xC2\xB7 hold: Delete";
     hints[n].keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0); hints[n++].verb = "Resume";
@@ -480,7 +490,16 @@ static void draw_screen(int bar_fill)
 
 static void bar_hook(int current, int total)
 {
-  draw_screen(total ? current * 256 / total : 0);
+  int fill = total ? current * 256 / total : 0;
+
+  if(current == 0)
+    p.bar_phase++;
+  if(fill > 256)
+    fill = 256;
+  /* two phases (the save to Last, then the load): 3/4 and 1/4 of the bar */
+  if(p.bar_phases == 2)
+    fill = (p.bar_phase <= 0) ? fill * 3 / 4 : 192 + fill / 4;
+  draw_screen(fill);
   ui_frame_end_now();
 }
 
@@ -488,6 +507,8 @@ static void run_with_bar(const char *text, const char *note)
 {
   p.bar_text = text;
   p.bar_note = note;
+  p.bar_phase = -1;
+  p.bar_phases = 1;
   progress_hook = bar_hook;
   state_no_question = 1;
   state_error_text = NULL;
@@ -503,15 +524,6 @@ static void end_bar(void)
 }
 
 /* ---- actions ------------------------------------------------------------- */
-
-static void move_tile(int to);
-
-/* After a load the cursor goes to Resume, so one confirm plays on. */
-static void cursor_to_resume(void)
-{
-  p.row = 1;
-  move_tile(TILE_RESUME);
-}
 
 static void show_toast(const char *text, u16 edge, int undo, int undo_slot)
 {
@@ -580,10 +592,6 @@ static u32 load_slot(int slot)
   char name[MAX_FILE];
   u32 ok;
 
-  state_no_question = 1;
-  progress_hook = bar_hook;
-  p.bar_text = NULL;
-  state_error_text = NULL;
   if(slot == LAST_SLOT)
   {
     load_last_state();
@@ -595,39 +603,65 @@ static u32 load_slot(int slot)
     get_savestate_filename_noshot(slot, name);
     ok = load_state(name, slot);
   }
-  end_bar();
   return ok;
 }
 
-static void action_load(int slot)
+/* Load and go straight back to the game. With "Save when leaving a game"
+ * on, the game before goes to Last first (loading Last swaps the two), so
+ * loading Last is the undo; one bar covers both. Returns 1 when loaded. */
+static int action_load(int slot)
 {
-  char text[48], msg_text[64];
-  int undo = UNDO_NONE;
+  char text[48], bar[48];
+  int keep = g_gpsp_config.save_on_leave, swap = keep && (slot == LAST_SLOT);
+  u32 ok;
 
   if(!p.has[slot])
-    return;
-  /* Load has Undo while "Save when leaving a game" is on: the moment being
-     left goes to Last first. Loading Last itself has none. */
-  if((slot != LAST_SLOT) && g_gpsp_config.save_on_leave)
+    return 0;
+  if(slot == LAST_SLOT)
+    strcpy(bar, "Loading Last\xE2\x80\xA6");
+  else
+    sprintf(bar, "Loading slot %d\xE2\x80\xA6", slot);
+  run_with_bar(bar, NULL);
+  if(swap)
   {
-    run_with_bar("Saving to Last\xE2\x80\xA6", NULL);
-    if(save_last_state(p.game))
-      undo = UNDO_LOAD;
-    end_bar();
-    read_slot(LAST_SLOT);
-  }
-  if(load_slot(slot))
-  {
-    p.changed = 1;
-    take_loaded_picture();
-    slot_name(slot, text);
-    sprintf(msg_text, "Loaded %s", text);
-    g_game_config.last_slot = slot;
-    show_toast(msg_text, UI_COL_SKY, undo, LAST_SLOT);
-    cursor_to_resume();
+    p.bar_phases = 2;
+    ok = swap_last_state(p.game);
   }
   else
+  {
+    ok = 1;
+    if(keep)
+    {
+      p.bar_phases = 2;
+      ok = save_last_state(p.game);  /* nothing is loaded if this fails */
+    }
+    if(ok)
+      ok = load_slot(slot);
+  }
+  end_bar();
+  if(keep)
+    read_slot(LAST_SLOT);
+
+  if(!ok)
+  {
     show_toast(state_error_text ? state_error_text : "Loading failed", UI_COL_PINK, UNDO_NONE, 0);
+    return 0;
+  }
+  p.changed = 1;
+  take_loaded_picture();
+  g_game_config.last_slot = slot;
+  if(slot == LAST_SLOT)
+    strcpy(text, "Last");
+  else
+    sprintf(text, "slot %d", slot);
+  if(swap)
+    strcpy(p.game_toast, "Swapped with Last");
+  else if(keep)
+    snprintf(p.game_toast, sizeof(p.game_toast), "Loaded %s \xC2\xB7 the game before is in Last", text);
+  else
+    snprintf(p.game_toast, sizeof(p.game_toast), "Loaded %s", text);
+  p.closing = 1;
+  return 1;
 }
 
 static void action_undo(void)
@@ -654,15 +688,6 @@ static void action_undo(void)
         load_last_state();
       read_slot(slot);
       show_toast("The slot is empty again", UI_COL_SKY, UNDO_NONE, 0);
-      break;
-    case UNDO_LOAD:
-      if(load_slot(LAST_SLOT))
-      {
-        p.changed = 1;
-        take_loaded_picture();
-        show_toast("Back where you were", UI_COL_SKY, UNDO_NONE, 0);
-        cursor_to_resume();
-      }
       break;
   }
 }
@@ -693,6 +718,7 @@ static void move_slot(int to)
   p.pos_f = 0;
   p.rest = 0;
   p.hold.p = 0;
+  p.load_hold.p = 0;
 }
 
 static void move_tile(int to)
@@ -774,8 +800,28 @@ u32 ui_pause(u16 *game_picture)
         if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
         if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
 
-        if(ui_pressed(ui_key_confirm))
-          action_load(cur_slot());
+        /* confirm: save into an empty slot, load a full one; with the
+           save off a load needs a hold, and a tap does nothing */
+        if(p.has[cur_slot()] && !g_gpsp_config.save_on_leave)
+        {
+          ui_hold_step(&p.load_hold, ui_key_confirm);
+          if(p.load_hold.done)
+          {
+            p.load_hold.p = 0;
+            action_load(cur_slot());
+          }
+        }
+        else
+        {
+          p.load_hold.p = 0;
+          if(ui_pressed(ui_key_confirm))
+          {
+            if(p.has[cur_slot()])
+              action_load(cur_slot());
+            else
+              action_save(cur_slot());
+          }
+        }
 
         /* SELECT: Undo while the toast offers it, else save; hold: delete */
         if(p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo))
@@ -871,6 +917,8 @@ u32 ui_pause(u16 *game_picture)
     ui_frame_end();
   }
   video_resolution_keep(FRAME_GAME);
+  if(p.game_toast[0])
+    ui_game_toast(p.game_toast, UI_COL_SKY);
   set_cpu_clock(g_game_config.clock_speed_number);
   pause_sound(0);
   real_frame_count = 0;

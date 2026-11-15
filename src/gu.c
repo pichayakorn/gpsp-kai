@@ -394,6 +394,133 @@ static u32 sharp_setup(SPRITE *s)
   return GU_LINEAR;
 }
 
+#ifdef UI4
+/* In-game overlay (4.0 UI): a small picture the GE draws over the running
+ * game after the game sprite, with alpha test, such as the toast after a
+ * load. The owner draws into osd_pixels (OSD_W x OSD_H, 5551, alpha bit 0
+ * is see-through) and sets osd_tick, which flip_screen() calls once a
+ * frame for the position; it returns 0 when the overlay is done. Parts of
+ * the last position outside the game picture are cleared to black, since
+ * the game sprite does not redraw the LCD there. */
+#define GE_CMD_ATE  0x22
+#define GE_CMD_ATST 0xDB
+
+u16 __attribute__((aligned(16))) osd_pixels[OSD_W * OSD_H];
+int (*osd_tick)(int *x, int *y, int *w, int *h) = NULL;
+static u16 __attribute__((aligned(16))) osd_black[8 * 8];
+static u32 __attribute__((aligned(16))) osd_cmd[64];
+static float __attribute__((aligned(16))) osd_vertex[10 * 5];
+static int osd_last[4];  /* x, y, w, h; w 0: nothing on the LCD */
+static u32 game_filter = GU_LINEAR;
+
+static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
+ int x, int y, int w, int h)
+{
+  v[0] = u1; v[1] = v1; v[2] = x;     v[3] = y;     v[4] = 0;
+  v[5] = u2; v[6] = v2; v[7] = x + w; v[8] = y + h; v[9] = 0;
+  return v + 10;
+}
+
+#define OSD_CMD(cmd, operand)                                               \
+  *c = (((GE_CMD_##cmd) << 24) | ((operand) & 0xFFFFFF));                   \
+  c++                                                                       \
+
+#define OSD_TEXTURE(address, width, size)                                   \
+  OSD_CMD(TBP0, (u32)(address) & 0x00FFFFFF);                               \
+  OSD_CMD(TBW0, (((u32)(address) & 0xFF000000) >> 8) | (width));            \
+  OSD_CMD(TSIZE0, (size));                                                  \
+  OSD_CMD(TFLUSH, 0)                                                        \
+
+static void osd_draw(void)
+{
+  int now[4] = { 0, 0, 0, 0 }, on, i, n = 0, gx, gy, gw, gh;
+  float *v = osd_vertex;
+  u32 *c = osd_cmd;
+
+  if((osd_tick == NULL) || (video_draw_frame != FRAME_GAME) || video_out_mode)
+    return;
+  on = osd_tick(&now[0], &now[1], &now[2], &now[3]);
+  if(!on)
+  {
+    osd_tick = NULL;
+    now[2] = 0;
+  }
+
+  if(osd_black[0] == 0)
+    for(i = 0; i < 8 * 8; i++)
+      osd_black[i] = 0x8000;
+
+  /* the last position outside the game picture: up to four black bands */
+  if(osd_last[2] && memcmp(osd_last, now, sizeof(now)))
+  {
+    int x1 = osd_last[0], y1 = osd_last[1];
+    int x2 = x1 + osd_last[2], y2 = y1 + osd_last[3];
+
+    get_game_rect(&gx, &gy, &gw, &gh);
+    if(y1 < gy)
+    {
+      v = osd_sprite(v, 0, 0, 8, 8, x1, y1, x2 - x1, ((y2 < gy) ? y2 : gy) - y1); n++;
+    }
+    if(y2 > gy + gh)
+    {
+      int t = (y1 > gy + gh) ? y1 : gy + gh;
+      v = osd_sprite(v, 0, 0, 8, 8, x1, t, x2 - x1, y2 - t); n++;
+    }
+    {
+      int t = (y1 > gy) ? y1 : gy, b = (y2 < gy + gh) ? y2 : gy + gh;
+      if(b > t)
+      {
+        if(x1 < gx)
+        {
+          v = osd_sprite(v, 0, 0, 8, 8, x1, t, ((x2 < gx) ? x2 : gx) - x1, b - t); n++;
+        }
+        if(x2 > gx + gw)
+        {
+          int l = (x1 > gx + gw) ? x1 : gx + gw;
+          v = osd_sprite(v, 0, 0, 8, 8, l, t, x2 - l, b - t); n++;
+        }
+      }
+    }
+  }
+  if(on)
+    v = osd_sprite(v, 0, 0, now[2], now[3], now[0], now[1], now[2], now[3]);
+  if((n == 0) && !on)
+  {
+    osd_last[2] = 0;
+    return;
+  }
+
+  OSD_CMD(VTYPE, (1 << 23) | (3 << 7) | 3);
+  OSD_CMD(BASE, ((u32)osd_vertex & 0xFF000000) >> 8);
+  OSD_CMD(VADDR, (u32)osd_vertex & 0x00FFFFFF);
+  OSD_CMD(TFILTER, (GU_NEAREST << 8) | GU_NEAREST);
+  if(n)
+  {
+    OSD_TEXTURE(osd_black, 8, (3 << 8) | 3);
+    OSD_CMD(PRIM, (6 << 16) | (n * 2));
+  }
+  if(on)
+  {
+    OSD_TEXTURE(osd_pixels, OSD_W, (5 << 8) | 9);
+    OSD_CMD(ATE, 1);
+    OSD_CMD(ATST, GU_GREATER | (0 << 8) | (0xFF << 16));
+    OSD_CMD(PRIM, (6 << 16) | 2);
+    OSD_CMD(ATE, 0);
+  }
+  OSD_CMD(TFILTER, (game_filter << 8) | game_filter);
+  OSD_CMD(FINISH, 0);
+  OSD_CMD(SIGNAL, 0);
+  OSD_CMD(NOP, 0);
+  OSD_CMD(NOP, 0);
+
+  memcpy(osd_last, now, sizeof(now));
+  sceKernelDcacheWritebackAll();
+  sceGeListEnQueue(osd_cmd, c, gecbid, NULL);
+}
+#else
+#define osd_draw()
+#endif
+
 void flip_screen()
 {
   u32 *old_ge_cmd_ptr = ge_cmd_ptr;
@@ -413,6 +540,7 @@ void flip_screen()
     sceKernelDcacheWritebackAll();
 
     sceGeListEnQueue(sharp_cmd, sharp_cmd_end, gecbid, NULL);
+    osd_draw();
     return;
   }
 
@@ -434,6 +562,7 @@ void flip_screen()
   sceKernelDcacheWritebackAll();
 
   sceGeListEnQueue(ge_cmd, ge_cmd_ptr, gecbid, NULL);
+  osd_draw();
 }
 
 static void set_resolution(u32 frame, u32 keep);
@@ -591,6 +720,10 @@ static void set_resolution(u32 frame, u32 keep)
     sceGuScissor(current_parameter->view.x, current_parameter->view.y, current_parameter->view.width, current_parameter->view.height);
     sceGuEnable(GU_SCISSOR_TEST);
     sceGuTexFilter(filter, filter);
+#ifdef UI4
+    if(frame == FRAME_GAME)
+      game_filter = filter;
+#endif
     sceGuTexWrap(GU_CLAMP, GU_CLAMP);
     sceGuEnable(GU_TEXTURE_2D);
     sceGuFinish();
