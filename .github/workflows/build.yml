@@ -34,8 +34,10 @@ jobs:
     env:
       CFW_SDK_COMMIT: d871f3f57a718cfdc0a0687da608f787b1445ad7
     steps:
+      # tar and zstd: actions/cache runs GNU tar options (--posix) that the
+      # image's BusyBox tar rejects, so without them the cache never saves.
       - name: Install build tools
-        run: apk add --no-cache zip python3 curl
+        run: apk add --no-cache zip python3 curl tar zstd
 
       - uses: actions/checkout@v7
         with:
