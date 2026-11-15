@@ -438,8 +438,7 @@ static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
 }
 
 #define OSD_CMD(cmd, operand)                                               \
-  *c = (((GE_CMD_##cmd) << 24) | ((operand) & 0xFFFFFF));                   \
-  c++                                                                       \
+  *c++ = (((GE_CMD_##cmd) << 24) | ((operand) & 0xFFFFFF))                  \
 
 #define OSD_TEXTURE(address, width, size)                                   \
   OSD_CMD(TBP0, (u32)(address) & 0x00FFFFFF);                               \
@@ -541,7 +540,9 @@ static void osd_before(void)
     OSD_CMD(STST, GU_NOTEQUAL | (1 << 8) | (0xFF << 16));
   }
   else
+  {
     OSD_CMD(STST, GU_ALWAYS | (0 << 8) | (0xFF << 16));
+  }
   OSD_CMD(SOP, STENCIL_ZERO | (STENCIL_ZERO << 8) | (STENCIL_ZERO << 16));
   OSD_CMD(TFILTER, (game_filter << 8) | game_filter);
   OSD_END();
