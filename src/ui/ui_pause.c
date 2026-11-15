@@ -117,6 +117,7 @@ static struct
   char toast[64];
   u16 toast_edge;
   int toast_f, toast_undo;
+  int undo_ended;            /* the cursor moved: the toast leaves, no Undo */
   int undo, undo_slot;
   ui_hold_t hold;
   ui_hold_t load_hold;       /* hold confirm: load with the save off */
@@ -528,6 +529,8 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
   *done = p.open_f >= F_OPEN;
 }
 
+static int undo_offered(void);
+
 static void draw_hints(int done)
 {
   ui_hint_t c1[4], c2[3], c3[1], c4[1], c5[1];
@@ -571,7 +574,7 @@ static void draw_hints(int done)
   if(p.row == 0)
   {
     cols[0].shown = !full ? 0 : (g_gpsp_config.save_on_leave ? 1 : 2);
-    cols[1].shown = (ui_toast_up(p.toast_f) && p.toast_undo) ? 1 : 0;
+    cols[1].shown = (undo_offered()) ? 1 : 0;
     cols[3].shown = 0;
     cols[4].shown = 0;
   }
@@ -729,8 +732,26 @@ static void end_bar(void)
 
 /* ---- actions ------------------------------------------------------------- */
 
+/* Is Undo on offer? While it is, SELECT means Undo. Moving the cursor
+ * ends it (maintainer, 2026-11-16): the toast slides out and SELECT saves
+ * again at once; staying put keeps it for the toast's 2 s. */
+static int undo_offered(void)
+{
+  return ui_toast_up(p.toast_f) && p.toast_undo && !p.undo_ended;
+}
+
+static void end_undo(void)
+{
+  if(!undo_offered())
+    return;
+  p.undo_ended = 1;
+  if(p.toast_f < UI_F_TOAST_IN + UI_F_TOAST_HOLD)
+    p.toast_f = UI_F_TOAST_IN + UI_F_TOAST_HOLD;
+}
+
 static void show_toast(const char *text, u16 edge, int undo, int undo_slot)
 {
+  p.undo_ended = 0;
   snprintf(p.toast, sizeof(p.toast), "%s", text);
   p.toast_edge = edge;
   p.toast_undo = (undo != UNDO_NONE);
@@ -921,6 +942,7 @@ static void move_slot(int to)
 {
   if((to < 0) || (to >= SLOTS) || (to == p.cur))
     return;
+  end_undo();
   p.pos_from = (p.pos_f < UI_F_SCROLL) ?
    ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
   p.cur = to;
@@ -935,6 +957,7 @@ static void move_tile(int to)
 {
   if(to == p.tile)
     return;
+  end_undo();
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
    ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
   p.tile = to;
@@ -1010,7 +1033,11 @@ u32 ui_pause(u16 *game_picture)
         move_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
         if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
-        if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
+        if(ui_pressed(PSP_CTRL_DOWN))
+        {
+          p.row = 1;
+          end_undo();
+        }
 
         /* confirm: save into an empty slot, load a full one; with the
            save off a load needs a hold, and a tap does nothing */
@@ -1041,7 +1068,7 @@ u32 ui_pause(u16 *game_picture)
            Where it can hold, only a release within 12 f is a tap: a longer
            press is a hold, and letting go early does nothing. */
         {
-          int can_hold = p.has[cur_slot()] && !(ui_toast_up(p.toast_f) && p.toast_undo);
+          int can_hold = p.has[cur_slot()] && !(undo_offered());
           int tap;
 
           if(can_hold)
@@ -1067,7 +1094,7 @@ u32 ui_pause(u16 *game_picture)
           }
           if(tap)
           {
-            if(ui_toast_up(p.toast_f) && p.toast_undo)
+            if(undo_offered())
               action_undo();
             else
               action_save(cur_slot());
@@ -1077,14 +1104,18 @@ u32 ui_pause(u16 *game_picture)
       else
       {
         move_tile(ui_step(p.tile, TILE_COUNT, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
-        if(ui_pressed(PSP_CTRL_UP)) p.row = 0;
+        if(ui_pressed(PSP_CTRL_UP))
+        {
+          p.row = 0;
+          end_undo();
+        }
         /* L and R go up to the strip, onto Last or slot 0 */
         if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
         {
           p.row = 0;
           move_slot(strip_position(ui_pressed(PSP_CTRL_LTRIGGER) ? LAST_SLOT : 0));
         }
-        if(ui_released(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
+        if(ui_released(PSP_CTRL_SELECT) && undo_offered())
           action_undo();
 
         if(ui_pressed(ui_key_confirm))
