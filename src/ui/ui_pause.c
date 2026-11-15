@@ -702,13 +702,27 @@ static void draw_exit_hold(void)
   ui_round_fill(462 - 18, y + 56, 10, 6, 1, UI_COL_CARD);  /* tail toward the Exit tile */
 }
 
+#ifdef UI_PERF
+/* draw_screen() sections, in microseconds: ground, header and status,
+   strip, slot line, tiles, cards and toast, hints */
+#define PERF_SECTIONS 7
+static u32 perf_sec[PERF_SECTIONS], perf_mark;
+#define PERF_SECTION(k) do { u32 t_ = sceKernelGetSystemTimeLow(); perf_sec[k] = t_ - perf_mark; perf_mark = t_; } while(0)
+#else
+#define PERF_SECTION(k) do { } while(0)
+#endif
+
 static void draw_screen(int bar_fill)
 {
   int hy, dy, tile_dy[TILE_COUNT], done, i;
   char info[48], when[16];
 
+#ifdef UI_PERF
+  perf_mark = sceKernelGetSystemTimeLow();
+#endif
   ui_frame_begin();
   ui_ground();
+  PERF_SECTION(0);
   if(!ui_layer_ready())
   {
     /* no pool memory: the game picture is drawn every frame */
@@ -723,6 +737,7 @@ static void draw_screen(int bar_fill)
   draw_header(hy);
   if(done && !p.closing)
     draw_status();
+  PERF_SECTION(1);
 
   /* the strip: the selected slot big, its neighbours small */
   {
@@ -731,6 +746,7 @@ static void draw_screen(int bar_fill)
     for(i = 0; i < SLOTS; i++)
       draw_slot(strip_slot[i], i * 256 - pos, dy, (i == p.cur) && (p.row == 0) && done && !p.closing && !p.bar_text);
   }
+  PERF_SECTION(2);
   if(done && !p.closing)
   {
     slot_name(cur_slot(), info);
@@ -749,6 +765,7 @@ static void draw_screen(int bar_fill)
       ui_text(STRIP_CX - iw / 2, 153, info, UI_COL_CREAM);
     }
   }
+  PERF_SECTION(3);
 
   for(i = 0; i < TILE_COUNT; i++)
     if(tile_dy[i] < 999)
@@ -759,6 +776,7 @@ static void draw_screen(int bar_fill)
      ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
     ui_cursor_frame(tx - 2, TILE_Y - 2, TILE_W, TILE_H);
   }
+  PERF_SECTION(4);
 
   if(p.exit_holding)
     draw_exit_hold();
@@ -769,7 +787,9 @@ static void draw_screen(int bar_fill)
   }
   if(p.bar_text)
     draw_bar_card(bar_fill);
+  PERF_SECTION(5);
   draw_hints(done);
+  PERF_SECTION(6);
 }
 
 /* ---- saving with a moving bar -------------------------------------------- */
@@ -1068,6 +1088,7 @@ static struct
 {
   u8 phase;
   u32 io, draw, period;
+  u16 sec[PERF_SECTIONS];
 } perf_log[PERF_MAX];
 static int perf_phase, perf_f, perf_n, perf_on;
 
@@ -1090,6 +1111,11 @@ static void perf_step(u32 io, u32 draw, u32 period)
     perf_log[perf_n].io = io;
     perf_log[perf_n].draw = draw;
     perf_log[perf_n].period = period;
+    {
+      int k;
+      for(k = 0; k < PERF_SECTIONS; k++)
+        perf_log[perf_n].sec[k] = (perf_sec[k] > 0xFFFF) ? 0xFFFF : perf_sec[k];
+    }
     perf_n++;
   }
   if(++perf_f >= perf_phases[perf_phase].frames)
@@ -1116,12 +1142,14 @@ static void perf_write(void)
    scePowerGetCpuClockFrequency(), scePowerGetBusClockFrequency(),
    (int)g_gpsp_config.screen_filter, saved, perf_n);
   sceIoWrite(fd, line, strlen(line));
-  strcpy(line, "phase,frame,io_us,draw_us,period_us\n");
+  strcpy(line, "phase,frame,io_us,draw_us,period_us,ground,header,strip,slotline,tiles,cards,hints\n");
   sceIoWrite(fd, line, strlen(line));
   for(i = 0; i < perf_n; i++)
   {
-    sprintf(line, "%s,%d,%u,%u,%u\n", perf_phases[perf_log[i].phase].name, i,
-     (unsigned)perf_log[i].io, (unsigned)perf_log[i].draw, (unsigned)perf_log[i].period);
+    sprintf(line, "%s,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n", perf_phases[perf_log[i].phase].name, i,
+     (unsigned)perf_log[i].io, (unsigned)perf_log[i].draw, (unsigned)perf_log[i].period,
+     perf_log[i].sec[0], perf_log[i].sec[1], perf_log[i].sec[2], perf_log[i].sec[3],
+     perf_log[i].sec[4], perf_log[i].sec[5], perf_log[i].sec[6]);
     sceIoWrite(fd, line, strlen(line));
   }
   sceIoClose(fd);
