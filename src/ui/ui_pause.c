@@ -429,52 +429,69 @@ static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
 
 /* The battery and clock are read once a second, not every frame: each
    scePower call asks the power chip and costs milliseconds (measured: the
-   header and chip took 10.5 ms of a 16 ms frame). status_age 0 reads now. */
+   header and chip took 10.5 ms of a 16 ms frame). */
 static int status_age;
+
+static ScePspDateTime status_now;
+static int status_level, status_format, status_battery, status_charging;
+
+/* Everything at once: when the screen opens, before its first frame. */
+static void read_status(void)
+{
+  status_level = scePowerGetBatteryLifePercent();
+  status_battery = scePowerIsBatteryExist() > 0;
+  status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  sceRtcGetCurrentClockLocalTime(&status_now);
+  status_format = 0;
+  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
+  status_age = 60;
+}
 
 static void draw_status(void)
 {
-  static ScePspDateTime now;
-  static int level, format, battery, charging;
+  int shown_level;
   char clock[16], pct[8];
   int w, x, tx, i, j, critical = 0;
   u16 color = UI_COL_LIME;
 
-  if(status_age-- <= 0)
+  /* one call a frame, spread over the second, so no frame takes them all
+     (a frame with every call still missed its vblank) */
+  if(status_age <= 0)
   {
     status_age = 60;
-    sceRtcGetCurrentClockLocalTime(&now);
-    format = 0;
-    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &format);
-    level = scePowerGetBatteryLifePercent();
-    battery = scePowerIsBatteryExist() > 0;
-    charging = battery && (scePowerIsBatteryCharging() > 0);
+    sceRtcGetCurrentClockLocalTime(&status_now);
+    status_format = 0;
+    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
   }
-  if(format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
-    sprintf(clock, "%d:%02d %s", (now.hour + 11) % 12 + 1, now.minute, (now.hour < 12) ? "AM" : "PM");
+  else if(status_age == 45)
+    status_level = scePowerGetBatteryLifePercent();
+  else if(status_age == 30)
+    status_battery = scePowerIsBatteryExist() > 0;
+  else if(status_age == 15)
+    status_charging = status_battery && (scePowerIsBatteryCharging() > 0);
+  status_age--;
+  shown_level = (status_level < 0) ? 0 : ((status_level > 100) ? 100 : status_level);
+  if(status_format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
+    sprintf(clock, "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? "AM" : "PM");
   else
-    sprintf(clock, "%02d:%02d", now.hour, now.minute);
-  if(level < 0)
-    level = 0;
-  if(level > 100)
-    level = 100;
-  if(charging)
+    sprintf(clock, "%02d:%02d", status_now.hour, status_now.minute);
+  if(status_charging)
     color = UI_COL_SKY;
-  else if(level <= 10)
+  else if(shown_level <= 10)
   {
     color = UI_COL_PINK;
-    critical = battery;
+    critical = status_battery;
   }
-  else if(level <= 20)
+  else if(shown_level <= 20)
     color = UI_COL_TANGERINE;
-  sprintf(pct, "%d%%", level);
+  sprintf(pct, "%d%%", shown_level);
 
   w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
-   (charging ? 7 : 0) + (battery ? 11 + 5 : 2);
+   (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
   x = 460 - w;
   ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
   ui_text(x + 6, 9, clock, UI_COL_CREAM);
-  if(!battery)
+  if(!status_battery)
     return;
   tx = x + 6 + ui_text_width(clock) + 4;
   if(critical)
@@ -482,7 +499,7 @@ static void draw_status(void)
     ui_text(tx, 9, pct, UI_COL_PINK);
     tx += ui_text_width(pct) + 4;
   }
-  if(charging)
+  if(status_charging)
   {
     for(j = 0; j < 7; j++)
       for(i = 0; i < 5; i++)
@@ -492,7 +509,7 @@ static void draw_status(void)
   }
   /* the bitmap's first column is empty: one to the left */
   draw_icon1x(tx - 1, 11, icon_battery, color);
-  ui_fill(tx + 1, 14, 7 * level / 100, 3, color);
+  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
 }
 
 static void draw_slot(int slot, int dd, int dy, int selected)
@@ -1177,7 +1194,6 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
-  status_age = 0;
   shot_fd = -1;
   shot_state = 0;
   shot_reading = -1;
@@ -1200,6 +1216,7 @@ u32 ui_pause(u16 *game_picture)
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
   load_big_picture_now();
+  read_status();  /* while the game is still on the LCD */
   build_layer();
   ui_input_init();
 #ifdef UI_PERF
