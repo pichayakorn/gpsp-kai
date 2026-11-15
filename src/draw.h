@@ -74,6 +74,7 @@ extern void boxfill(u32 sx, u32 sy, u32 ex, u32 ey, u32 color);
 extern void boxfill_alpha(u32 sx, u32 sy, u32 ex, u32 ey, u32 color, u32 alpha);
 extern void init_progress(u32 total, char *text);
 extern void update_progress(void);
+extern void (*progress_hook)(int current, int total);
 extern void show_progress(char *text);
 extern void scrollbar(u32 sx, u32 sy, u32 ex, u32 ey, u32 all,u32 view,u32 now);
 extern u32 yesno_dialog(char *text);

@@ -21,6 +21,9 @@
 
 #include "common.h"
 #include <pspctrl_kernel.h>
+#ifdef UI4
+#include "ui/ui.h"
+#endif
 
 // Special thanks to psp298 for the analog->dpad code!
 
@@ -333,7 +336,11 @@ u32 update_input()
       case BUTTON_ID_MENU:
       {
         u16 *screen_copy = copy_screen();
+#ifdef UI4
+        u32 ret_val = ui_pause(screen_copy);
+#else
         u32 ret_val = menu(screen_copy);
+#endif
         free(screen_copy);
 
         return ret_val;

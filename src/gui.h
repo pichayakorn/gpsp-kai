@@ -100,6 +100,7 @@ s32 load_config_file();
 s32 save_game_config_file();
 void note_game_left(void);
 void check_battery_save(void);
+void save_ss_bmp(u16 *image);
 s32 save_config_file();
 
 u32 menu(u16 *original_screen);
