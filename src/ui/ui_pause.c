@@ -1100,7 +1100,7 @@ static struct
   u32 io, draw, period;
   u16 sec[PERF_SECTIONS];
 } perf_log[PERF_MAX];
-static int perf_phase, perf_f, perf_n, perf_on;
+static int perf_phase, perf_f, perf_n, perf_on, perf_done;
 
 static u32 perf_script(void)
 {
@@ -1203,8 +1203,13 @@ u32 ui_pause(u16 *game_picture)
   build_layer();
   ui_input_init();
 #ifdef UI_PERF
-  perf_phase = perf_f = perf_n = perf_on = 0;
-  ui_input_script = perf_script;
+  /* the script runs on the first pause only; later pauses take the pad,
+     so the game can still be left with Exit */
+  if(!perf_done)
+  {
+    perf_phase = perf_f = perf_n = perf_on = 0;
+    ui_input_script = perf_script;
+  }
 #endif
 
   while(leave == LEAVE_NONE)
@@ -1365,7 +1370,7 @@ u32 ui_pause(u16 *game_picture)
       static u32 last;
       u32 t0 = sceKernelGetSystemTimeLow(), t1, t2;
 
-      if(opened && !perf_on)
+      if(opened && !perf_on && !perf_done)
       {
         perf_on = 1;
         last = t0;
@@ -1391,7 +1396,11 @@ u32 ui_pause(u16 *game_picture)
 #ifdef UI_PERF
   ui_input_script = NULL;
   if(perf_on)
+  {
     perf_write();
+    perf_on = 0;
+    perf_done = 1;
+  }
 #endif
   ui_layer_reset();
   ui_pool_release(mark);
