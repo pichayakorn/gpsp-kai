@@ -1093,7 +1093,7 @@ u32 menu(u16 *original_screen)
       if(g_savestate_slot_num == MEM_STATE_NUM)
         delete_last_state();
       else
-        sceIoRemove(savestate_path);
+        delete_state_files(savestate_path);
       forget_savestate_snapshot();
     }
 
