@@ -4025,14 +4025,88 @@ static void write_state_thumbnail(const char *savestate_path)
   }
 }
 
-// Delete a savestate file and its picture.
-void delete_state_files(const char *savestate_path)
+/*--------------------------------------------------------
+  Undo (.bak)
+  Saving over a slot or deleting it first renames <game>_N.svs and its
+  .thm to <game>_N.svs.bak and .thm.bak, replacing any older backup, so
+  the last save or delete on each slot can be undone. The next save or
+  delete on that slot replaces the backup.
+--------------------------------------------------------*/
+static void get_backup_path(const char *path, char *backup_path)
+{
+  path_printf(backup_path, MAX_PATH, "%s.bak", path);
+}
+
+// Move path to path.bak, if it exists. FAT can't rename over a file.
+static void backup_file(const char *path)
+{
+  char backup_path[MAX_PATH];
+  SceIoStat stat;
+
+  get_backup_path(path, backup_path);
+  sceIoRemove(backup_path);
+  if(sceIoGetstat(path, &stat) >= 0)
+    sceIoRename(path, backup_path);
+}
+
+static void backup_state_files(const char *savestate_path)
 {
   char thumbnail_path[MAX_PATH];
 
   get_thumbnail_path(savestate_path, thumbnail_path);
+  backup_file(savestate_path);
+  backup_file(thumbnail_path);
+}
+
+// Forget the backup of a slot (its file was changed without one).
+static void drop_state_backup(const char *savestate_path)
+{
+  char thumbnail_path[MAX_PATH];
+  char backup_path[MAX_PATH];
+
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  get_backup_path(savestate_path, backup_path);
+  sceIoRemove(backup_path);
+  get_backup_path(thumbnail_path, backup_path);
+  sceIoRemove(backup_path);
+}
+
+// Is there a save or delete on this slot to undo?
+u32 has_state_backup(const char *savestate_path)
+{
+  char backup_path[MAX_PATH];
+  SceIoStat stat;
+
+  get_backup_path(savestate_path, backup_path);
+  return sceIoGetstat(backup_path, &stat) >= 0;
+}
+
+// Put the backup back: the slot returns to what it was before the last
+// save or delete. Returns 1 on success.
+u32 undo_state_files(const char *savestate_path)
+{
+  char thumbnail_path[MAX_PATH];
+  char backup_path[MAX_PATH];
+
+  if(!has_state_backup(savestate_path))
+    return 0;
+
+  get_backup_path(savestate_path, backup_path);
   sceIoRemove(savestate_path);
+  if(sceIoRename(backup_path, savestate_path) < 0)
+    return 0;
+
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  get_backup_path(thumbnail_path, backup_path);
   sceIoRemove(thumbnail_path);
+  sceIoRename(backup_path, thumbnail_path);
+  return 1;
+}
+
+// Delete a savestate file and its picture, keeping them as the backup.
+void delete_state_files(const char *savestate_path)
+{
+  backup_state_files(savestate_path);
 }
 
 u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
@@ -4058,6 +4132,8 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
   write_state_buffer(screen_capture);
 
   // Slot 10 is written to its file too, so it is kept after quitting.
+  // The old file becomes the backup; a failed write puts it back.
+  backup_state_files(savestate_path);
   FILE_OPEN(savestate_file, savestate_path, WRITE);
   if(FILE_CHECK_VALID(savestate_file))
   {
@@ -4065,7 +4141,11 @@ u32 save_state(char *savestate_filename, u16 *screen_capture, u32 slot_num)
     FILE_CLOSE(savestate_file);
     if(written == (s32)sizeof(savestate_write_buffer))
       write_state_thumbnail(savestate_path);
+    else
+      undo_state_files(savestate_path);
   }
+  else
+    undo_state_files(savestate_path);
 
   update_progress();
   show_progress(msg[MSG_SAVE_STATE_END]);
@@ -4107,6 +4187,7 @@ u32 save_last_state(u16 *screen_capture)
   write_state_buffer(screen_capture);
 
   get_last_state_path(savestate_path);
+  drop_state_backup(savestate_path);  // the automatic save has no Undo
   FILE_OPEN(savestate_file, savestate_path, WRITE);
   if(FILE_CHECK_VALID(savestate_file))
   {
