@@ -731,6 +731,10 @@ u32 ui_pause(u16 *game_picture)
   p.shot = ui_pool_alloc(240 * 160 * 2);
   for(i = 0; i < SLOTS; i++)
     read_slot(i);
+  /* the big picture is sharp from the first frame: it loads while the game
+     is still on the LCD */
+  load_big_picture();
+  p.rest = SHOT_REST + UI_F_SCROLL;
   build_layer();
   ui_input_init();
 
