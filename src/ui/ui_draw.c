@@ -168,6 +168,13 @@ static char *key_label(u32 key)
     case PSP_CTRL_START:    return "START";
     case PSP_CTRL_SELECT:   return "SELECT";
     case PSP_CTRL_HOME:     return "HOME";
+    /* the d-pad: a pair shares one pill */
+    case PSP_CTRL_UP:       return "\xE2\x86\x91";
+    case PSP_CTRL_DOWN:     return "\xE2\x86\x93";
+    case PSP_CTRL_LEFT:     return "\xE2\x86\x90";
+    case PSP_CTRL_RIGHT:    return "\xE2\x86\x92";
+    case PSP_CTRL_UP | PSP_CTRL_DOWN:    return "\xE2\x86\x91\xE2\x86\x93";
+    case PSP_CTRL_LEFT | PSP_CTRL_RIGHT: return "\xE2\x86\x90\xE2\x86\x92";
     default:                return "?";
   }
 }
@@ -228,8 +235,18 @@ void ui_hint_strip(const ui_hint_t *hints, int count)
   ui_fill(0, UI_STRIP_Y, UI_SCREEN_W, UI_STRIP_H, UI_COL_SHADE);
   for(n = 0; n < count; n++)
   {
+    u32 keys = hints[n].keys;
+    static const u32 pairs[2] = { PSP_CTRL_UP | PSP_CTRL_DOWN, PSP_CTRL_LEFT | PSP_CTRL_RIGHT };
+    int j;
+
+    for(j = 0; j < 2; j++)
+      if((keys & pairs[j]) == pairs[j])
+      {
+        x = ui_glyph(x, y, pairs[j]) + 2;
+        keys &= ~pairs[j];
+      }
     for(bit = 1; bit; bit <<= 1)
-      if(hints[n].keys & bit)
+      if(keys & bit)
         x = ui_glyph(x, y, bit) + 2;
     x = ui_text(x + 2, small_text_top(y, UI_DISC), hints[n].verb, UI_COL_CREAM) + 14;
   }

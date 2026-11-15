@@ -439,6 +439,8 @@ int main(int argc, char *argv[])
     sceCtrlPeekBufferPositive(&ctrl, 1);
     if(ctrl.Buttons & PSP_CTRL_RTRIGGER)
       ui_bench();
+    else if(ctrl.Buttons & PSP_CTRL_LTRIGGER)
+      ui_components();
   }
 #endif
 
