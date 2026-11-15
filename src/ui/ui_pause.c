@@ -458,10 +458,10 @@ static void draw_status(void)
      (a frame with every call still missed its vblank) */
   if(status_age <= 0)
   {
+    /* the 12/24-hour setting is read in read_status() only: reading the
+       system settings cost a frame 10-20 ms (PERF run) */
     status_age = 60;
     sceRtcGetCurrentClockLocalTime(&status_now);
-    status_format = 0;
-    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &status_format);
   }
   else if(status_age == 45)
     status_level = scePowerGetBatteryLifePercent();
