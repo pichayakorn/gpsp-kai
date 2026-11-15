@@ -768,7 +768,7 @@ void init_gpsp_config()
   int temp;
   g_gpsp_config.screen_mode = scaled_aspect;
   g_gpsp_config.screen_scale = 100;
-  g_gpsp_config.screen_filter = filter_bilinear;
+  g_gpsp_config.screen_filter = filter_sharp_bilinear;  /* crisp at any scale (#74) */
   g_gpsp_config.screen_ratio = R4_3;
   g_gpsp_config.screen_interlace = PROGRESSIVE;
   g_gpsp_config.enable_audio = YES;
