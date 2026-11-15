@@ -724,7 +724,7 @@ u32 ui_pause(u16 *game_picture)
 
   pause_sound(1);
   set_cpu_clock(10);  /* menus run at 222 MHz */
-  video_resolution(FRAME_MENU);
+  video_resolution_keep(FRAME_MENU);  /* the game stays on the LCD meanwhile */
 
   mark = ui_pool_mark();
   p.thumbs = ui_pool_alloc(SLOTS * SMALL_W * SMALL_H * 2);
@@ -856,11 +856,17 @@ u32 ui_pause(u16 *game_picture)
   if(leave == LEAVE_OLD_MENU)
     return menu(p.game) | p.changed;
 
-  clear_screen(0);
-  flip_screen();
-  clear_screen(0);
-  flip_screen();
-  video_resolution(FRAME_GAME);
+  /* The last frame is the game as it will be shown, without the door, so
+     going back to the game needs no black frames. */
+  {
+    int x, y, w, h;
+    ui_frame_begin();
+    ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
+    get_game_rect(&x, &y, &w, &h);
+    ui_blit_scaled(p.game, 240, 160, x, y, w, h);
+    ui_frame_end();
+  }
+  video_resolution_keep(FRAME_GAME);
   set_cpu_clock(g_game_config.clock_speed_number);
   pause_sound(0);
   real_frame_count = 0;

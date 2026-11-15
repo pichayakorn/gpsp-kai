@@ -436,7 +436,23 @@ void flip_screen()
   sceGeListEnQueue(ge_cmd, ge_cmd_ptr, gecbid, NULL);
 }
 
+static void set_resolution(u32 frame, u32 keep);
+
 void video_resolution(u32 frame)
+{
+  set_resolution(frame, 0);
+}
+
+/* Switches like video_resolution() but without showing black frames: the
+ * LCD keeps the last picture until the next flip_screen(), so a screen that
+ * draws its own first frame (the 4.0 pause screen) opens and closes without
+ * a blink. TV output keeps the black frames. */
+void video_resolution_keep(u32 frame)
+{
+  set_resolution(frame, (psp_model != PSP_2000) || (use_video_out == 0));
+}
+
+static void set_resolution(u32 frame, u32 keep)
 {
   static u32 first_load = 0;
   static SCREEN_PARAMETER *old_parameter = NULL;
@@ -449,7 +465,7 @@ void video_resolution(u32 frame)
     first_load = 1;
     current_parameter = &screen_parameter_psp_menu;
   }
-  else
+  else if(!keep)
   {
     flip_screen();
     clear_screen(0);
@@ -568,11 +584,14 @@ void video_resolution(u32 frame)
     sceGuFinish();
     sceGuSync(0, 0);
 
-    flip_screen();
-    clear_screen(0);
-    flip_screen();
-    clear_screen(0);
-    flip_screen();
+    if(!keep)
+    {
+      flip_screen();
+      clear_screen(0);
+      flip_screen();
+      clear_screen(0);
+      flip_screen();
+    }
   }
 }
 

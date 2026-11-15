@@ -35,6 +35,7 @@
 
 void init_video();
 void video_resolution(u32 mode);
+void video_resolution_keep(u32 mode);
 void clear_screen(u16 color);
 void blit_to_screen(u16 *src, u32 w, u32 h, u32 x, u32 y);
 u16 *copy_screen();
