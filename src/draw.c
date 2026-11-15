@@ -168,6 +168,24 @@ u32 yesno_dialog(char *text)
     return 1;
 }
 
+/* A message with one confirm: text, then a second line, until O or X. */
+void message_dialog(char *text, char *text2)
+{
+  gui_action_type gui_action = CURSOR_NONE;
+
+  draw_dialog(yesno_sx - 8, yesno_sy -29, yesno_ex + 8, yesno_ey + 13);
+  print_string_center(yesno_sy - 16, COLOR_YESNO_TEXT, COLOR_DIALOG, text);
+  print_string_center(yesno_sy + 5 , COLOR_YESNO_TEXT, COLOR_DIALOG, text2);
+
+  flip_screen();
+
+  while((gui_action != CURSOR_SELECT)  && (gui_action != CURSOR_EXIT))
+  {
+    gui_action = get_gui_input();
+    sceKernelDelayThread(15000); /* 0.0015s */
+  }
+}
+
 void init_progress(u32 total, char *text)
 {
   progress_current = 0;

@@ -1235,3 +1235,15 @@
 #Load slot 10 next time to continue from where you left.
 !Select 'yes' to save into slot 10 when you load another game or exit.\n
 !Load slot 10 next time to continue from where you left.
+
+# MSG_BATTERY_LOW_SAVED
+#Battery low: the game was saved to slot 10.
+!Battery low: the game was saved to slot 10.
+
+# MSG_BATTERY_LOW_NOT_SAVED
+#Battery low: saving to slot 10 failed.
+!Battery low: saving to slot 10 failed.
+
+# MSG_BATTERY_LOW_CONTINUE
+#Charge the PSP soon. Press O or X to continue.
+!Charge the PSP soon. Press O or X to continue.
