@@ -4316,6 +4316,53 @@ u32 save_last_state(u16 *screen_capture)
   return ret;
 }
 
+// Load Last and keep the running game in its place (4.0 pause: loading
+// Last with "Save when leaving a game" on swaps). Last moves aside, the
+// running game becomes Last, then the old Last is loaded and removed. If
+// the load fails, the old Last goes back.
+u32 swap_last_state(u16 *screen_capture)
+{
+  char path[MAX_PATH], aside[MAX_PATH], name[MAX_FILE], *dot;
+  u32 ok;
+
+  if (gamepak_filename[0] == 0)
+    return 0;
+
+  get_last_state_path(path);
+  get_savestate_filename_noshot(MEM_STATE_NUM, name);
+  dot = strrchr(name, '.');
+  if (dot == NULL)
+    return 0;
+  strcpy(dot, ".swp");
+  if (g_default_save_dir[0] != '\0')
+    path_printf(aside, sizeof(aside), "%s/%s", g_default_save_dir, name);
+  else
+    strcpy(aside, name);
+
+  sceIoRemove(aside);
+  if (sceIoRename(path, aside) < 0)
+    return 0;
+
+  if (!save_last_state(screen_capture))
+  {
+    sceIoRemove(path);
+    sceIoRename(aside, path);
+    return 0;
+  }
+
+  ok = load_state(name, 0);
+  if (ok)
+    sceIoRemove(aside);
+  else
+  {
+    // the .thm now shows the running game; its time no longer matches, so
+    // it is made again from the old Last the next time it is needed
+    sceIoRemove(path);
+    sceIoRename(aside, path);
+  }
+  return ok;
+}
+
 // Fill slot 10 from the file, if this game has one.
 void load_last_state(void)
 {

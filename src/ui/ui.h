@@ -114,6 +114,7 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f);
 
 int ui_toast(const char *text, u16 edge, const char *undo, int f);
 int ui_toast_up(int f);
+void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 
 typedef struct
 {

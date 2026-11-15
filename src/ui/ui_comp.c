@@ -323,6 +323,57 @@ int ui_toast(const char *text, u16 edge, const char *undo, int f)
   return 1;
 }
 
+/* A toast over the running game, after the pause screen closes: top
+ * right (y 6, right edge 466), so it stays clear of the text boxes most
+ * games draw at the bottom; no button, since every key belongs to the
+ * game. It is drawn once into the GE overlay (gu.c), which slides it. */
+#define GAME_TOAST_KEY 0x7C1F  /* drawn nowhere: see-through */
+static int game_toast_f, game_toast_w;
+
+static int game_toast_tick(int *x, int *y, int *w, int *h)
+{
+  int f = game_toast_f++, out = game_toast_w + 24, right = 466 - game_toast_w;
+
+  if(f < UI_F_TOAST_IN)
+    *x = right + ui_ease_out_back(out, 0, f + 1, UI_F_TOAST_IN);
+  else if(f < UI_F_TOAST_IN + UI_F_TOAST_HOLD)
+    *x = right;
+  else if(f < UI_F_TOAST_IN + UI_F_TOAST_HOLD + UI_F_TOAST_OUT)
+    *x = right + ui_ease_in_cubic(0, out, f - UI_F_TOAST_IN - UI_F_TOAST_HOLD + 1, UI_F_TOAST_OUT);
+  else
+    return 0;
+  *y = 6;
+  *w = game_toast_w + 3;  /* the shadow */
+  *h = 29;
+  return 1;
+}
+
+void ui_game_toast(const char *text, u16 edge)
+{
+  u16 *saved = ui_fb;
+  u32 saved_pitch = ui_fb_pitch, i;
+  int w = body_width(text, 0) + 28, x0;
+
+  if(w > OSD_W - 3)
+    w = OSD_W - 3;
+  for(i = 0; i < OSD_W * OSD_H; i++)
+    osd_pixels[i] = GAME_TOAST_KEY;
+  /* ui_toast() draws its resting position, x0..x0+w+3 and 212..241, so
+     the frame pointer is moved for that to land at the overlay's origin */
+  x0 = 460 - w;
+  ui_fb = osd_pixels - (x0 + 212 * OSD_W);
+  ui_fb_pitch = OSD_W;
+  ui_toast(text, edge, NULL, UI_F_TOAST_IN);
+  ui_fb = saved;
+  ui_fb_pitch = saved_pitch;
+  for(i = 0; i < OSD_W * OSD_H; i++)
+    osd_pixels[i] = (osd_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_pixels[i] | 0x8000);
+
+  game_toast_w = w;
+  game_toast_f = 0;
+  osd_tick = game_toast_tick;
+}
+
 /* Is the toast still up (Undo works while it is)? */
 int ui_toast_up(int f)
 {
