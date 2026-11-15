@@ -78,7 +78,47 @@ void ui_hint_strip(const ui_hint_t *hints, int count);
 int ui_ease_out_back(int a, int b, int f, int n);
 int ui_ease_in_cubic(int a, int b, int f, int n);
 
+/* Components (ui_comp.c, spec section 2). Each draws one frame from the
+ * state it is given; f arguments are frames since the change started. */
+void ui_round_fill(int x, int y, int w, int h, int r, u16 color);
+void ui_round_frame(int x, int y, int w, int h, int r, u16 color);
+void ui_cursor_frame(int x, int y, int w, int h);
+
+#define UI_ROW_CHANGED  1  /* not the default: a tangerine dot in the margin */
+#define UI_ROW_PER_GAME 2  /* saved for this game only: the cartridge mark */
+#define UI_ROW_DISABLED 4  /* no card, mute label */
+void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group,
+ int flags, int *vx, int *vy);
+void ui_row_note(int xr, int y, const char *note);
+void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int f);
+void ui_row_segments(int xr, int y, const char **labels, int count, int k,
+ int from, int f, int selected, u16 group);
+void ui_row_switch(int xr, int y, int p, int selected);
+int ui_switch_pos(int on, int f);
+void ui_row_blocks(int xr, int y, int n, int k, const char *text, int f,
+ int selected, u16 group);
+void ui_row_action(int xr, int y, int selected);
+
+int ui_tabs(int x, const char **labels, int count, int k, int prev, int f);
+
+int ui_toast(const char *text, u16 edge, const char *undo, int f);
+int ui_toast_up(int f);
+
+typedef struct
+{
+  int p;      /* progress, 1/256 */
+  int fired;  /* the hold completed and the key is still down */
+  int done;   /* the hold completed this frame */
+} ui_hold_t;
+int ui_hold_step(ui_hold_t *h, u32 key);
+void ui_hold_bar(int x, int y, int w, int p, u16 color);
+
+void ui_dialog(const char *title, const char *body, const char **buttons,
+ int button_count, int selected, u16 edge, int f, int closing);
+
 /* Step 1 benchmark screen: hold R while kai starts. */
 void ui_bench(void);
+/* Step 2 component screen: hold L while kai starts. */
+void ui_components(void);
 
 #endif
