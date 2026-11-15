@@ -240,7 +240,7 @@ char g_default_cheat_dir[MAX_PATH];
 u32 g_savestate_slot_num = 0;
 
 char *msg[MSG_END];
-char msg_data[16 * 1024]; // 16 KB buffer holding the message strings
+char *msg_data; // the message strings, sized from the .msg file at load
 
 static char m_font[MAX_PATH];
 static char s_font[MAX_PATH];
@@ -1975,50 +1975,58 @@ u32 load_msgcfg(char *file_name)
   FILE *msg_file;
   char msg_path[MAX_PATH];
   u32 offset;
+  long file_size;
 
   path_printf(msg_path, sizeof(msg_path), "%s/%s", main_path, file_name);
 
   msg_file = fopen(msg_path, "rb");
+  if(msg_file == NULL)
+    return -1;
+
+  /* The parsed strings never take more bytes than the file: each '!' line
+     loses its '!' and line end, and every other line adds one NUL. */
+  fseek(msg_file, 0, SEEK_END);
+  file_size = ftell(msg_file);
+  fseek(msg_file, 0, SEEK_SET);
+  free(msg_data);
+  msg_data = (file_size > 0) ? malloc(file_size + 1) : NULL;
+  if(msg_data == NULL)
+  {
+    fclose(msg_file);
+    return -1;
+  }
 
   next_line = 0;
   offset = 0;
-  if(msg_file)
+  loop = 0;
+  while(fgets(current_line, 256, msg_file))
   {
-    loop = 0;
-    while(fgets(current_line, 256, msg_file))
+    if(parse_line(current_line, current_str) != -1)
     {
-      if(parse_line(current_line, current_str) != -1)
+      if(next_line == 0)
       {
-        if (loop <= (MSG_END + 1 + next_line)) {
-          if (next_line == 0)
-          {
-            msg[loop] = &msg_data[offset];
-            next_line = 1;
-            loop++;
-          }
-          strcpy(&msg_data[offset], current_str);
-          offset = offset + strlen(current_str);  // offset points at the terminating NUL
+        if(loop == MSG_END)
+        {
+          /* more messages than message.h knows */
+          loop++;
+          break;
         }
+        msg[loop] = &msg_data[offset];
+        next_line = 1;
+        loop++;
       }
-      else
-      {
-        next_line = 0;
-        offset++;
-      }
-    }
-
-    fclose(msg_file);
-    if (loop == (MSG_END))
-    {
-      return 0;
+      strcpy(&msg_data[offset], current_str);
+      offset = offset + strlen(current_str);  // offset points at the terminating NUL
     }
     else
     {
-      return -1;
+      next_line = 0;
+      offset++;
     }
   }
+
   fclose(msg_file);
-  return -1;
+  return (loop == MSG_END) ? 0 : -1;
 }
 
 u32 load_font()
