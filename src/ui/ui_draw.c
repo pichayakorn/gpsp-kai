@@ -193,6 +193,52 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
   }
 }
 
+/* A picture (w x h, pitch in pixels) at x, y as it is. */
+void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h)
+{
+  int j, x0 = x, y0 = y, cw = w, ch = h;
+  u16 *row;
+
+  if(!clip(&x0, &y0, &cw, &ch))
+    return;
+  src += (y0 - y) * pitch + (x0 - x);
+  row = fb + y0 * fb_pitch + x0;
+  for(j = 0; j < ch; j++, row += fb_pitch, src += pitch)
+    memcpy(row, src, cw * 2);
+}
+
+/* A picture (sw x sh, pitch a multiple of 8 pixels, in RAM) stretched to
+ * w x h at x, y by the GE with bilinear filtering: smooth, and no CPU per
+ * pixel. Texels at the far edges are not sampled (half a texel inset). */
+void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, int w, int h)
+{
+  struct { float u, v, x, y, z; } *v;
+  int tw = 1, th = 1, lw = 0, lh = 0;
+
+  while(tw < pitch) { tw <<= 1; lw++; }
+  while(th < sh) { th <<= 1; lh++; }
+  sceKernelDcacheWritebackRange(src, pitch * sh * 2);
+  sceGuStart(GU_DIRECT, ge_list);
+  sceGuDrawBufferList(GU_PSM_5551, (void *)((u32)screen_address - 0x04000000), fb_pitch);
+  sceGuScissor(0, 0, UI_SCREEN_W, UI_SCREEN_H);
+  sceGuTexMode(GU_PSM_5551, 0, 0, GU_FALSE);
+  sceGuTexImage(0, tw, th, pitch, src);
+  sceGuTexFunc(GU_TFX_REPLACE, GU_TCC_RGBA);
+  sceGuTexFilter(GU_LINEAR, GU_LINEAR);
+  sceGuTexFlush();
+  v = sceGuGetMemory(2 * sizeof(*v));
+  v[0].u = 0.5f;            v[0].v = 0.5f;            v[0].x = x;     v[0].y = y;     v[0].z = 0;
+  v[1].u = sw - 0.5f;       v[1].v = sh - 0.5f;       v[1].x = x + w; v[1].y = y + h; v[1].z = 0;
+  sceGuDrawArray(GU_SPRITES, GU_TEXTURE_32BITF | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 2, 0, v);
+  /* back to what flip_screen() expects: the display as the target */
+  sceGuDrawBufferList(GU_PSM_5551, (void *)0, 768);
+  sceGuScissor(current_parameter->view.x, current_parameter->view.y,
+   current_parameter->view.width, current_parameter->view.height);
+  sceGuFinish();
+  sceGuSync(0, 0);
+  (void)lw; (void)lh;
+}
+
 void ui_rect(int x, int y, int w, int h, int t, u16 color)
 {
   ui_fill(x, y, w, t, color);
