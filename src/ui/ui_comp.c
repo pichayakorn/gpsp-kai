@@ -120,8 +120,12 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
   x -= lift;
   y -= lift;
   end = body_text(x + 8, y + 2, label, tc, 0);
-  if(flags & UI_ROW_PER_GAME)  /* saved for this game only */
-    draw_icon(end + 8, y + 4, icon_rom, selected ? UI_COL_PLUM : UI_COL_TANGERINE);
+  /* Saved for this game only: the cartridge, its ink 6 px after the label
+   * and its 7 rows of ink (bitmap rows 1-7) centred on the capitals, which
+   * sit on rows 4-12 of the 12 px font's cell (CJK ink is centred there
+   * too). The label's cell starts at y + 2. */
+  if(flags & UI_ROW_PER_GAME)
+    draw_icon(end + 5, y + 2 + 4, icon_rom, selected ? UI_COL_PLUM : UI_COL_TANGERINE);
   *vx = x + w - 8;
   *vy = y;
 }
