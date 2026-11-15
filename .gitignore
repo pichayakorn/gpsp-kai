@@ -5,6 +5,7 @@ out/
 *.elf
 eboot/EBOOT.PBP
 eboot/PARAM.SFO
+eboot/build_options.stamp
 prx/dvemgr/dvemgr.prx
 prx/dvemgr/exports.o
 # export tables generated from the .exp files

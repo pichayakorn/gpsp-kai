@@ -20,6 +20,9 @@
  */
 
 #include "common.h"
+#ifdef UI4
+#include "ui/ui.h"
+#endif
 #include <stdarg.h>
 
 PSP_MODULE_INFO("gpSP", PSP_MODULE_USER, VERSION_MAJOR, VERSION_MINOR);
@@ -287,6 +290,10 @@ void quit(u32 mode)
   sceKernelExitGame();
 }
 
+#ifdef SIM_PSP1000
+void *sim_psp1000_ballast;
+#endif
+
 int main(int argc, char *argv[])
 {
   char load_filename[MAX_FILE];
@@ -302,6 +309,13 @@ int main(int argc, char *argv[])
 #ifdef USE_DEBUG
   g_dbg_file = fopen(DBG_FILE_NAME, "awb");
   DBGOUT("\nStart gpSP\n");
+#endif
+
+#ifdef SIM_PSP1000
+  // Test build: hold back what MEMSIZE adds on a PSP-2000/3000 (user
+  // memory 52 MB instead of the PSP-1000's 24 MB), so the game buffer gets
+  // what a PSP-1000 would leave it. Never freed.
+  sim_psp1000_ballast = malloc(28 * 1024 * 1024);
 #endif
 
   load_config_file();
@@ -385,6 +399,11 @@ int main(int argc, char *argv[])
   }
   update_progress();
 
+#ifdef UI4
+  // Before the game buffer, which takes all the RAM left on a PSP-1000
+  ui_pool_init();
+  ui_font_init(g_gpsp_config.language);
+#endif
   init_gamepak_buffer();
   update_progress();
 
@@ -412,6 +431,15 @@ int main(int argc, char *argv[])
   update_progress();
 
   show_progress(msg[MSG_INIT_END]);
+
+#ifdef UI4
+  {
+    SceCtrlData ctrl;
+    sceCtrlPeekBufferPositive(&ctrl, 1);
+    if(ctrl.Buttons & PSP_CTRL_RTRIGGER)
+      ui_bench();
+  }
+#endif
 
   if(argc > 1)
   {
