@@ -341,7 +341,7 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
 
 static void draw_hints(int done)
 {
-  ui_hint_t hints[4];
+  ui_hint_t hints[6];
   int n = 0;
 
   if(p.bar_text || !done || p.closing)
@@ -360,6 +360,8 @@ static void draw_hints(int done)
     hints[n].keys = PSP_CTRL_SELECT;
     hints[n++].verb = (ui_toast_up(p.toast_f) && p.toast_undo) ? "Undo" : "Save \xC2\xB7 hold: Delete";
     hints[n].keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0); hints[n++].verb = "Resume";
+    hints[n].keys = PSP_CTRL_LTRIGGER; hints[n++].verb = "Last";
+    hints[n].keys = PSP_CTRL_RTRIGGER; hints[n++].verb = "Slot 0";
   }
   else
   {
@@ -550,6 +552,7 @@ static void action_save(int slot)
     }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
     show_toast(msg_text, UI_COL_SKY, had ? UNDO_SAVE : UNDO_SAVE_NEW, slot);
+    g_game_config.last_slot = slot;
   }
   else
     show_toast(state_error_text ? state_error_text : "Saving failed", UI_COL_PINK, UNDO_NONE, 0);
@@ -619,6 +622,7 @@ static void action_load(int slot)
     take_loaded_picture();
     slot_name(slot, text);
     sprintf(msg_text, "Loaded %s", text);
+    g_game_config.last_slot = slot;
     show_toast(msg_text, UI_COL_SKY, undo, LAST_SLOT);
     cursor_to_resume();
   }
@@ -711,8 +715,9 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
-  /* It opens on slot 0, with Last one press to the left (maintainer). */
-  p.cur = strip_position(0);
+  /* It opens on the slot last saved or loaded in this game (slot 0 at
+     first); L jumps to Last, R to slot 0 (maintainer, 2026-11-15). */
+  p.cur = strip_position((g_game_config.last_slot < SLOTS) ? g_game_config.last_slot : 0);
   p.pos_f = UI_F_SCROLL;
   p.tile_f = UI_F_CURSOR;
 
@@ -761,6 +766,8 @@ u32 ui_pause(u16 *game_picture)
       {
         if(ui_repeat(PSP_CTRL_LEFT)) move_slot(p.cur - 1);
         if(ui_repeat(PSP_CTRL_RIGHT)) move_slot(p.cur + 1);
+        if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
+        if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
         if(ui_pressed(PSP_CTRL_DOWN)) p.row = 1;
 
         if(ui_pressed(ui_key_confirm))
@@ -791,6 +798,12 @@ u32 ui_pause(u16 *game_picture)
         if(ui_repeat(PSP_CTRL_LEFT)) move_tile(p.tile - 1);
         if(ui_repeat(PSP_CTRL_RIGHT)) move_tile(p.tile + 1);
         if(ui_pressed(PSP_CTRL_UP)) p.row = 0;
+        /* L and R go up to the strip, onto Last or slot 0 */
+        if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
+        {
+          p.row = 0;
+          move_slot(strip_position(ui_pressed(PSP_CTRL_LTRIGGER) ? LAST_SLOT : 0));
+        }
         if(ui_tap(PSP_CTRL_SELECT) && ui_toast_up(p.toast_f) && p.toast_undo)
           action_undo();
 

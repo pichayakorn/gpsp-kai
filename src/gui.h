@@ -72,6 +72,7 @@ typedef struct
   u32 rapidfire_speed;     // RAPIDFIRE_SLOW, RAPIDFIRE_MEDIUM or RAPIDFIRE_FAST
   u32 play_seconds;        // time spent in the game, menus not counted
   u32 last_played;         // when the game was last left, Unix time (UTC); 0 = never
+  u32 last_slot;           // savestate slot last saved or loaded (0-9, 10 = Last)
 } game_config_t;
 
 #define ASM_CORE 0
