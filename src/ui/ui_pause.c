@@ -131,6 +131,9 @@ static struct
   const char *bar_text;      /* the saving card while a save runs */
   const char *bar_note;
   int bar_phase, bar_phases; /* a load after a save fills one bar */
+  int busy;                  /* a save or load runs (nothing to press) */
+  u32 busy_start;            /* when it started (us) */
+  char hold_line[48];        /* the hold card's line once its load runs */
   char game_toast[64];       /* said over the game after a load */
   int changed;               /* the machine state changed (load, restart) */
   int layer_full;            /* the header and tiles at rest are in the ground */
@@ -748,7 +751,10 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   if(big && p.has[slot] && (p.hold.shown || p.load_hold.shown))
   {
     ui_hold_t *hd = p.hold.shown ? &p.hold : &p.load_hold;
-    const char *verb = p.hold.shown ? "Delete (hold)" : "Load (hold)";
+    /* with the save off, a filled load hold keeps its card: the line
+       becomes "Loading slot 3..." while the load runs */
+    const char *verb = p.hold.shown ? "Delete (hold)" :
+     (p.hold_line[0] ? p.hold_line : "Load (hold)");
     int cw = ui_text_width((char *)verb) + 20, cx, cy;
 
     if(cw < 96)
@@ -828,7 +834,7 @@ static void draw_hints(int done)
   u32 resume_keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0);
   int i, full = p.has[cur_slot()];
 
-  if(p.bar_text || !done || p.closing)
+  if(p.bar_text || p.busy || !done || p.closing)
   {
     ui_hint_strip(c1, 0);  /* nothing to press while saving */
     return;
@@ -1021,6 +1027,10 @@ static void bar_hook(int current, int total)
   /* two phases (the save to Last, then the load): 3/4 and 1/4 of the bar */
   if(p.bar_phases == 2)
     fill = (p.bar_phase <= 0) ? fill * 3 / 4 : 192 + fill / 4;
+  /* nothing shows for work done within 10 frames, so a quick save or
+     load never flashes a card (spec: progress cards show only past 10 f) */
+  if(sceKernelGetSystemTimeLow() - p.busy_start < 10 * 16667)
+    return;
   draw_screen(fill);
   ui_frame_end_now();
 }
@@ -1031,6 +1041,8 @@ static void run_with_bar(const char *text, const char *note)
   p.bar_note = note;
   p.bar_phase = -1;
   p.bar_phases = 1;
+  p.busy = 1;
+  p.busy_start = sceKernelGetSystemTimeLow();
   progress_hook = bar_hook;
   state_no_question = 1;
   state_error_text = NULL;
@@ -1042,6 +1054,7 @@ static void end_bar(void)
   state_no_question = 0;
   p.bar_text = NULL;
   p.bar_note = NULL;
+  p.busy = 0;
   pause_sound(1);  /* the savestate code turns the sound back on */
 }
 
@@ -1164,7 +1177,16 @@ static int action_load(int slot)
     strcpy(bar, "Loading Last\xE2\x80\xA6");
   else
     sprintf(bar, "Loading slot %d\xE2\x80\xA6", slot);
-  run_with_bar(bar, NULL);
+  if(keep)
+    run_with_bar(bar, NULL);
+  else
+  {
+    /* the save is off: no new card; the filled hold card says it */
+    run_with_bar(NULL, NULL);
+    strcpy(p.hold_line, bar);
+    p.load_hold.p = 256;
+    p.load_hold.shown = 1;
+  }
   if(swap)
   {
     p.bar_phases = 2;
@@ -1182,6 +1204,9 @@ static int action_load(int slot)
       ok = load_slot(slot);
   }
   end_bar();
+  p.hold_line[0] = 0;
+  p.load_hold.p = 0;
+  p.load_hold.shown = 0;
   if(keep)
     read_slot(LAST_SLOT);
 
