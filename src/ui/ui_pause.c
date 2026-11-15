@@ -1043,6 +1043,91 @@ static void move_tile(int to)
   p.tile_f = 0;
 }
 
+#ifdef UI_PERF
+/* Measuring build (make UI4=1 PERF=1): once the pause screen has opened it
+ * drives itself through a fixed script, logs every frame and closes, then
+ * writes <kai>/perf_pause.csv. */
+static const struct
+{
+  const char *name;
+  int frames;
+  u32 keys;
+  int tap_every;  /* 0: held the whole phase */
+} perf_phases[] =
+{
+  { "still",      120, 0,              0 },
+  { "tap_right",  200, PSP_CTRL_RIGHT, 20 },
+  { "hold_right", 150, PSP_CTRL_RIGHT, 0 },
+  { "hold_left",  150, PSP_CTRL_LEFT,  0 },
+  { "still_end",   60, 0,              0 },
+};
+#define PERF_PHASES (int)(sizeof(perf_phases) / sizeof(perf_phases[0]))
+#define PERF_MAX 800
+
+static struct
+{
+  u8 phase;
+  u32 io, draw, period;
+} perf_log[PERF_MAX];
+static int perf_phase, perf_f, perf_n, perf_on;
+
+static u32 perf_script(void)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return 0;
+  if(perf_phases[perf_phase].tap_every)
+    return ((perf_f % perf_phases[perf_phase].tap_every) < 3) ? perf_phases[perf_phase].keys : 0;
+  return perf_phases[perf_phase].keys;
+}
+
+static void perf_step(u32 io, u32 draw, u32 period)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return;
+  if(perf_n < PERF_MAX)
+  {
+    perf_log[perf_n].phase = perf_phase;
+    perf_log[perf_n].io = io;
+    perf_log[perf_n].draw = draw;
+    perf_log[perf_n].period = period;
+    perf_n++;
+  }
+  if(++perf_f >= perf_phases[perf_phase].frames)
+  {
+    perf_f = 0;
+    if(++perf_phase >= PERF_PHASES)
+      p.closing = 1;
+  }
+}
+
+static void perf_write(void)
+{
+  char path[MAX_PATH], line[128];
+  SceUID fd;
+  int i, saved = 0;
+
+  for(i = 0; i < SLOTS; i++)
+    saved += p.has[i] ? 1 : 0;
+  path_printf(path, sizeof(path), "%s/perf_pause.csv", main_path);
+  fd = sceIoOpen(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+  if(fd < 0)
+    return;
+  sprintf(line, "# cpu %d MHz, bus %d MHz, filter %d, saved slots %d, frames %d\n",
+   scePowerGetCpuClockFrequency(), scePowerGetBusClockFrequency(),
+   (int)g_gpsp_config.screen_filter, saved, perf_n);
+  sceIoWrite(fd, line, strlen(line));
+  strcpy(line, "phase,frame,io_us,draw_us,period_us\n");
+  sceIoWrite(fd, line, strlen(line));
+  for(i = 0; i < perf_n; i++)
+  {
+    sprintf(line, "%s,%d,%u,%u,%u\n", perf_phases[perf_log[i].phase].name, i,
+     (unsigned)perf_log[i].io, (unsigned)perf_log[i].draw, (unsigned)perf_log[i].period);
+    sceIoWrite(fd, line, strlen(line));
+  }
+  sceIoClose(fd);
+}
+#endif
+
 enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_QUIT };
 
 u32 ui_pause(u16 *game_picture)
@@ -1078,6 +1163,10 @@ u32 ui_pause(u16 *game_picture)
   load_big_picture_now();
   build_layer();
   ui_input_init();
+#ifdef UI_PERF
+  perf_phase = perf_f = perf_n = perf_on = 0;
+  ui_input_script = perf_script;
+#endif
 
   while(leave == LEAVE_NONE)
   {
@@ -1232,15 +1321,39 @@ u32 ui_pause(u16 *game_picture)
 
     if(p.pos_f < UI_F_SCROLL) p.pos_f++;
     if(p.tile_f < UI_F_CURSOR) p.tile_f++;
+#ifdef UI_PERF
+    {
+      static u32 last;
+      u32 t0 = sceKernelGetSystemTimeLow(), t1, t2;
+
+      if(opened && !perf_on)
+      {
+        perf_on = 1;
+        last = t0;
+      }
+      load_big_picture();
+      t1 = sceKernelGetSystemTimeLow();
+      draw_screen(0);
+      t2 = sceKernelGetSystemTimeLow();
+      perf_step(t1 - t0, t2 - t1, t0 - last);
+      last = t0;
+    }
+#else
     load_big_picture();
 
     draw_screen(0);
+#endif
     if(p.toast_f >= 0)
       p.toast_f++;
     ui_frame_end();
   }
 
   shot_wait();
+#ifdef UI_PERF
+  ui_input_script = NULL;
+  if(perf_on)
+    perf_write();
+#endif
   ui_layer_reset();
   ui_pool_release(mark);
 
