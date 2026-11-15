@@ -427,23 +427,33 @@ static void draw_header(int hy)
  * less, pink with the % at 10 % or less, sky with a bolt while charging. */
 static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
 
+/* The battery and clock are read once a second, not every frame: each
+   scePower call asks the power chip and costs milliseconds (measured: the
+   header and chip took 10.5 ms of a 16 ms frame). status_age 0 reads now. */
+static int status_age;
+
 static void draw_status(void)
 {
-  ScePspDateTime now;
+  static ScePspDateTime now;
+  static int level, format, battery, charging;
   char clock[16], pct[8];
-  int level = scePowerGetBatteryLifePercent(), format = 0, battery, charging;
   int w, x, tx, i, j, critical = 0;
   u16 color = UI_COL_LIME;
 
-  sceRtcGetCurrentClockLocalTime(&now);
-  sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &format);
+  if(status_age-- <= 0)
+  {
+    status_age = 60;
+    sceRtcGetCurrentClockLocalTime(&now);
+    format = 0;
+    sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_TIME_FORMAT, &format);
+    level = scePowerGetBatteryLifePercent();
+    battery = scePowerIsBatteryExist() > 0;
+    charging = battery && (scePowerIsBatteryCharging() > 0);
+  }
   if(format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
     sprintf(clock, "%d:%02d %s", (now.hour + 11) % 12 + 1, now.minute, (now.hour < 12) ? "AM" : "PM");
   else
     sprintf(clock, "%02d:%02d", now.hour, now.minute);
-
-  battery = scePowerIsBatteryExist() > 0;
-  charging = battery && (scePowerIsBatteryCharging() > 0);
   if(level < 0)
     level = 0;
   if(level > 100)
@@ -1167,6 +1177,7 @@ u32 ui_pause(u16 *game_picture)
   p.game = game_picture;
   p.shot_slot = -1;
   p.toast_f = -1;
+  status_age = 0;
   shot_fd = -1;
   shot_state = 0;
   shot_reading = -1;
