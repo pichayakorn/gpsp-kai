@@ -104,6 +104,9 @@ int ui_ease_in_cubic(int a, int b, int f, int n);
 void ui_round_fill(int x, int y, int w, int h, int r, u16 color);
 void ui_round_frame(int x, int y, int w, int h, int r, u16 color);
 void ui_cursor_frame(int x, int y, int w, int h);
+void ui_line(int x0, int y0, int x1, int y1, u16 color);
+void ui_disc(int cx, int cy, int r, u16 color);
+void ui_ring(int cx, int cy, int r, int t, u16 color);  /* t px thick, outer radius r */
 
 #define UI_ROW_CHANGED  1  /* not the default: a tangerine dot in the margin */
 #define UI_ROW_PER_GAME 2  /* saved for this game only: the cartridge mark */
@@ -161,6 +164,7 @@ u32 ui_pause(u16 *game_picture);
  * back. The caller draws its own ground again. */
 int ui_settings(int tab, int row);
 void ui_settings_where(int *tab, int *row);
+extern const u16 *ui_settings_game;  /* the game picture for Controls (240 x 160) */
 extern u32 ui_start_language;  /* the language kai started with */
 
 /* Restart kai (ui_restart.c): the note that brings the player back where

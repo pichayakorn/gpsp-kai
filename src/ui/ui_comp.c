@@ -683,3 +683,63 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
     bx -= 10;
   }
 }
+
+/* ---- lines and discs (the Controls drawings; drawn into the ground) ---- */
+
+/* A 1 px line, Bresenham. */
+void ui_line(int x0, int y0, int x1, int y1, u16 color)
+{
+  int dx = (x1 > x0) ? x1 - x0 : x0 - x1, sx = (x0 < x1) ? 1 : -1;
+  int dy = (y1 > y0) ? y0 - y1 : y1 - y0, sy = (y0 < y1) ? 1 : -1;
+  int err = dx + dy, e2;
+
+  while(1)
+  {
+    ui_fill(x0, y0, 1, 1, color);
+    if((x0 == x1) && (y0 == y1))
+      break;
+    e2 = 2 * err;  /* taken once: both steps test the same error */
+    if(e2 >= dy) { err += dy; x0 += sx; }
+    if(e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+
+/* The half-width of a disc of radius r at row offset y. */
+static int disc_span(int r, int y)
+{
+  int w = 0;
+
+  while((w + 1) * (w + 1) + y * y <= r * r + r)
+    w++;
+  return w;
+}
+
+void ui_disc(int cx, int cy, int r, u16 color)
+{
+  int y;
+
+  for(y = -r; y <= r; y++)
+  {
+    int w = disc_span(r, y);
+    ui_fill(cx - w, cy + y, w * 2 + 1, 1, color);
+  }
+}
+
+/* A ring t px thick whose outer radius is r. */
+void ui_ring(int cx, int cy, int r, int t, u16 color)
+{
+  int y;
+
+  for(y = -r; y <= r; y++)
+  {
+    int wo = disc_span(r, y), ri = r - t, wi;
+    if((y < -ri) || (y > ri))
+    {
+      ui_fill(cx - wo, cy + y, wo * 2 + 1, 1, color);
+      continue;
+    }
+    wi = disc_span(ri, y);
+    ui_fill(cx - wo, cy + y, wo - wi, 1, color);
+    ui_fill(cx + wi + 1, cy + y, wo - wi, 1, color);
+  }
+}

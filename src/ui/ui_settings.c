@@ -49,6 +49,7 @@ typedef struct
 /* K_ACTION rows keep their action in def */
 enum { ACT_RESET_ALL, ACT_RESTART };
 #define LANG_TAB 4  /* System: the Language row is its first */
+#define PAD_TAB 2   /* Controls */
 
 static const u8 map_frameskip[3] = { no_frameskip, auto_frameskip, manual_frameskip };
 static const u8 map_ff[2] = { FF_HOLD, FF_TOGGLE };
@@ -82,8 +83,11 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Sound delay", "Less delay feels faster; more delay stops crackles in busy games.",
       K_BLOCKS, 1, 11, { NULL }, &g_game_config.audio_buffer_size_number, NULL, 2 },
   },
-  { /* Controls */
-    { "Buttons and stick", NULL, K_OFF, 0, 0, { "In the next update" } },
+  { /* Controls: the Stick page; the Buttons page is drawn on its own */
+    { "Use the stick", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
+    { "Sensitivity", "The ring shows where a push starts to count.",
+      K_BLOCKS, 0, 10, { NULL }, &g_gpsp_config.analog_sensitivity_level, NULL, 4, 0, 0, "%d" },
+    { "Tilt sensor", NULL, K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
   { /* Play */
     { "Save when leaving a game", "Exit and Library save to Last first; Continue picks up there.",
@@ -176,7 +180,18 @@ static struct
   char toast[48];
   int toast_f, toast_undo;
   int restart;                    /* leave Settings and restart kai */
+  /* Controls */
+  int page;                       /* 0 Buttons, 1 Stick */
+  int btn;                        /* the selected chip on the Buttons page */
+  int pick, pick_f, pick_out;     /* the action picker: open, its motion */
+  int pcur, pcur_from, pcur_f;    /* the picker's cursor */
+  u32 undo_map[MAX_GAMEPAD_CONFIG_MAP];
+  u32 undo_map_default;
 } s;
+
+/* The picture of the game under the pause screen, for the Controls tab's
+ * PSP (240 x 160); NULL draws an empty screen. */
+const u16 *ui_settings_game;
 
 /* The language kai started with; the Language row may differ until a
  * restart. */
@@ -204,9 +219,14 @@ static int action_of(int tab, int i)
   return (rows[tab][i].kind == K_ACTION) ? rows[tab][i].def : -1;
 }
 
+/* The Stick page keeps its rows on the right, beside the stick. */
+static int row_x(int tab)  { return (tab == PAD_TAB) ? 236 : ROW_X; }
+static int row_w(int tab)  { return (tab == PAD_TAB) ? 224 : ROW_W; }
+static int rows_y0(int tab) { return (tab == PAD_TAB) ? 70 : ROWS_Y; }
+
 static int row_y(int tab, int i)
 {
-  int y = ROWS_Y, j;
+  int y = rows_y0(tab), j;
 
   for(j = 0; j < i; j++)
     y += row_pitch(&rows[tab][j]);
@@ -229,15 +249,15 @@ static void scroll_to_cursor(void)
   {
     int want = (s.cur + 1 < n) ? s.cur + 1 : s.cur;
 
-    while((first < n - 1) && (row_y(s.tab, first + 1) - ROWS_Y <= s.top))
+    while((first < n - 1) && (row_y(s.tab, first + 1) - rows_y0(s.tab) <= s.top))
       first++;  /* the first row in view now */
     if((s.cur <= first) && (first > 0))
       first = (s.cur > 0) ? s.cur - 1 : 0;
     while((first < s.cur) && (row_y(s.tab, want) + row_height(&rows[s.tab][want])
-                              - (row_y(s.tab, first) - ROWS_Y) > VIEW_B))
+                              - (row_y(s.tab, first) - rows_y0(s.tab)) > VIEW_B))
       first++;
   }
-  top = row_y(s.tab, first) - ROWS_Y;
+  top = row_y(s.tab, first) - rows_y0(s.tab);
   if(top != s.top)
   {
     s.top = top;
@@ -280,10 +300,11 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   u16 g = UI_COL_LIME;
   int vx, vy, flags = 0, k;
   char text[32];
+  int rx = row_x(tab), rw = row_w(tab);
 
   if(r->kind == K_OFF)
   {
-    ui_card_row(ROW_X, y, ROW_W, r->label, 0, g, UI_ROW_DISABLED, &vx, &vy);
+    ui_card_row(rx, y, rw, r->label, 0, g, UI_ROW_DISABLED, &vx, &vy);
     ui_row_note(vx, vy, r->opts[0]);
     return;
   }
@@ -296,22 +317,22 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   {
     int lift = selected ? UI_LIFT : 0;
     if(selected)
-      ui_round_fill(ROW_X + 1, y + 1, ROW_W, SCREEN_ROW_H, 2, UI_COL_SHADE);
-    ui_round_fill(ROW_X - lift, y - lift, ROW_W, SCREEN_ROW_H, 2, selected ? g : UI_COL_CARD);
+      ui_round_fill(rx + 1, y + 1, rw, SCREEN_ROW_H, 2, UI_COL_SHADE);
+    ui_round_fill(rx - lift, y - lift, rw, SCREEN_ROW_H, 2, selected ? g : UI_COL_CARD);
     if(flags & UI_ROW_CHANGED)
-      ui_fill(ROW_X - 9, y + 18, 4, 4, UI_COL_TANGERINE);
-    ui_print(ROW_X + 8 - lift, y + 12 - lift, r->label, selected ? UI_COL_PLUM : UI_COL_CREAM,
+      ui_fill(rx - 9, y + 18, 4, 4, UI_COL_TANGERINE);
+    ui_print(rx + 8 - lift, y + 12 - lift, r->label, selected ? UI_COL_PLUM : UI_COL_CREAM,
      UI_FONT_BODY, 0);
-    draw_screen_choices(r, ROW_X + ROW_W - 8 - lift, y - lift, selected, g);
+    draw_screen_choices(r, rx + rw - 8 - lift, y - lift, selected, g);
     return;
   }
 
-  ui_card_row(ROW_X, y, ROW_W, r->label, selected, g, flags, &vx, &vy);
+  ui_card_row(rx, y, rw, r->label, selected, g, flags, &vx, &vy);
   if(is_lang_row(tab, i) && lang_pending())
   {
     /* "next start": a sky pill 6 px after the label, 3 px down */
     int lift = selected ? UI_LIFT : 0;
-    int px = ROW_X + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 6;
+    int px = rx + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 6;
     int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 10;
     ui_round_fill(px, y + 3 - lift, pw, 14, 2, UI_COL_SKY);
     ui_print(px + 5, y + 3 - lift + 1, "next start", UI_COL_PLUM, UI_FONT_SMALL, 0);
@@ -326,7 +347,11 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       ui_row_switch(vx, vy, ui_switch_pos(*r->value != 0, selected ? f : UI_F_VALUE), selected);
       break;
     case K_BLOCKS:
-      ui_row_blocks(vx, vy, r->count, k, msg[MSG_SB_2048 + k], selected ? f : UI_F_VALUE, selected, g);
+      if(r->fmt)
+        snprintf(text, sizeof(text), r->fmt, k + 1);
+      else
+        snprintf(text, sizeof(text), "%s", msg[MSG_SB_2048 + k]);
+      ui_row_blocks(vx, vy, r->count, k, text, selected ? f : UI_F_VALUE, selected, g);
       break;
     case K_CYCLE:
       if(r->names)
@@ -344,6 +369,352 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   }
 }
 
+static void show_toast(const char *text, int undo);
+
+/* ---- Controls: the Buttons page ------------------------------------------ */
+
+/* The PSP drawn with each button's job (spec Settings › Controls). Chips
+ * sit in three groups: left (L and the d-pad), right (R and the face
+ * buttons) and below (SELECT, START). The map is the game's own: editing
+ * it makes the game keep its own map (use_default_gamepad_map off). */
+extern const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP];
+
+#define PAD_BX 128
+#define PAD_BY 56
+#define PAD_BW 224
+#define PAD_BH 120
+#define CHIP_W 112
+#define CHIP_H 18
+#define PAD_ACTIONS 22  /* BUTTON_ID_UP .. BUTTON_ID_NONE */
+
+typedef struct
+{
+  u8 map;     /* index in gamepad_config_map */
+  u32 key;    /* its glyph */
+  s16 x, y;   /* the chip */
+  s16 ax, ay; /* where its line meets the button */
+} chip_t;
+
+/* 0-4 left, 5-9 right, 10-11 below */
+static const chip_t chips[12] =
+{
+  {  4, PSP_CTRL_LTRIGGER,   8,  46, PAD_BX + 26,          PAD_BY - 3 },
+  {  8, PSP_CTRL_UP,         8,  72, PAD_BX + 26,          PAD_BY + 35 },
+  {  7, PSP_CTRL_LEFT,       8,  98, PAD_BX + 15,          PAD_BY + 46 },
+  {  9, PSP_CTRL_RIGHT,      8, 124, PAD_BX + 37,          PAD_BY + 46 },
+  {  6, PSP_CTRL_DOWN,       8, 150, PAD_BX + 26,          PAD_BY + 57 },
+  {  5, PSP_CTRL_RTRIGGER, 360,  46, PAD_BX + PAD_BW - 26, PAD_BY - 3 },
+  {  0, PSP_CTRL_TRIANGLE, 360,  72, PAD_BX + PAD_BW - 26, PAD_BY + 33 },
+  {  2, PSP_CTRL_CIRCLE,   360,  98, PAD_BX + PAD_BW - 13, PAD_BY + 46 },
+  {  1, PSP_CTRL_CROSS,    360, 124, PAD_BX + PAD_BW - 26, PAD_BY + 59 },
+  {  3, PSP_CTRL_SQUARE,   360, 150, PAD_BX + PAD_BW - 39, PAD_BY + 46 },
+  { 10, PSP_CTRL_SELECT,   128, 188, PAD_BX + 87,          PAD_BY + 99 },
+  { 11, PSP_CTRL_START,    248, 188, PAD_BX + 137,         PAD_BY + 99 },
+};
+
+static const char *action_name(u32 id)
+{
+  return msg[MSG_PAD_MENU_CFG_0 + ((id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1)];
+}
+
+static int chip_remapped(int i)
+{
+  int m = chips[i].map;
+  return gamepad_config_map[m] != gamepad_config_map_init[m];
+}
+
+/* The button itself on the drawn PSP, lime when its chip is selected. */
+static void draw_pad_button(int i, u16 color)
+{
+  int dx = PAD_BX + 26, dy = PAD_BY + 46, fx = PAD_BX + PAD_BW - 26, fy = PAD_BY + 46;
+
+  switch(chips[i].map)
+  {
+    case 4:  ui_round_fill(PAD_BX + 6, PAD_BY - 8, 40, 10, 3, color); break;
+    case 5:  ui_round_fill(PAD_BX + PAD_BW - 46, PAD_BY - 8, 40, 10, 3, color); break;
+    case 8:  ui_fill(dx - 5, dy - 16, 10, 10, color); break;
+    case 6:  ui_fill(dx - 5, dy + 6, 10, 10, color); break;
+    case 7:  ui_fill(dx - 16, dy - 5, 10, 10, color); break;
+    case 9:  ui_fill(dx + 6, dy - 5, 10, 10, color); break;
+    case 0:  ui_disc(fx, fy - 13, 5, color); break;
+    case 1:  ui_disc(fx, fy + 13, 5, color); break;
+    case 3:  ui_disc(fx - 13, fy, 5, color); break;
+    case 2:  ui_disc(fx + 13, fy, 5, color); break;
+    case 10: ui_round_fill(PAD_BX + 74, PAD_BY + 92, 26, 7, 2, color); break;
+    case 11: ui_round_fill(PAD_BX + 124, PAD_BY + 92, 26, 7, 2, color); break;
+  }
+}
+
+static void draw_chip(int i, int selected)
+{
+  const chip_t *c = &chips[i];
+  int lift = selected ? 2 : 0, x = c->x - lift, y = c->y - lift, gx;
+  int ex = (i < 5) ? c->x + CHIP_W : c->x, ey = c->y + 9;
+  u16 line = selected ? UI_COL_LIME : UI_COL_MUTE;
+
+  if(i >= 10)
+  {
+    ex = c->x + CHIP_W / 2;
+    ey = c->y;
+  }
+  ui_line(ex, ey, c->ax, c->ay, line);
+  if(selected)
+    ui_round_fill(c->x + 1, c->y + 1, CHIP_W, CHIP_H, 2, UI_COL_SHADE);
+  ui_round_fill(x, y, CHIP_W, CHIP_H, 2, selected ? UI_COL_LIME : UI_COL_PLUM_2);
+  gx = ui_glyph(x + 4, y + 3, c->key) + 4;
+  ui_print_fit(gx, y + 2, action_name(gamepad_config_map[c->map]),
+   selected ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, x + CHIP_W - 4 - gx);
+  if(chip_remapped(i))  /* remapped: a dot beside the chip */
+    ui_fill((i >= 5) && (i < 10) ? c->x + CHIP_W + 3 : c->x - 7, c->y + 7, 4, 4, UI_COL_TANGERINE);
+  draw_pad_button(i, selected ? UI_COL_LIME :
+   (((c->map >= 6) && (c->map <= 9)) || (c->map <= 3) ? UI_COL_CREAM : UI_COL_MUTE));
+}
+
+static void draw_pad_body(void)
+{
+  int i;
+
+  ui_round_fill(PAD_BX + 3, PAD_BY + 3, PAD_BW, PAD_BH, 4, UI_COL_SHADE);
+  ui_round_fill(PAD_BX, PAD_BY, PAD_BW, PAD_BH, 4, UI_COL_CARD);
+  ui_fill(PAD_BX + 52, PAD_BY + 14, 120, 68, UI_COL_SHADE);
+  if(ui_settings_game)
+    ui_blit_scaled(ui_settings_game, 240, 160, PAD_BX + 54, PAD_BY + 16, 116, 64);
+  for(i = 0; i < 12; i++)
+    if(i != s.btn)
+      draw_chip(i, 0);
+}
+
+/* Spatial moves between the chips; never wraps. */
+static int chip_step(int i, u32 dir)
+{
+  switch(dir)
+  {
+    case PSP_CTRL_UP:
+      if(i == 10) return 4;
+      if(i == 11) return 9;
+      return ((i % 5) > 0) ? i - 1 : i;
+    case PSP_CTRL_DOWN:
+      if(i == 4) return 10;
+      if(i == 9) return 11;
+      return ((i < 10) && ((i % 5) < 4)) ? i + 1 : i;
+    case PSP_CTRL_LEFT:
+      if(i == 11) return 10;
+      return ((i >= 5) && (i < 10)) ? i - 5 : i;
+    case PSP_CTRL_RIGHT:
+      if(i == 10) return 11;
+      return (i < 5) ? i + 5 : i;
+  }
+  return i;
+}
+
+/* ---- Controls: the action picker ------------------------------------------ */
+
+#define PICK_W 400
+#define PICK_H 176
+#define PICK_X ((UI_SCREEN_W - PICK_W) / 2)
+#define PICK_Y 46
+#define PICK_CW 92
+#define PICK_CH 20
+
+static int menu_reachable_without(int m, u32 id)
+{
+  int i;
+
+  if(g_use_home || (id == BUTTON_ID_MENU))
+    return 1;
+  for(i = 0; i < 12; i++)
+    if((chips[i].map != m) && (gamepad_config_map[chips[i].map] == BUTTON_ID_MENU))
+      return 1;
+  return 0;
+}
+
+static void open_picker(void)
+{
+  u32 id = gamepad_config_map[chips[s.btn].map];
+
+  s.pick = 1;
+  s.pick_f = 0;
+  s.pick_out = 0;
+  s.pcur = (id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1;
+  s.pcur_from = s.pcur;
+  s.pcur_f = UI_F_CURSOR;
+}
+
+static void picker_input(void)
+{
+  int to = s.pcur;
+
+  if(s.pick_out)
+    return;
+  if(ui_pressed(ui_key_back))
+  {
+    s.pick_out = 1;
+    s.pick_f = 0;
+    return;
+  }
+  if(ui_pressed(ui_key_confirm))
+  {
+    int m = chips[s.btn].map;
+    if(!menu_reachable_without(m, s.pcur))
+    {
+      show_toast("One button has to open the menu", 0);
+      return;
+    }
+    if(gamepad_config_map[m] != (u32)s.pcur)
+    {
+      gamepad_config_map[m] = s.pcur;
+      g_game_config.use_default_gamepad_map = NO;  /* the game keeps its own map */
+      s.dirty = 1;
+    }
+    s.pick_out = 1;
+    s.pick_f = 0;
+    return;
+  }
+  if(ui_repeat(PSP_CTRL_LEFT) && (to % 4 > 0)) to--;
+  if(ui_repeat(PSP_CTRL_RIGHT) && (to % 4 < 3) && (to + 1 < PAD_ACTIONS)) to++;
+  if(ui_repeat(PSP_CTRL_UP) && (to >= 4)) to -= 4;
+  if(ui_repeat(PSP_CTRL_DOWN) && (to + 4 < PAD_ACTIONS)) to += 4;
+  if(to != s.pcur)
+  {
+    s.pcur_from = ui_ease_out_back(s.pcur_from, s.pcur, s.pcur_f, UI_F_CURSOR);
+    s.pcur = to;
+    s.pcur_f = 0;
+  }
+}
+
+static void picker_cell(int i, int *x, int *y, int top)
+{
+  *x = PICK_X + 16 + (i % 4) * (PICK_CW + 2);
+  *y = top + 28 + (i / 4) * (PICK_CH + 4);
+}
+
+/* Returns 0 once it has closed. */
+static int draw_picker(void)
+{
+  int top, i, fx, fy, ax, ay, bx, by, n;
+  ui_hint_t hints[2];
+
+  if(!s.pick_out)
+  {
+    if(s.pick_f < UI_F_POPUP_IN) s.pick_f++;
+    top = ui_ease_out_back(PICK_Y - 24, PICK_Y, s.pick_f, UI_F_POPUP_IN);
+  }
+  else
+  {
+    if(++s.pick_f > UI_F_POPUP_OUT)
+    {
+      s.pick = 0;
+      return 0;
+    }
+    top = ui_ease_in_cubic(PICK_Y, PICK_Y + 24, s.pick_f, UI_F_POPUP_OUT);
+  }
+  if(s.pcur_f < UI_F_CURSOR) s.pcur_f++;
+
+  ui_checker(0, 0, UI_SCREEN_W, UI_SCREEN_H, UI_COL_SHADE);
+  ui_round_fill(PICK_X + 4, top + 4, PICK_W, PICK_H, 3, UI_COL_SHADE);
+  ui_round_fill(PICK_X, top, PICK_W, PICK_H, 3, UI_COL_CREAM);
+  ui_fill(PICK_X, top + 4, 6, PICK_H - 8, UI_COL_LIME);
+  n = ui_print(PICK_X + 16, top + 6, "Button action \xC2\xB7 ", UI_COL_PLUM, UI_FONT_BODY, 0);
+  ui_glyph(n, top + 8, ui_key_confirm);
+  for(i = 0; i < PAD_ACTIONS; i++)
+  {
+    int x, y;
+    picker_cell(i, &x, &y, top);
+    if(i == s.pcur)
+    {
+      ui_round_fill(x + 1, y + 1, PICK_CW - 2, PICK_CH, 2, UI_COL_SHADE);
+      ui_round_fill(x - 1, y - 1, PICK_CW - 2, PICK_CH, 2, UI_COL_LIME);
+      ui_print_fit(x + 5, y + 2, action_name(i), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
+    }
+    else
+    {
+      ui_round_frame(x, y, PICK_CW - 2, PICK_CH, 2, UI_COL_MUTE);
+      ui_print_fit(x + 6, y + 3, action_name(i), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
+    }
+  }
+  /* the cursor frame glides between cells */
+  picker_cell(s.pcur_from, &ax, &ay, top);
+  picker_cell(s.pcur, &bx, &by, top);
+  fx = ui_ease_out_back(ax, bx, s.pcur_f, UI_F_CURSOR);
+  fy = ui_ease_out_back(ay, by, s.pcur_f, UI_F_CURSOR);
+  ui_round_frame(fx - 4, fy - 4, PICK_CW + 4, PICK_CH + 6, 2, UI_COL_PLUM);
+
+  hints[0].keys = ui_key_back;    hints[0].verb = "Back";
+  hints[1].keys = ui_key_confirm; hints[1].verb = "Pick";
+  ui_hint_packed(hints, 2, 14);
+  return 1;
+}
+
+/* ---- Controls: the Stick page ---------------------------------------------- */
+
+#define STICK_CX 118
+#define STICK_CY 140
+#define STICK_R  54
+
+static void draw_page_switch(void)
+{
+  static const char *names[2] = { "Buttons", "Stick" };
+  int x = UI_MARGIN, i;
+
+  for(i = 0; i < 2; i++)
+  {
+    int w = ui_print_width(names[i], UI_FONT_SMALL, 0) + 16;
+    if(i == s.page)
+      ui_round_fill(x, 38, w, 16, 2, UI_COL_LIME);
+    ui_print(x + 8, 39, names[i], (i == s.page) ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+    x += w;
+  }
+  ui_glyph(x + 6, 40, PSP_CTRL_SELECT);
+}
+
+static void draw_stick(void)
+{
+  static const u32 keys[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
+  static const s8 dirs[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
+  int sens = g_gpsp_config.analog_sensitivity_level + 1;
+  int dz = STICK_R * (75 - sens * 6) / 100, i;
+
+  draw_page_switch();
+  /* the travel, the ring where a push starts to count (smaller = more
+     sensitive) and the nub */
+  ui_disc(STICK_CX, STICK_CY, STICK_R + 3, UI_COL_SHADE);
+  ui_disc(STICK_CX, STICK_CY, STICK_R, UI_COL_CARD);
+  ui_ring(STICK_CX, STICK_CY, dz, 2, UI_COL_LIME);
+  ui_disc(STICK_CX, STICK_CY, 12, UI_COL_CREAM);
+  ui_disc(STICK_CX, STICK_CY, 8, UI_COL_MUTE);
+  /* what each push does: map entries 12-15 */
+  for(i = 0; i < 4; i++)
+  {
+    const char *name = action_name(gamepad_config_map[12 + i]);
+    int w = ui_print_width(name, UI_FONT_SMALL, 0) + ui_glyph_width(keys[i]) + 14, px, py, gx;
+    px = STICK_CX + dirs[i][0] * (STICK_R + 10) - ((dirs[i][0] == 0) ? w / 2 : ((dirs[i][0] < 0) ? w : 0));
+    py = STICK_CY + dirs[i][1] * (STICK_R + 10) - ((dirs[i][1] == 0) ? 9 : ((dirs[i][1] < 0) ? 18 : 0));
+    ui_round_fill(px, py, w, 18, 2, UI_COL_PLUM_2);
+    gx = ui_glyph(px + 4, py + 3, keys[i]) + 4;
+    ui_print(gx, py + 2, name, UI_COL_CREAM, UI_FONT_SMALL, 0);
+  }
+}
+
+/* ---- Controls: reset and undo ------------------------------------------------ */
+
+static void pad_remember(void)
+{
+  memcpy(s.undo_map, gamepad_config_map, sizeof(s.undo_map));
+  s.undo_map_default = g_game_config.use_default_gamepad_map;
+}
+
+static void pad_reset(void)
+{
+  memcpy(gamepad_config_map, gamepad_config_map_init, sizeof(s.undo_map));
+  g_game_config.use_default_gamepad_map = NO;
+}
+
+static void pad_undo(void)
+{
+  memcpy(gamepad_config_map, s.undo_map, sizeof(s.undo_map));
+  g_game_config.use_default_gamepad_map = s.undo_map_default;
+}
+
 /* Steady hints first, then the row's own (spec: Hint strip). */
 static void draw_hints(void)
 {
@@ -352,6 +723,16 @@ static void draw_hints(void)
 
   hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
   hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
+  if(s.tab == PAD_TAB)
+  {
+    hints[n].keys = PSP_CTRL_SELECT; hints[n++].verb = s.page ? "Buttons" : "Stick";
+    if(s.page == 0)
+    {
+      hints[n].keys = ui_key_confirm; hints[n++].verb = "Pick";
+      ui_hint_packed(hints, n, 14);
+      return;
+    }
+  }
   switch(action_of(s.tab, s.cur))
   {
     case ACT_RESET_ALL:
@@ -386,9 +767,18 @@ static void build_ground(void)
   s.dirty = 0;
   if(!ui_layer_begin())
     return;
+  if((s.tab == PAD_TAB) && (s.page == 0))
+  {
+    draw_pad_body();
+    draw_hints();
+    ui_layer_end();
+    return;
+  }
+  if(s.tab == PAD_TAB)
+    draw_stick();
   for(i = 0; i < n; i++)
     per_game |= rows[s.tab][i].per_game;
-  if(per_game)
+  if(per_game && (s.tab != PAD_TAB))
   {
     ui_per_game_mark(UI_MARGIN, 40, UI_COL_TANGERINE);
     ui_text(UI_MARGIN + 16, 39, "Saved for this game only", UI_COL_MUTE);
@@ -407,6 +797,13 @@ static void build_ground(void)
     ui_round_fill(468, VIEW_T + 2, 4, track, 1, UI_COL_CARD);
     ui_round_fill(468, ty, 4, th, 1, UI_COL_MUTE);
   }
+  if((s.tab == PAD_TAB) && rows[s.tab][s.cur].tip)
+  {
+    /* the Stick page's tip sits under its rows, up to three lines */
+    char line[128];
+    for(i = 0; (i < 3) && ui_wrap_line(rows[s.tab][s.cur].tip, i, 220, UI_FONT_SMALL, line, sizeof(line)); i++)
+      ui_print(236, 150 + i * 14, line, UI_COL_MUTE, UI_FONT_SMALL, 0);
+  }
   draw_hints();
   ui_layer_end();
 }
@@ -417,6 +814,8 @@ static void remember_tab(int tab)
 {
   int i;
 
+  if(tab == PAD_TAB)
+    pad_remember();
   for(i = 0; i < row_count(tab); i++)
     if(rows[tab][i].value)
       s.undo[tab][i] = *rows[tab][i].value;
@@ -426,6 +825,8 @@ static void reset_tab(int tab)
 {
   int i;
 
+  if(tab == PAD_TAB)
+    pad_reset();
   for(i = 0; i < row_count(tab); i++)
     if(rows[tab][i].value)
       *rows[tab][i].value = rows[tab][i].def;
@@ -446,6 +847,8 @@ static void undo_reset(void)
   {
     if(!s.undo_all && (t != s.tab))
       continue;
+    if(t == PAD_TAB)
+      pad_undo();
     for(i = 0; i < row_count(t); i++)
       if(rows[t][i].value)
         *rows[t][i].value = s.undo[t][i];
@@ -584,6 +987,11 @@ int ui_settings(int tab, int row)
     int moved = 0;
 
     ui_input_update();
+    if(s.pick)
+    {
+      picker_input();  /* the picker takes every key while it is up */
+      goto draw;
+    }
     if(ui_pressed(ui_key_back))
       break;
 
@@ -599,25 +1007,56 @@ int ui_settings(int tab, int row)
       moved = 1;
     }
 
+    if((s.tab == PAD_TAB) && (s.page == 0))
+    {
+      /* the Buttons page: move between the chips, × opens the picker */
+      static const u32 dirs[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
+      int d;
+      for(d = 0; d < 4; d++)
+        if(!moved && ui_repeat(dirs[d]))
+        {
+          int to = chip_step(s.btn, dirs[d]);
+          if(to != s.btn)
+          {
+            s.btn = to;
+            s.dirty = 1;
+            s.rest = 0;
+          }
+          break;
+        }
+      if(ui_pressed(ui_key_confirm))
+        open_picker();
+    }
     /* rows */
-    if(!moved && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
+    else if(!moved && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
       move_cursor(next_row(ui_repeat(PSP_CTRL_DOWN) ? 1 : -1));
-    if(row_selectable(&rows[s.tab][s.cur]))
+    if(!((s.tab == PAD_TAB) && (s.page == 0)) && row_selectable(&rows[s.tab][s.cur]))
     {
       int pending = lang_pending();
       if(ui_repeat(PSP_CTRL_RIGHT)) change_value(1);
       if(ui_repeat(PSP_CTRL_LEFT)) change_value(-1);
       if(lang_pending() != pending)
         s.dirty = 1;  /* the hint strip gains or loses "Restart now" */
+      if((s.tab == PAD_TAB) && (ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT) || ui_pressed(ui_key_confirm)))
+        s.dirty = 1;  /* the drawn stick follows the sensitivity */
       if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
         change_value(1);  /* a switch also flips on confirm, as in Cheats */
     }
 
-    /* SELECT: Undo while the toast offers it */
-    if(ui_released(PSP_CTRL_SELECT) && ui_toast_up(s.toast_f) && s.toast_undo)
+    /* SELECT: Undo while the toast offers it; on Controls, Buttons/Stick */
+    if(ui_released(PSP_CTRL_SELECT))
     {
-      undo_reset();
-      s.toast_undo = 0;
+      if(ui_toast_up(s.toast_f) && s.toast_undo)
+      {
+        undo_reset();
+        s.toast_undo = 0;
+      }
+      else if(s.tab == PAD_TAB)
+      {
+        s.page ^= 1;
+        first_row();
+        s.dirty = 1;
+      }
     }
 
     /* hold START: reset this tab */
@@ -682,6 +1121,7 @@ int ui_settings(int tab, int row)
       }
     }
 
+  draw:
     if(s.dirty)
       build_ground();
 
@@ -698,18 +1138,27 @@ int ui_settings(int tab, int row)
     }
     if(s.value_f < UI_F_VALUE) s.value_f++;
     if(s.cursor_f < UI_F_CURSOR) s.cursor_f++;
+    if((s.tab == PAD_TAB) && (s.page == 0))
+      draw_chip(s.btn, 1);
+    else
     {
       int y = row_y(s.tab, s.cur) - s.top, h = row_height(&rows[s.tab][s.cur]);
       int cy = ui_ease_out_back(s.cursor_from, y, s.cursor_f, UI_F_CURSOR);
       if(row_selectable(&rows[s.tab][s.cur]))
       {
         draw_row(s.tab, s.cur, y, 1, s.value_f);
-        ui_cursor_frame(ROW_X - UI_LIFT, cy - UI_LIFT, ROW_W, h);
+        ui_cursor_frame(row_x(s.tab) - UI_LIFT, cy - UI_LIFT, row_w(s.tab), h);
       }
     }
     /* the tip line waits for the cursor to rest */
     if(s.rest < UI_F_TIP_DELAY)
       s.rest++;
+    else if(s.tab == PAD_TAB)
+    {
+      if(s.page == 0)
+        ui_print_fit(UI_MARGIN, 231, "Confirm picks what this button does in the game.",
+         UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
+    }
     else
     {
       const char *tip = rows[s.tab][s.cur].tip;
@@ -718,6 +1167,8 @@ int ui_settings(int tab, int row)
       if(tip)
         ui_print_fit(UI_MARGIN, 231, tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
     }
+    if(s.pick && !draw_picker())
+      s.dirty = 1;  /* closed: the chip shows its new job */
     if(s.toast_f >= 0)
     {
       if(!ui_toast(s.toast, UI_COL_LIME, s.toast_undo ? "Undo" : NULL, s.toast_f))
