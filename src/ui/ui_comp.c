@@ -457,14 +457,22 @@ void ui_game_battery(int level, int on_battery)
  * screen's top left, never on the game picture's corner: centred in the
  * side bar when it is narrower than 60 px (Fit), else 6 px in from the
  * corner. 28 px wide. Show FPS: the number on shade, cream, pink below 50.
- * Fast forward: a tangerine part with plum arrows, under the number (a
- * square join) or alone. Called every frame; it redraws only on a change.
+ * Fast forward: a tangerine part under the number (a square join) or alone,
+ * with the speed ("3×") in plum, or arrows on Max. Called every frame; it redraws only on a change.
  * fps < 0: Show FPS is off. */
 #define STATUS_W 28
 
-static void status_arrows(int y)
+static void status_foot(int y, int ff)
 {
   int a, i;
+
+  if(ff >= 2)
+  {
+    const char *t = (ff == 2) ? "2\xC3\x97" : "3\xC3\x97";
+    ui_print((STATUS_W - ui_print_width(t, UI_FONT_SMALL, 0)) / 2, y + 1, t, UI_COL_PLUM,
+     UI_FONT_SMALL, 0);
+    return;
+  }
 
   for(a = 0; a < 2; a++)  /* two heads 6 px apart, centred: 10 px */
     for(i = 0; i < 4; i++)
@@ -506,7 +514,7 @@ void ui_game_status(int fps, int ff)
     {
       ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
       ui_fill(0, 8, STATUS_W, 8, UI_COL_SHADE);  /* the square join */
-      status_arrows(16);
+      status_foot(16, ff);
     }
     ui_round_fill(0, 0, STATUS_W, ff ? 12 : 16, 2, UI_COL_SHADE);
     snprintf(num, sizeof(num), "%d", fps);
@@ -517,7 +525,7 @@ void ui_game_status(int fps, int ff)
   {
     h = 16;
     ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
-    status_arrows(0);
+    status_foot(0, ff);
   }
   ui_fb = saved;
   ui_fb_pitch = saved_pitch;

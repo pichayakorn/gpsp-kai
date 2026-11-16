@@ -97,6 +97,8 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.save_on_leave, NULL, YES },
     { "Fast forward", "Hold: fast while the button is down. Toggle: one press on, one press off.",
       K_SEG, 0, 2, { "Hold", "Toggle" }, &g_gpsp_config.fast_forward_mode, map_ff, FF_TOGGLE },
+    { "Fast forward speed", "Max runs as fast as the PSP can, so its speed changes with each game.",
+      K_SEG, 0, 3, { "2\xC3\x97", "3\xC3\x97", "Max" }, &g_gpsp_config.ff_speed, NULL, FF_SPEED_3X },
     { "Sound while fast", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
     { "Rapid-fire speed", NULL, K_SEG, 1, 3, { "Slow", "Medium", "Fast" },
       &g_game_config.rapidfire_speed, NULL, RAPIDFIRE_FAST },

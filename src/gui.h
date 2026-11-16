@@ -37,6 +37,11 @@
 #define CONFIRM_CROSS  1
 #define CONFIRM_CIRCLE 2
 
+// g_gpsp_config.ff_speed
+#define FF_SPEED_2X  0
+#define FF_SPEED_3X  1
+#define FF_SPEED_MAX 2  // as fast as the PSP can
+
 typedef struct
 {
   u32 screen_mode;
@@ -62,6 +67,7 @@ typedef struct
   u32 save_on_leave;       // YES: save into slot 10 when leaving a game
   u32 side_bars;           // SIDE_BARS_*: what fills the space beside the picture
   u32 confirm_button;      // CONFIRM_*: which key confirms in the 4.0 menus
+  u32 ff_speed;            // FF_SPEED_*: how fast fast forward runs
 #if 0
   u32 solar_level;
 #endif
