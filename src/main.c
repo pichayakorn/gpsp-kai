@@ -872,6 +872,26 @@ void synchronize()
       break;
   }
 
+#ifdef UI4
+  // Fast forward at 2x or 3x: draw only the last of every N frames and let
+  // at most N run per vblank. Max skips the wait, as fast forward always did.
+  if(!g_synchronize_flag && (g_gpsp_config.ff_speed != FF_SPEED_MAX))
+  {
+    static u32 ff_n, ff_vcount;
+    u32 n = (g_gpsp_config.ff_speed == FF_SPEED_2X) ? 2 : 3;
+    if(++ff_n >= n)
+    {
+      ff_n = 0;
+      skip_next_frame_flag = 0;
+      if(sceDisplayGetVcount() == ff_vcount)
+        sceDisplayWaitVblankStart();  // ahead: wait for the next refresh
+      ff_vcount = sceDisplayGetVcount();
+    }
+    else
+      skip_next_frame_flag = 1;
+  }
+#endif
+
   // No timer needed: the 1/60 s VBLANK interrupt drives this
   if(frames == 60)
   {
@@ -882,6 +902,12 @@ void synchronize()
     frames_drawn_count = 0;
   }
 
+#ifdef UI4
+  // The status chip in the PSP screen's corner: FPS and fast forward. The
+  // count changes once a second; the chip redraws only on a change.
+  ui_game_status(g_gpsp_config.show_fps ? (int)fps : -1, g_synchronize_flag ? 0 :
+   ((g_gpsp_config.ff_speed == FF_SPEED_2X) ? 2 : ((g_gpsp_config.ff_speed == FF_SPEED_3X) ? 3 : 1)));
+#else
   if(!g_synchronize_flag)
     PRINT_STRING_BG("--FF--", 0xFFFF, 0x000, 0, 10);
 
@@ -894,6 +920,7 @@ void synchronize()
     PRINT_STRING_BG(fps_buffer, 0xFFFF, 0x000,
      screen_width - fbm_getwidth(fps_buffer) - 1, screen_height - FONT_HEIGHT - 1);
   }
+#endif
 }
 
 void reset_gba()

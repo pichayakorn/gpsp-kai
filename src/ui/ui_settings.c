@@ -69,7 +69,8 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SCREEN, 0, 3, { "Original", "Fit", "Full" }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
     { "Smoothing", "Sharp keeps pixels crisp at any size; Smooth blurs them; Off shows them as they fall.",
       K_SEG, 0, 3, { "Off", "Smooth", "Sharp" }, &g_gpsp_config.screen_filter, NULL, filter_sharp_bilinear },
-    { "Side bars", NULL, K_OFF, 0, 0, { "Comes later" } },
+    { "Side bars", "What fills the screen beside the picture: black, the menu's pattern, or the game's own edge colours.",
+      K_SEG, 0, 3, { "Black", "Pattern", "Game colours" }, &g_gpsp_config.side_bars, NULL, SIDE_BARS_BLACK },
     { "Frameskip", "Auto skips drawing only when the game can't keep up.",
       K_SEG, 1, 3, { "Off", "Auto", "Fixed" }, &g_game_config.frameskip_type, map_frameskip, auto_frameskip },
     { "Skip up to", "The most frames in a row that may go undrawn.",
@@ -96,6 +97,8 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.save_on_leave, NULL, YES },
     { "Fast forward", "Hold: fast while the button is down. Toggle: one press on, one press off.",
       K_SEG, 0, 2, { "Hold", "Toggle" }, &g_gpsp_config.fast_forward_mode, map_ff, FF_TOGGLE },
+    { "Fast forward speed", "Max runs as fast as the PSP can, so its speed changes with each game.",
+      K_SEG, 0, 3, { "2\xC3\x97", "3\xC3\x97", "Max" }, &g_gpsp_config.ff_speed, NULL, FF_SPEED_3X },
     { "Sound while fast", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
     { "Rapid-fire speed", NULL, K_SEG, 1, 3, { "Slow", "Medium", "Fast" },
       &g_game_config.rapidfire_speed, NULL, RAPIDFIRE_FAST },
@@ -109,7 +112,8 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Write game saves", "Right away writes the game's own save as soon as it changes.",
       K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
     { "Start games with", NULL, K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
-    { "Confirm button", NULL, K_OFF, 0, 0, { "Comes later" } },
+    { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models.",
+      K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
     { "Reset all settings (hold)", "Every setting on every tab goes back to its default.",
@@ -211,12 +215,6 @@ static int is_lang_row(int tab, int i)
   return (tab == LANG_TAB) && (rows[tab][i].value == &g_gpsp_config.language);
 }
 
-/* Restart kai is a tap, unless play could be lost: Save when leaving a game
- * is off (a game always runs under Settings). */
-static int restart_is_hold(void)
-{
-  return !g_gpsp_config.save_on_leave;
-}
 
 static int action_of(int tab, int i)
 {
@@ -789,7 +787,7 @@ static void draw_hints(void)
       break;
     case ACT_RESTART:
       hints[n].keys = ui_key_confirm;
-      hints[n++].verb = restart_is_hold() ? "Hold: restart" : "Restart";
+      hints[n++].verb = "Hold: restart";
       break;
     default:
       if(rows[s.tab][s.cur].kind == K_SWITCH)
@@ -800,7 +798,7 @@ static void draw_hints(void)
       hints[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[n++].verb = "Change";
       if(is_lang_row(s.tab, s.cur) && lang_pending())
       {
-        hints[n].keys = ui_key_confirm; hints[n++].verb = "Restart now";
+        hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: restart now";
       }
       break;
   }
@@ -1047,11 +1045,13 @@ int ui_settings(int tab, int row)
     if(ui_pressed(ui_key_back))
       break;
 
-    /* tabs */
-    if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
+    /* tabs: L R step and repeat while held, stopping at the first and the
+       last tab */
+    if(ui_repeat(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER) &&
+     (ui_repeat(PSP_CTRL_RTRIGGER) ? (s.tab < TABS - 1) : (s.tab > 0)))
     {
       s.tab_prev = s.tab;
-      s.tab = (s.tab + (ui_pressed(PSP_CTRL_RTRIGGER) ? 1 : TABS - 1)) % TABS;
+      s.tab += ui_repeat(PSP_CTRL_RTRIGGER) ? 1 : -1;
       s.tab_f = 0;
       s.reset_hold.p = 0;
       s.dir = -1;
@@ -1121,6 +1121,11 @@ int ui_settings(int tab, int row)
         s.dirty = 1;  /* the hint strip gains or loses "Restart now" */
       if((s.tab == PAD_TAB) && (ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT) || ui_pressed(ui_key_confirm)))
         s.dirty = 1;  /* the drawn stick follows the sensitivity */
+      if((rows[s.tab][s.cur].value == &g_gpsp_config.confirm_button) && ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT))
+      {
+        ui_input_init();  /* the new confirm and back keys, at once */
+        s.dirty = 1;      /* every hint shows them */
+      }
       if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
         change_value(1);  /* a switch also flips on confirm, as in Cheats */
     }
@@ -1163,32 +1168,15 @@ int ui_settings(int tab, int row)
       s.dirty = 1;
     }
 
-    /* Language: × restarts now when the pick differs from the running one */
-    if(is_lang_row(s.tab, s.cur) && lang_pending() && ui_pressed(ui_key_confirm))
+    /* Restart kai, or a changed Language: hold × so a stray press never
+       restarts */
+    if((action_of(s.tab, s.cur) == ACT_RESTART) || (is_lang_row(s.tab, s.cur) && lang_pending()))
     {
-      s.restart = 1;
-      break;
-    }
-
-    /* Restart kai: a tap, or a hold when play could be lost */
-    if(action_of(s.tab, s.cur) == ACT_RESTART)
-    {
-      if(!restart_is_hold())
+      ui_hold_step(&s.action_hold, ui_key_confirm);
+      if(s.action_hold.done)
       {
-        if(ui_pressed(ui_key_confirm))
-        {
-          s.restart = 1;
-          break;
-        }
-      }
-      else
-      {
-        ui_hold_step(&s.action_hold, ui_key_confirm);
-        if(s.action_hold.done)
-        {
-          s.restart = 1;
-          break;
-        }
+        s.restart = 1;
+        break;
       }
     }
 
@@ -1252,8 +1240,10 @@ int ui_settings(int tab, int row)
     {
       const char *tip = rows[s.tab][s.cur].tip;
       if(is_lang_row(s.tab, s.cur) && lang_pending())
-        tip = "Applies after a restart: \xC3\x97 restarts now, or it waits for the next start.";
-      if(tip)
+        tip = "Applies after a restart: hold \xC3\x97 to restart now, or it waits for the next start.";
+      if(is_lang_row(s.tab, s.cur) && (s.action_hold.p > 0))
+        ui_hold_bar(UI_MARGIN, 233, 184, s.action_hold.p, UI_COL_SKY);  /* in the tip's place */
+      else if(tip)
         ui_print_fit(UI_MARGIN, 231, tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
     }
     if(s.pick && !draw_picker())

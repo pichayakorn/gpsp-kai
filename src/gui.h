@@ -27,6 +27,21 @@
 #define RAPIDFIRE_MEDIUM 1
 #define RAPIDFIRE_FAST   2
 
+// g_gpsp_config.side_bars (#104)
+#define SIDE_BARS_BLACK   0
+#define SIDE_BARS_PATTERN 1
+#define SIDE_BARS_GAME    2  // the colours of the picture's edges
+
+// g_gpsp_config.confirm_button
+#define CONFIRM_SYSTEM 0  // the PSP's own setting
+#define CONFIRM_CROSS  1
+#define CONFIRM_CIRCLE 2
+
+// g_gpsp_config.ff_speed
+#define FF_SPEED_2X  0
+#define FF_SPEED_3X  1
+#define FF_SPEED_MAX 2  // as fast as the PSP can
+
 typedef struct
 {
   u32 screen_mode;
@@ -50,6 +65,9 @@ typedef struct
   u32 fast_forward_sound;  // NO: silent while fast forwarding
   u32 show_fps;            // YES: FPS counter in the corner of the game
   u32 save_on_leave;       // YES: save into slot 10 when leaving a game
+  u32 side_bars;           // SIDE_BARS_*: what fills the space beside the picture
+  u32 confirm_button;      // CONFIRM_*: which key confirms in the 4.0 menus
+  u32 ff_speed;            // FF_SPEED_*: how fast fast forward runs
 #if 0
   u32 solar_level;
 #endif

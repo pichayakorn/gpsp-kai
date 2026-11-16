@@ -791,6 +791,9 @@ void init_gpsp_config()
   g_gpsp_config.fast_forward_sound = YES;
   g_gpsp_config.show_fps = NO;
   g_gpsp_config.save_on_leave = YES;
+  g_gpsp_config.side_bars = SIDE_BARS_BLACK;
+  g_gpsp_config.confirm_button = CONFIRM_SYSTEM;
+  g_gpsp_config.ff_speed = FF_SPEED_3X;
 #if 0
   g_gpsp_config.solar_level = 0;
 #endif

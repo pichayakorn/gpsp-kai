@@ -51,6 +51,10 @@ extern int (*osd_tick)(int *x, int *y, int *w, int *h);
 #define OSD_CHIP_H 16
 extern u16 osd_chip_pixels[OSD_CHIP_W * OSD_CHIP_H];
 extern int osd_chip_rect[4];  /* x, y, w, h; w 0: hidden */
+#define OSD_FPS_W 32
+#define OSD_FPS_H 32
+extern u16 osd_fps_pixels[OSD_FPS_W * OSD_FPS_H];
+extern int osd_fps_rect[4];   /* x, y, w, h; w 0: hidden */
 void osd_fade_start(void);
 #endif
 void flip_screen();

@@ -117,6 +117,9 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
  int flags, int *vx, int *vy);
 void ui_row_note(int xr, int y, const char *note);
 void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int f);
+/* Segment labels drawn as button discs (Confirm button row) */
+#define UI_SEG_CROSS  "\x01x"
+#define UI_SEG_CIRCLE "\x01o"
 void ui_row_segments(int xr, int y, const char **labels, int count, int k,
  int from, int f, int selected, u16 group);
 void ui_row_switch(int xr, int y, int p, int selected);
@@ -136,6 +139,9 @@ void ui_status_read(void);
 void ui_status_chip(void);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 void ui_game_battery(int level, int on_battery);  /* once a second in a game */
+/* Every frame in a game. fps < 0: Show FPS off. ff: 0 off, 1 Max, 2 or 3
+ * the fixed speed. */
+void ui_game_status(int fps, int ff);
 
 typedef struct
 {

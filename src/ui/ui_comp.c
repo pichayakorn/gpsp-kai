@@ -161,6 +161,27 @@ void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int
 
 /* Segments: the chosen one filled; on a change the fill springs from the
  * old segment to the new one. */
+/* A segment label of UI_SEG_CROSS or UI_SEG_CIRCLE is drawn as the
+ * button's disc, 9 px, its mark cut in the colour under it. */
+static int seg_disc(const char *label)
+{
+  return (label[0] == '\x01') ? label[1] : 0;
+}
+
+static void seg_disc_draw(int x, int y, int which, u16 col, u16 under)
+{
+  static const u8 cross[5] = { 0x11, 0x0A, 0x04, 0x0A, 0x11 };
+  static const u8 circle[5] = { 0x0E, 0x11, 0x11, 0x11, 0x0E };
+  const u8 *mark = (which == 'x') ? cross : circle;
+  int i, j;
+
+  ui_disc(x + 4, y + 4, 4, col);
+  for(j = 0; j < 5; j++)
+    for(i = 0; i < 5; i++)
+      if(mark[j] & (0x10 >> i))
+        ui_fill(x + 2 + i, y + 2 + j, 1, 1, under);
+}
+
 void ui_row_segments(int xr, int y, const char **labels, int count, int k,
  int from, int f, int selected, u16 group)
 {
@@ -176,7 +197,7 @@ void ui_row_segments(int xr, int y, const char **labels, int count, int k,
     k = 0;
   for(j = 0; j < count; j++)
   {
-    widths[j] = small_width(labels[j]) + 12;
+    widths[j] = (seg_disc(labels[j]) ? 9 : small_width(labels[j])) + 12;
     sx -= widths[j];
   }
   for(j = 0; j < count; j++)
@@ -201,7 +222,11 @@ void ui_row_segments(int xr, int y, const char **labels, int count, int k,
       col = selected ? group : UI_COL_PLUM;
     else
       col = selected ? UI_COL_PLUM : UI_COL_MUTE;
-    small_text(starts[j] + 6, y + 3 + ((ui_font_loaded()) ? 0 : 3), labels[j], col);
+    if(seg_disc(labels[j]))
+      seg_disc_draw(starts[j] + 6, y + 6, seg_disc(labels[j]), col,
+       (j == k) ? fill : (selected ? group : UI_COL_CARD));
+    else
+      small_text(starts[j] + 6, y + 3 + ((ui_font_loaded()) ? 0 : 3), labels[j], col);
   }
 }
 
@@ -430,6 +455,94 @@ void ui_game_battery(int level, int on_battery)
   osd_chip_rect[2] = w;  /* last: the chip shows from here */
 }
 
+/* The in-game status chip (spec: Show FPS and fast forward), in the PSP
+ * screen's top left, never on the game picture's corner: centred in the
+ * side bar when it is narrower than 60 px (Fit), else 6 px in from the
+ * corner. 28 px wide. Show FPS: the number on shade, cream, pink below 50.
+ * Fast forward: a tangerine part under the number (a square join) or alone,
+ * with the speed ("3×") in plum, or arrows on Max. Called every frame; it redraws only on a change.
+ * fps < 0: Show FPS is off. */
+#define STATUS_W 28
+
+/* The fast-forward part, h px high (16 alone, 14 under the number): the
+ * speed or the arrows centred in it. */
+static void status_foot(int y, int h, int ff)
+{
+  int a, i;
+
+  if(ff >= 2)
+  {
+    const char *t = (ff == 2) ? "2\xC3\x97" : "3\xC3\x97";
+    /* the 14 px text line, centred in the part */
+    ui_print((STATUS_W - ui_print_width(t, UI_FONT_SMALL, 0)) / 2, y + (h - 14) / 2, t, UI_COL_PLUM,
+     UI_FONT_SMALL, 0);
+    return;
+  }
+
+  for(a = 0; a < 2; a++)  /* two heads 6 px apart, centred: 10 px */
+    for(i = 0; i < 4; i++)
+      ui_fill((STATUS_W - 10) / 2 + a * 6 + i, y + (h - 8) / 2 + i, 1, 8 - 2 * i, UI_COL_PLUM);
+}
+
+void ui_game_status(int fps, int ff)
+{
+  static int shown = -2, shown_ff = -1, shown_x = -1;
+  u16 *saved = ui_fb;
+  u32 saved_pitch = ui_fb_pitch, i;
+  char num[8];
+  int h, x, gx, gy, gw, gh;
+
+  if((fps < 0) && !ff)
+  {
+    osd_fps_rect[2] = 0;
+    shown = -2;
+    return;
+  }
+  if(fps > 999)
+    fps = 999;
+  get_game_rect(&gx, &gy, &gw, &gh);
+  x = ((gx > 0) && (gx < 60)) ? (gx - STATUS_W) / 2 : 6;
+  if((fps == shown) && (ff == shown_ff) && (x == shown_x))
+    return;
+  shown = fps;
+  shown_ff = ff;
+  shown_x = x;
+
+  for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
+    osd_fps_pixels[i] = GAME_TOAST_KEY;
+  ui_fb = osd_fps_pixels;
+  ui_fb_pitch = OSD_FPS_W;
+  if(fps >= 0)
+  {
+    h = ff ? 30 : 16;
+    if(ff)
+    {
+      ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
+      ui_fill(0, 8, STATUS_W, 8, UI_COL_SHADE);  /* the square join */
+      status_foot(16, 14, ff);
+    }
+    ui_round_fill(0, 0, STATUS_W, ff ? 12 : 16, 2, UI_COL_SHADE);
+    snprintf(num, sizeof(num), "%d", fps);
+    ui_print((STATUS_W - ui_print_width(num, UI_FONT_SMALL, 0)) / 2, 1, num,
+     (fps < 50) ? UI_COL_PINK : UI_COL_CREAM, UI_FONT_SMALL, 0);
+  }
+  else
+  {
+    h = 16;
+    ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
+    status_foot(0, 16, ff);
+  }
+  ui_fb = saved;
+  ui_fb_pitch = saved_pitch;
+  for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
+    osd_fps_pixels[i] = (osd_fps_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_fps_pixels[i] | 0x8000);
+
+  osd_fps_rect[0] = x;
+  osd_fps_rect[1] = 6;
+  osd_fps_rect[3] = h;
+  osd_fps_rect[2] = STATUS_W;  /* last: the chip shows from here */
+}
+
 static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
 
 /* The status chip, top right and as wide as its content: the clock (the
@@ -539,7 +652,9 @@ void ui_hold_bar(int x, int y, int w, int p, u16 color)
 }
 
 /* Hold progress in 1/256: fills while the key is down (UI_F_HOLD frames),
- * drains in UI_F_HOLD_DRAIN after an early release. Call once a frame. */
+ * drains in UI_F_HOLD_DRAIN after an early release. Once the hold has done
+ * its job the bar goes at once, even while the key is still down. Call once
+ * a frame. */
 int ui_hold_step(ui_hold_t *h, u32 key)
 {
   u32 frames = ui_hold_frames(key);
@@ -555,8 +670,13 @@ int ui_hold_step(ui_hold_t *h, u32 key)
       {
         h->fired = 1;
         h->done = 1;
+        h->p = 256;
       }
-      h->p = 256;
+      else
+      {
+        h->p = 0;  /* done: no full bar left waiting for the release */
+        h->shown = 0;
+      }
     }
     else
       h->p = (frames * 256) / UI_F_HOLD;

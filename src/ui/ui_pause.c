@@ -602,6 +602,69 @@ static void draw_icon20(int x, int y, const u32 (*bits)[20], u16 fill)
 static void draw_header(int hy);
 static void draw_tile(int i, int ty, int selected);
 
+/* Around the game picture: the Side bars setting, as in the game. */
+static u16 edge_colour(int side, int j)
+{
+  u32 r = 0, g = 0, b = 0;
+  int y, k, n = 0;
+
+  for(y = j * 10; y < j * 10 + 10; y++)  /* 16 bands of 10 lines */
+    for(k = 0; k < 2; k++)
+    {
+      u16 c = p.game[y * 240 + (side ? 238 + k : k)];
+      r += c & 31; g += (c >> 5) & 31; b += (c >> 10) & 31; n++;
+    }
+  return COLOR16(r / n, g / n, b / n);
+}
+
+static u16 mix(u16 a, u16 b, int t, int n)
+{
+  int i;
+  u16 c = 0;
+
+  for(i = 0; i < 15; i += 5)
+  {
+    int ca = (a >> i) & 31, cb = (b >> i) & 31;
+    c |= ((ca + (cb - ca) * t / n) & 31) << i;
+  }
+  return c;
+}
+
+static void draw_side_bars(int x, int y, int w, int h)
+{
+  int i, j;
+
+  switch(g_gpsp_config.side_bars)
+  {
+    case SIDE_BARS_PATTERN:  /* the ground's 8 px check */
+      for(j = 0; j < UI_SCREEN_H; j += 8)
+        for(i = 0; i < UI_SCREEN_W; i += 8)
+          ui_fill(i, j, 8, 8, (((i ^ j) >> 3) & 1) ? UI_COL_PLUM_2 : UI_COL_PLUM);
+      break;
+    case SIDE_BARS_GAME:
+      for(j = 0; j < 16; j++)
+      {
+        u16 l = edge_colour(0, j), r = edge_colour(1, j);
+        int y0 = y + j * h / 16, y1 = y + (j + 1) * h / 16;
+        if(j == 0) y0 = 0;
+        if(j == 15) y1 = UI_SCREEN_H;
+        ui_fill(0, y0, x, y1 - y0, l);
+        ui_fill(x + w, y0, UI_SCREEN_W - x - w, y1 - y0, r);
+        if((j == 0) || (j == 15))
+        {
+          /* above and below the picture: left edge to right edge */
+          int ty = (j == 0) ? 0 : y + h, th = (j == 0) ? y : UI_SCREEN_H - y - h;
+          for(i = 0; (th > 0) && (i < 16); i++)
+            ui_fill(x + i * w / 16, ty, (i + 1) * w / 16 - i * w / 16, th, mix(l, r, i, 15));
+        }
+      }
+      break;
+    default:
+      ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
+      break;
+  }
+}
+
 /* The static ground: the game picture as it was on the LCD, screen-doored.
  * Once the screen has opened (full), the header and the tiles at rest go
  * in too, so a frame draws only what moves (spec section 6: repeated
@@ -614,8 +677,8 @@ static void build_layer(int full)
   p.layer_full = 0;
   if(!ui_layer_begin())
     return;
-  ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
   get_game_rect(&x, &y, &w, &h);
+  draw_side_bars(x, y, w, h);
   ui_blit_scaled(p.game, 240, 160, x, y, w, h);
   ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
   if(full)
@@ -878,8 +941,8 @@ static void draw_screen(int bar_fill)
   {
     /* no pool memory: the game picture is drawn every frame */
     int x, y, w, h;
-    ui_fill(0, 0, UI_SCREEN_W, UI_SCREEN_H, COLOR16(0, 0, 0));
     get_game_rect(&x, &y, &w, &h);
+    draw_side_bars(x, y, w, h);
     ui_blit_scaled(p.game, 240, 160, x, y, w, h);
     ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
   }

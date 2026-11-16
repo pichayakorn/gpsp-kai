@@ -42,6 +42,8 @@ void ui_input_init(void)
 
   /* PSP_SYSTEMPARAM_ID_INT_UNKNOWN (9): 0 = ○ confirms (Japanese models) */
   sceUtilityGetSystemParamInt(9, &enter);
+  if(g_gpsp_config.confirm_button != CONFIRM_SYSTEM)  /* Settings › Confirm button */
+    enter = (g_gpsp_config.confirm_button == CONFIRM_CROSS);
   ui_key_confirm = enter ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
   ui_key_back    = enter ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
 
@@ -83,7 +85,8 @@ void ui_input_update(void)
         hold_frames[i]++;
       if(hold_frames[i] == UI_F_HOLD)
         keys_held |= bit;
-      if((UI_DPAD & bit) && ((hold_frames[i] == 1) ||
+      /* the d-pad, and L R for Settings' tabs, repeat while held */
+      if(((UI_DPAD | PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER) & bit) && ((hold_frames[i] == 1) ||
        ((hold_frames[i] > UI_REPEAT_DELAY) &&
        (((hold_frames[i] - UI_REPEAT_DELAY) % UI_REPEAT_RATE) == 0))))
         keys_repeat |= bit;
