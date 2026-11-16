@@ -739,13 +739,15 @@ static void draw_tile(int i, int ty, int selected)
   ui_round_fill(tx - lift, ty - lift, TILE_W, TILE_H, 2, selected ? tiles[i].color : UI_COL_CARD);
   tx -= lift;
   ty -= lift;
-  ui_round_fill(tx + 16, ty + 6, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
-  draw_icon20(tx + 19, ty + 9, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
+  /* centred in the tile: 10 px above the icon box, about 11 under the
+     label (design repo 4aff042) */
+  ui_round_fill(tx + 16, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
+  draw_icon20(tx + 19, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
   for(j = 0; j < 2; j++)
     if(ui_wrap_line(tiles[i].label, j, 56, UI_FONT_SMALL, line[j], sizeof(line[j])))
       lines++;
   for(j = 0; j < lines; j++)
-    ui_text(tx + 30 - ui_text_width(line[j]) / 2, ty + 36 + j * 12 - ((lines == 2) ? 6 : 0),
+    ui_text(tx + 30 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
      line[j], selected ? UI_COL_PLUM : UI_COL_CREAM);
 }
 
