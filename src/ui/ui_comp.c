@@ -220,6 +220,8 @@ void ui_row_switch(int xr, int y, int p, int selected)
   if(p > 294) p = 294;  /* 1.15 */
   kx = x + 2 + (14 * p + 128) / 256;
   ui_round_fill(kx, y + 2, 10, 10, 2, (on || !selected) ? UI_COL_CREAM : UI_COL_PLUM);
+  if(on && selected)  /* a lime dash: a dark track under the cursor reads as on */
+    ui_fill(x + 5, y + 6, 6, 2, UI_COL_LIME);
 }
 
 /* The switch knob over UI_F_VALUE frames after a flip to state on. */
