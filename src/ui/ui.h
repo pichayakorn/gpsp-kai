@@ -114,6 +114,7 @@ void ui_cursor_frame(int x, int y, int w, int h);
 #define UI_ROW_CHANGED  1  /* not the default: a tangerine dot in the margin */
 #define UI_ROW_PER_GAME 2  /* saved for this game only: the cartridge mark */
 #define UI_ROW_DISABLED 4  /* no card, mute label */
+void ui_per_game_mark(int x, int y, u16 color);
 void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group,
  int flags, int *vx, int *vy);
 void ui_row_note(int xr, int y, const char *note);
@@ -130,6 +131,11 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f);
 
 int ui_toast(const char *text, u16 edge, const char *undo, int f);
 int ui_toast_up(int f);
+/* The clock and battery chip, top right (pause, settings). ui_status_read()
+ * reads everything once, when a screen opens; the chip then refreshes a
+ * value a frame, over each second. */
+void ui_status_read(void);
+void ui_status_chip(void);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 void ui_game_battery(int level, int on_battery);  /* once a second in a game */
 
@@ -155,5 +161,9 @@ void ui_components(void);
 /* The pause screen (the menu button in a game); returns 1 when the game's
  * state changed (a load or a restart), like menu(). */
 u32 ui_pause(u16 *game_picture);
+
+/* Settings (from the pause screen's Settings tile); returns when back is
+ * pressed. The caller draws its own ground again. */
+void ui_settings(void);
 
 #endif
