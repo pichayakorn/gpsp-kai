@@ -46,6 +46,10 @@ typedef struct
 #define ROW_W  (UI_SCREEN_W - UI_MARGIN * 2)
 #define SCREEN_ROW_H 40
 
+/* K_ACTION rows keep their action in def */
+enum { ACT_RESET_ALL, ACT_RESTART };
+#define LANG_TAB 4  /* System: the Language row is its first */
+
 static const u8 map_frameskip[3] = { no_frameskip, auto_frameskip, manual_frameskip };
 static const u8 map_ff[2] = { FF_HOLD, FF_TOGGLE };
 static const u8 map_clock[3] = { 10, 7, 9 };  /* 222, 266, 333 MHz */
@@ -100,8 +104,10 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
     { "Start games with", NULL, K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
     { "Confirm button", NULL, K_OFF, 0, 0, { "Comes later" } },
+    { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
+      K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
     { "Reset all settings (hold)", "Every setting on every tab goes back to its default.",
-      K_ACTION, 0, 0, { NULL } },
+      K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESET_ALL },
   },
 };
 
@@ -169,7 +175,34 @@ static struct
   int undo_all;                   /* the undo covers every tab */
   char toast[48];
   int toast_f, toast_undo;
+  int restart;                    /* leave Settings and restart kai */
 } s;
+
+/* The language kai started with; the Language row may differ until a
+ * restart. */
+u32 ui_start_language;
+
+static int lang_pending(void)
+{
+  return g_gpsp_config.language != ui_start_language;
+}
+
+static int is_lang_row(int tab, int i)
+{
+  return (tab == LANG_TAB) && (rows[tab][i].value == &g_gpsp_config.language);
+}
+
+/* Restart kai is a tap, unless play could be lost: Save when leaving a game
+ * is off (a game always runs under Settings). */
+static int restart_is_hold(void)
+{
+  return !g_gpsp_config.save_on_leave;
+}
+
+static int action_of(int tab, int i)
+{
+  return (rows[tab][i].kind == K_ACTION) ? rows[tab][i].def : -1;
+}
 
 static int row_y(int tab, int i)
 {
@@ -274,6 +307,16 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   }
 
   ui_card_row(ROW_X, y, ROW_W, r->label, selected, g, flags, &vx, &vy);
+  if(is_lang_row(tab, i) && lang_pending())
+  {
+    /* "next start": a sky pill 10 px after the label, 3 px down, 7 px
+       either side of its text, which is centred in it */
+    int lift = selected ? UI_LIFT : 0;
+    int px = ROW_X + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 10;
+    int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 14;
+    ui_round_fill(px, y + 3 - lift, pw, 14, 2, UI_COL_SKY);
+    ui_print(px + 7, y + 3 - lift, "next start", UI_COL_PLUM, UI_FONT_SMALL, 0);
+  }
   k = (r->value) ? row_index(r) : 0;
   switch(r->kind)
   {
@@ -302,26 +345,37 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   }
 }
 
+/* Steady hints first, then the row's own (spec: Hint strip). */
 static void draw_hints(void)
 {
-  ui_hint_t hints[4];
+  ui_hint_t hints[5];
+  int n = 0;
 
-  if(rows[s.tab][s.cur].kind == K_SWITCH)
+  hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
+  hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
+  switch(action_of(s.tab, s.cur))
   {
-    hints[0].keys = ui_key_confirm;               hints[0].verb = "Switch";
+    case ACT_RESET_ALL:
+      hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: reset all";
+      break;
+    case ACT_RESTART:
+      hints[n].keys = ui_key_confirm;
+      hints[n++].verb = restart_is_hold() ? "Hold: restart" : "Restart";
+      break;
+    default:
+      if(rows[s.tab][s.cur].kind == K_SWITCH)
+      {
+        hints[n].keys = ui_key_confirm; hints[n++].verb = "Switch";
+        break;
+      }
+      hints[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[n++].verb = "Change";
+      if(is_lang_row(s.tab, s.cur) && lang_pending())
+      {
+        hints[n].keys = ui_key_confirm; hints[n++].verb = "Restart now";
+      }
+      break;
   }
-  else if(rows[s.tab][s.cur].kind == K_ACTION)
-  {
-    hints[0].keys = ui_key_confirm;               hints[0].verb = "Hold: reset all";
-  }
-  else
-  {
-    hints[0].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[0].verb = "Change";
-  }
-  hints[1].keys = PSP_CTRL_START;                 hints[1].verb = "Hold: reset tab";
-  hints[2].keys = PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER; hints[2].verb = "Tabs";
-  hints[3].keys = ui_key_back;                    hints[3].verb = "Back";
-  ui_hint_strip(hints, 4);
+  ui_hint_packed(hints, n, 14);
 }
 
 /* The ground: the check, the legend, every row but the selected one, the
@@ -499,7 +553,7 @@ static void change_value(int dir)
 
 /* ---- the screen ---------------------------------------------------------------- */
 
-void ui_settings(void)
+int ui_settings(int tab, int row)
 {
   u32 mark = ui_pool_mark();
 
@@ -514,7 +568,14 @@ void ui_settings(void)
     sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &lang);
     rows[4][0].def = lang;
   }
+  if((tab > 0) && (tab < TABS))
+    s.tab = tab;  /* back where a restart left it */
   first_row();
+  if((row > 0) && (row < row_count(s.tab)) && row_selectable(&rows[s.tab][row]))
+  {
+    s.cur = row;
+    scroll_to_cursor();
+  }
   ui_input_init();
   ui_status_read();
   build_ground();
@@ -544,8 +605,11 @@ void ui_settings(void)
       move_cursor(next_row(ui_repeat(PSP_CTRL_DOWN) ? 1 : -1));
     if(row_selectable(&rows[s.tab][s.cur]))
     {
+      int pending = lang_pending();
       if(ui_repeat(PSP_CTRL_RIGHT)) change_value(1);
       if(ui_repeat(PSP_CTRL_LEFT)) change_value(-1);
+      if(lang_pending() != pending)
+        s.dirty = 1;  /* the hint strip gains or loses "Restart now" */
       if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
         change_value(1);  /* a switch also flips on confirm, as in Cheats */
     }
@@ -572,8 +636,37 @@ void ui_settings(void)
       s.dirty = 1;
     }
 
+    /* Language: × restarts now when the pick differs from the running one */
+    if(is_lang_row(s.tab, s.cur) && lang_pending() && ui_pressed(ui_key_confirm))
+    {
+      s.restart = 1;
+      break;
+    }
+
+    /* Restart kai: a tap, or a hold when play could be lost */
+    if(action_of(s.tab, s.cur) == ACT_RESTART)
+    {
+      if(!restart_is_hold())
+      {
+        if(ui_pressed(ui_key_confirm))
+        {
+          s.restart = 1;
+          break;
+        }
+      }
+      else
+      {
+        ui_hold_step(&s.action_hold, ui_key_confirm);
+        if(s.action_hold.done)
+        {
+          s.restart = 1;
+          break;
+        }
+      }
+    }
+
     /* hold confirm on Reset all */
-    if(rows[s.tab][s.cur].kind == K_ACTION)
+    if(action_of(s.tab, s.cur) == ACT_RESET_ALL)
     {
       ui_hold_step(&s.action_hold, ui_key_confirm);
       if(s.action_hold.done)
@@ -618,8 +711,14 @@ void ui_settings(void)
     /* the tip line waits for the cursor to rest */
     if(s.rest < UI_F_TIP_DELAY)
       s.rest++;
-    else if(rows[s.tab][s.cur].tip)
-      ui_print_fit(UI_MARGIN, 231, rows[s.tab][s.cur].tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
+    else
+    {
+      const char *tip = rows[s.tab][s.cur].tip;
+      if(is_lang_row(s.tab, s.cur) && lang_pending())
+        tip = "Applies after a restart: \xC3\x97 restarts now, or it waits for the next start.";
+      if(tip)
+        ui_print_fit(UI_MARGIN, 231, tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
+    }
     if(s.toast_f >= 0)
     {
       if(!ui_toast(s.toast, UI_COL_LIME, s.toast_undo ? "Undo" : NULL, s.toast_f))
@@ -632,4 +731,12 @@ void ui_settings(void)
 
   /* the screen keeps no memory; the caller rebuilds its own ground */
   ui_pool_release(mark);
+  return s.restart;
+}
+
+/* Where Settings stands, for the restart note. */
+void ui_settings_where(int *tab, int *row)
+{
+  *tab = s.tab;
+  *row = s.cur;
 }

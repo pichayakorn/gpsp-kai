@@ -89,16 +89,10 @@ typedef struct
   char *verb;
 } ui_hint_t;
 void ui_hint_strip(const ui_hint_t *hints, int count);
-/* Hints in fixed columns (the pause screen): each column is as wide as its
- * widest variant, so a changing verb never moves the others; shown -1
- * leaves the column empty. */
-typedef struct
-{
-  const ui_hint_t *variants;
-  int count;
-  int shown;
-} ui_hint_col_t;
-void ui_hint_columns(const ui_hint_col_t *cols, int count);
+/* Hints packed with a gap (spec: 10 px on the pause screen). Hints that
+ * never change on a screen come first, the most changing one last, and a
+ * hint that doesn't apply is left out. */
+void ui_hint_packed(const ui_hint_t *hints, int count, int gap);
 
 /* Easing: value at frame f (1..n) of an n-frame out-back or in-cubic move
  * from a to b. */
@@ -162,8 +156,24 @@ void ui_components(void);
  * state changed (a load or a restart), like menu(). */
 u32 ui_pause(u16 *game_picture);
 
-/* Settings (from the pause screen's Settings tile); returns when back is
- * pressed. The caller draws its own ground again. */
-void ui_settings(void);
+/* Settings (from the pause screen's Settings tile), opened on a tab and row
+ * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on
+ * back. The caller draws its own ground again. */
+int ui_settings(int tab, int row);
+void ui_settings_where(int *tab, int *row);
+extern u32 ui_start_language;  /* the language kai started with */
+
+/* Restart kai (ui_restart.c): the note that brings the player back where
+ * they were, and the relaunch itself. */
+typedef struct
+{
+  int pending;      /* a note was read at this start */
+  int tab, row;     /* Settings tab and row */
+  char game[MAX_PATH];  /* the game to reopen from Last; empty: none */
+} ui_restart_note_t;
+extern ui_restart_note_t ui_restart_note;
+void ui_restart_note_read(void);
+void ui_restart_now(int tab, int row, const char *game);
+void ui_restart_exec(void);  /* from quit(3) */
 
 #endif

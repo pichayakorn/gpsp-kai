@@ -292,6 +292,12 @@ u32 update_input()
     ctrl_buttons = readHomeButton();
 
   buttons = ctrl_data.Buttons | ctrl_buttons;
+#ifdef UI4
+  /* back from a restart: the pause screen opens by itself once the game
+     has drawn a frame, and takes it from there */
+  if(ui_restart_note.pending)
+    buttons |= PSP_CTRL_HOME;
+#endif
 
   if((g_gpsp_config.enable_analog) && !(buttons & PSP_CTRL_HOLD))
   {

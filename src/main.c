@@ -264,9 +264,10 @@ int SetupCallbacks()
 // mode = 0 NORMAL
 // mode = 1 INIT ERROR
 // mode = 2 FONT INIT ERROR
+// mode = 3 RESTART (saves like NORMAL, then starts kai again)
 void quit(u32 mode)
 {
-  if(mode == 0)
+  if((mode == 0) || (mode == 3))
     {
       note_game_left();
       save_game_config_file();
@@ -288,6 +289,10 @@ void quit(u32 mode)
 
   set_cpu_clock(10);
 
+#ifdef UI4
+  if(mode == 3)
+    ui_restart_exec();  /* returns only if the relaunch failed */
+#endif
   sceKernelExitGame();
 }
 
@@ -444,6 +449,38 @@ int main(int argc, char *argv[])
   }
 #endif
 
+#ifdef UI4
+  // Back from "Restart kai": reopen the game the note names; the pause
+  // screen then loads Last and opens Settings (ui_pause.c)
+  ui_start_language = g_gpsp_config.language;
+  ui_restart_note_read();
+  if(ui_restart_note.pending)
+  {
+    char *slash = strrchr(ui_restart_note.game, '/');
+
+    ui_restart_note.pending = 0;
+    if(slash && (slash[1] != 0))
+    {
+      *slash = 0;
+      snprintf(rom_path, sizeof(rom_path), "%s", ui_restart_note.game);
+      if(load_gamepak(slash + 1) != -1)
+        ui_restart_note.pending = 1;
+    }
+  }
+  if(ui_restart_note.pending)
+  {
+    clear_screen(0);
+    flip_screen();
+    clear_screen(0);
+    flip_screen();
+    video_resolution(FRAME_GAME);
+
+    init_cpu();
+    init_memory();
+    reset_sound();
+  }
+  else
+#endif
   if(argc > 1)
   {
     if(load_gamepak((char *)argv[1]) == -1)
