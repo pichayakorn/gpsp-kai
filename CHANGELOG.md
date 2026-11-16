@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.9.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.8.0...v3.9.0) (2026-11-16)
+
+
+### Features
+
+* **input:** rapid fire speed setting, saved per game ([#115](https://github.com/pichayakorn/gpsp-kai/issues/115)) ([af41400](https://github.com/pichayakorn/gpsp-kai/commit/af4140081445bb347621a238368017d325e7c1ec))
+* **savestate:** save into slot 10 when leaving a game, kept on the Memory Stick ([#117](https://github.com/pichayakorn/gpsp-kai/issues/117)) ([b5ecdb9](https://github.com/pichayakorn/gpsp-kai/commit/b5ecdb96819f9a5028823c1ad47e9f35fe4ade95))
+* sharp bilinear is the default screen filter ([#135](https://github.com/pichayakorn/gpsp-kai/issues/135)) ([416af2f](https://github.com/pichayakorn/gpsp-kai/commit/416af2f664db91c5daedb0fc3ae995627ceb18b5))
+* **video:** Show FPS setting ([#114](https://github.com/pichayakorn/gpsp-kai/issues/114)) ([5d812be](https://github.com/pichayakorn/gpsp-kai/commit/5d812be0c831c3964364e64174005e263084f832))
+
+
+### Bug Fixes
+
+* **build:** retitled test builds keep MEMSIZE ([#120](https://github.com/pichayakorn/gpsp-kai/issues/120)) ([11aef29](https://github.com/pichayakorn/gpsp-kai/commit/11aef29c477e1465caebe3a677919683261a166b))
+
 ## [3.8.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.7.2...v3.8.0) (2026-11-14)
 
 
