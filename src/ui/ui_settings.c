@@ -334,12 +334,13 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   ui_card_row(rx, y, rw, r->label, selected, g, flags, &vx, &vy);
   if(is_lang_row(tab, i) && lang_pending())
   {
-    /* "next start": a sky pill 6 px after the label, 3 px down */
+    /* "next start": a sky pill 10 px after the label, 3 px down, 7 px
+       either side of its text, which is centred in it */
     int lift = selected ? UI_LIFT : 0;
-    int px = rx + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 6;
-    int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 10;
+    int px = rx + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 10;
+    int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 14;
     ui_round_fill(px, y + 3 - lift, pw, 14, 2, UI_COL_SKY);
-    ui_print(px + 5, y + 3 - lift + 1, "next start", UI_COL_PLUM, UI_FONT_SMALL, 0);
+    ui_print(px + 7, y + 3 - lift, "next start", UI_COL_PLUM, UI_FONT_SMALL, 0);
   }
   k = (r->value) ? row_index(r) : 0;
   switch(r->kind)
