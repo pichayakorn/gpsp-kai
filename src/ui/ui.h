@@ -89,16 +89,10 @@ typedef struct
   char *verb;
 } ui_hint_t;
 void ui_hint_strip(const ui_hint_t *hints, int count);
-/* Hints in fixed columns (the pause screen): each column is as wide as its
- * widest variant, so a changing verb never moves the others; shown -1
- * leaves the column empty. */
-typedef struct
-{
-  const ui_hint_t *variants;
-  int count;
-  int shown;
-} ui_hint_col_t;
-void ui_hint_columns(const ui_hint_col_t *cols, int count);
+/* Hints packed with a gap (spec: 10 px on the pause screen). Hints that
+ * never change on a screen come first, the most changing one last, and a
+ * hint that doesn't apply is left out. */
+void ui_hint_packed(const ui_hint_t *hints, int count, int gap);
 
 /* Easing: value at frame f (1..n) of an n-frame out-back or in-cubic move
  * from a to b. */

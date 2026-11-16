@@ -344,11 +344,14 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   }
 }
 
+/* Steady hints first, then the row's own (spec: Hint strip). */
 static void draw_hints(void)
 {
   ui_hint_t hints[5];
   int n = 0;
 
+  hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
+  hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
   switch(action_of(s.tab, s.cur))
   {
     case ACT_RESET_ALL:
@@ -371,13 +374,7 @@ static void draw_hints(void)
       }
       break;
   }
-  hints[n].keys = PSP_CTRL_START;                 hints[n++].verb = "Hold: reset tab";
-  if(n < 4)
-  {
-    hints[n].keys = PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER; hints[n++].verb = "Tabs";
-  }
-  hints[n].keys = ui_key_back;                    hints[n++].verb = "Back";
-  ui_hint_strip(hints, n);
+  ui_hint_packed(hints, n, 14);
 }
 
 /* The ground: the check, the legend, every row but the selected one, the

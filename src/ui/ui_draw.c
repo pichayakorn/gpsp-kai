@@ -405,10 +405,9 @@ void ui_hint_strip(const ui_hint_t *hints, int count)
   }
 }
 
-/* One hint for the column strip: glyphs 4 px apart, the verb 4 px after
- * them and 10 px after the verb (spec: 10 px on the pause screen). With
- * draw 0 it only measures. */
-static int hint_column_one(int x, int y, const ui_hint_t *h, int draw)
+/* One packed hint: glyphs 4 px apart, the verb 4 px after them and gap px
+ * after the verb. */
+static int hint_packed_one(int x, int y, const ui_hint_t *h, int gap)
 {
   static const u32 pairs[2] = { PSP_CTRL_UP | PSP_CTRL_DOWN, PSP_CTRL_LEFT | PSP_CTRL_RIGHT };
   u32 keys = h->keys, bit;
@@ -417,37 +416,24 @@ static int hint_column_one(int x, int y, const ui_hint_t *h, int draw)
   for(j = 0; j < 2; j++)
     if((keys & pairs[j]) == pairs[j])
     {
-      x = (draw ? ui_glyph(x, y, pairs[j]) : x + ui_glyph_width(pairs[j])) + 4;
+      x = ui_glyph(x, y, pairs[j]) + 4;
       keys &= ~pairs[j];
     }
   for(bit = 1; bit; bit <<= 1)
     if(keys & bit)
-      x = (draw ? ui_glyph(x, y, bit) : x + ui_glyph_width(bit)) + 4;
+      x = ui_glyph(x, y, bit) + 4;
   if(h->verb && h->verb[0])
-    x = (draw ? ui_text(x, small_text_top(y, UI_DISC), h->verb, UI_COL_CREAM) :
-     x + ui_text_width(h->verb)) + 10;
+    x = ui_text(x, small_text_top(y, UI_DISC), h->verb, UI_COL_CREAM) + gap;
   return x;
 }
 
-void ui_hint_columns(const ui_hint_col_t *cols, int count)
+void ui_hint_packed(const ui_hint_t *hints, int count, int gap)
 {
-  int n, k, x = UI_MARGIN, y = UI_STRIP_Y + (UI_STRIP_H - UI_DISC) / 2;
+  int n, x = UI_MARGIN, y = UI_STRIP_Y + (UI_STRIP_H - UI_DISC) / 2;
 
   ui_fill(0, UI_STRIP_Y, UI_SCREEN_W, UI_STRIP_H, UI_COL_SHADE);
   for(n = 0; n < count; n++)
-  {
-    int w = 0;
-
-    for(k = 0; k < cols[n].count; k++)
-    {
-      int vw = hint_column_one(0, y, &cols[n].variants[k], 0);
-      if(vw > w)
-        w = vw;
-    }
-    if((cols[n].shown >= 0) && (cols[n].shown < cols[n].count))
-      hint_column_one(x, y, &cols[n].variants[cols[n].shown], 1);
-    x += w;
-  }
+    x = hint_packed_one(x, y, &hints[n], gap);
 }
 
 static const unsigned short *out_back_table(int n)

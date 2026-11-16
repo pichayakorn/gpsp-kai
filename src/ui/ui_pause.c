@@ -779,10 +779,9 @@ static int undo_offered(void);
 
 static void draw_hints(int done)
 {
-  ui_hint_t c1[4], c2[3], c3[1], c4[1], c5[1];
-  ui_hint_col_t cols[5];
+  ui_hint_t c1[2], c[6];
   u32 resume_keys = PSP_CTRL_TRIANGLE | (g_use_home ? PSP_CTRL_HOME : 0);
-  int i, full = p.has[cur_slot()];
+  int n, full = p.has[cur_slot()];
 
   if(p.bar_text || p.busy || !done || p.closing)
   {
@@ -797,41 +796,24 @@ static void draw_hints(int done)
     return;
   }
 
-  /* fixed columns, each as wide as its widest variant, so a changing verb
-     never moves the others (spec section 2, hint strip) */
-  for(i = 0; i < 4; i++)
-    c1[i].keys = ui_key_confirm;
-  c1[0].verb = "Save";
-  c1[1].verb = "Load";
-  c1[2].verb = "Load (hold)";
-  c1[3].verb = "Open";
-  c2[0].keys = PSP_CTRL_SELECT; c2[0].verb = "Save \xC2\xB7 hold: Delete";
-  c2[1].keys = PSP_CTRL_SELECT; c2[1].verb = "Undo";
-  c2[2].keys = PSP_CTRL_UP;     c2[2].verb = "Savestates";
-  c3[0].keys = resume_keys;       c3[0].verb = "Resume";
-  c4[0].keys = PSP_CTRL_LTRIGGER; c4[0].verb = "Last";
-  c5[0].keys = PSP_CTRL_RTRIGGER; c5[0].verb = "Slot 0";
-
-  cols[0].variants = c1; cols[0].count = 4;
-  cols[1].variants = c2; cols[1].count = 3;
-  cols[2].variants = c3; cols[2].count = 1; cols[2].shown = 0;
-  cols[3].variants = c4; cols[3].count = 1;
-  cols[4].variants = c5; cols[4].count = 1;
+  /* steady hints first, the changing ones last (spec: Hint strip) */
+  n = 0;
+  c[n].keys = resume_keys; c[n++].verb = "Resume";
   if(p.row == 0)
   {
-    cols[0].shown = !full ? 0 : (g_gpsp_config.save_on_leave ? 1 : 2);
-    cols[1].shown = (undo_offered()) ? 1 : 0;
-    cols[3].shown = 0;
-    cols[4].shown = 0;
+    c[n].keys = PSP_CTRL_LTRIGGER; c[n++].verb = "Last";
+    c[n].keys = PSP_CTRL_RTRIGGER; c[n++].verb = "Slot 0";
+    c[n].keys = PSP_CTRL_SELECT;
+    c[n++].verb = undo_offered() ? "Undo" : "Save \xC2\xB7 hold: Delete";
+    c[n].keys = ui_key_confirm;
+    c[n++].verb = !full ? "Save" : (g_gpsp_config.save_on_leave ? "Load" : "Load (hold)");
   }
   else
   {
-    cols[0].shown = 3;
-    cols[1].shown = 2;
-    cols[3].shown = -1;  /* L and R columns stay empty on the tile row */
-    cols[4].shown = -1;
+    c[n].keys = PSP_CTRL_UP;    c[n++].verb = "Savestates";
+    c[n].keys = ui_key_confirm; c[n++].verb = "Open";
   }
-  ui_hint_columns(cols, 5);
+  ui_hint_packed(c, n, 10);
 }
 
 /* The saving card: a title, 30 blocks and a note (spec "exit"). */
