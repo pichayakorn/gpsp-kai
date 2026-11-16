@@ -1026,11 +1026,13 @@ int ui_settings(int tab, int row)
     if(ui_pressed(ui_key_back))
       break;
 
-    /* tabs */
-    if(ui_repeat(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
+    /* tabs: L R step and repeat while held, stopping at the first and the
+       last tab */
+    if(ui_repeat(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER) &&
+     (ui_repeat(PSP_CTRL_RTRIGGER) ? (s.tab < TABS - 1) : (s.tab > 0)))
     {
       s.tab_prev = s.tab;
-      s.tab = (s.tab + (ui_repeat(PSP_CTRL_RTRIGGER) ? 1 : TABS - 1)) % TABS;
+      s.tab += ui_repeat(PSP_CTRL_RTRIGGER) ? 1 : -1;
       s.tab_f = 0;
       s.reset_hold.p = 0;
       s.dir = -1;
