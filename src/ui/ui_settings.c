@@ -472,6 +472,11 @@ static void draw_chip(int i, int selected)
    (((c->map >= 6) && (c->map <= 9)) || (c->map <= 3) ? UI_COL_CREAM : UI_COL_MUTE));
 }
 
+#define PAD_SHOT_W 96
+#define PAD_SHOT_H 64
+static u16 pad_shot[PAD_SHOT_W * PAD_SHOT_H];
+static int pad_shot_ok;  /* cleared each time Settings opens: a new picture */
+
 static void draw_pad_body(void)
 {
   int i;
@@ -480,7 +485,16 @@ static void draw_pad_body(void)
   ui_round_fill(PAD_BX, PAD_BY, PAD_BW, PAD_BH, 4, UI_COL_CARD);
   ui_fill(PAD_BX + 52, PAD_BY + 14, 120, 68, UI_COL_SHADE);
   if(ui_settings_game)
-    ui_blit_scaled(ui_settings_game, 240, 160, PAD_BX + 54, PAD_BY + 16, 116, 64);
+  {
+    /* the game's 3:2 picture fills the drawn screen's height, centred,
+       averaged down once (the ground is rebuilt on every move) */
+    if(!pad_shot_ok)
+    {
+      ui_shrink_box(ui_settings_game, 240, 160, pad_shot, PAD_SHOT_W, PAD_SHOT_H);
+      pad_shot_ok = 1;
+    }
+    ui_blit(pad_shot, PAD_SHOT_W, PAD_BX + 54 + (116 - PAD_SHOT_W) / 2, PAD_BY + 16, PAD_SHOT_W, PAD_SHOT_H);
+  }
   for(i = 0; i < 12; i++)
     if(i != s.btn)
       draw_chip(i, 0);
@@ -998,6 +1012,7 @@ int ui_settings(int tab, int row)
   s.value_f = UI_F_VALUE;
   s.toast_f = -1;
   s.dir = -1;
+  pad_shot_ok = 0;
   /* the language row's default is the PSP's own language */
   {
     int lang = 1;
