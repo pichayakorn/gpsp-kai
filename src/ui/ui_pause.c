@@ -128,6 +128,7 @@ static struct
   ui_hold_t exit_hold;
   int exit_holding;
   const char *bar_text;      /* the saving card while a save runs */
+  u16 bar_col;               /* its edge and blocks: pink, sky for a restart */
   const char *bar_note;
   int bar_phase, bar_phases; /* a load after a save fills one bar */
   int busy;                  /* a save or load runs (nothing to press) */
@@ -842,12 +843,12 @@ static void draw_bar_card(int fill_256)
      noise (maintainer, 2026-11-15) */
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CARD);
-  ui_fill(x, y + 4, 4, h - 8, UI_COL_PINK);
+  ui_fill(x, y + 4, 4, h - 8, p.bar_col);
   ui_print(x + 16, y + 10, p.bar_text, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
   {
     int i;
     for(i = 0; i < 30; i++)
-      ui_fill(x + 16 + i * 10, y + 32, 8, 12, (i <= k) ? UI_COL_PINK : UI_COL_PLUM_2);
+      ui_fill(x + 16 + i * 10, y + 32, 8, 12, (i <= k) ? p.bar_col : UI_COL_PLUM_2);
   }
   if(p.bar_note)
     ui_print_fit(x + 16, y + 52, p.bar_note, UI_COL_MUTE, UI_FONT_SMALL, 0, w - 28);
@@ -1225,6 +1226,55 @@ static int action_exit(void)
   return 1;
 }
 
+/* Restart kai (spec "Restart kai"): save like Exit, show the sky card and
+ * start kai again; the note brings the player back to this Settings row.
+ * Does not return. */
+static void restart_kai(void)
+{
+  static const char then[] = "Then kai starts again and brings you back here.";
+  int tab, row, save = g_gpsp_config.save_on_leave;
+
+  ui_settings_where(&tab, &row);
+  build_layer(1);  /* the pause screen behind the card */
+  p.bar_col = UI_COL_SKY;
+  if(save)
+  {
+    run_with_bar("Saving to Last\xE2\x80\xA6", then);
+    save_last_state(p.game);
+    end_bar();
+  }
+  /* the relaunch itself is the rest of the work: the card shows full */
+  p.bar_text = "Restarting kai\xE2\x80\xA6";
+  p.bar_note = then;
+  p.busy = 1;
+  draw_screen(256);
+  ui_frame_end_now();
+  /* with the save off the game is not reopened: kai starts on the library */
+  ui_restart_now(tab, row, save ? gamepak_path : NULL);
+}
+
+/* Back from a restart: load Last over the freshly started game and open
+ * Settings on the row the player left. */
+static void restart_return(void)
+{
+  int tab = ui_restart_note.tab, row = ui_restart_note.row;
+
+  ui_restart_note.pending = 0;
+  run_with_bar(NULL, NULL);
+  if(load_slot(LAST_SLOT))
+  {
+    p.changed = 1;
+    take_loaded_picture();
+    g_game_config.last_slot = LAST_SLOT;
+  }
+  end_bar();
+  if(ui_settings(tab, row))
+    restart_kai();
+  build_layer(0);  /* Settings used the layer */
+  ui_status_read();
+  ui_input_init();
+}
+
 /* ---- the screen ------------------------------------------------------------ */
 
 static void move_slot(int to)
@@ -1355,6 +1405,7 @@ u32 ui_pause(u16 *game_picture)
 
   memset(&p, 0, sizeof(p));
   p.game = game_picture;
+  p.bar_col = UI_COL_PINK;
   p.big_slot = -1;
   p.toast_f = -1;
   shot_fd = -1;
@@ -1385,6 +1436,8 @@ u32 ui_pause(u16 *game_picture)
   ui_status_read();  /* while the game is still on the LCD */
   build_layer(0);
   ui_input_init();
+  if(ui_restart_note.pending)
+    restart_return();
 #ifdef UI_PERF
   /* the script runs on the first pause only; later pauses take the pad,
      so the game can still be left with Exit */
@@ -1530,7 +1583,8 @@ u32 ui_pause(u16 *game_picture)
               /* Settings draws its own ground; the pause screen's comes
                  back after it */
               shot_wait();
-              ui_settings();
+              if(ui_settings(0, 0))
+                restart_kai();  /* does not return */
               build_layer(1);
               ui_status_read();
               ui_input_init();

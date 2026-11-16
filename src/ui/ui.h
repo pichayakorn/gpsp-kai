@@ -162,8 +162,24 @@ void ui_components(void);
  * state changed (a load or a restart), like menu(). */
 u32 ui_pause(u16 *game_picture);
 
-/* Settings (from the pause screen's Settings tile); returns when back is
- * pressed. The caller draws its own ground again. */
-void ui_settings(void);
+/* Settings (from the pause screen's Settings tile), opened on a tab and row
+ * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on
+ * back. The caller draws its own ground again. */
+int ui_settings(int tab, int row);
+void ui_settings_where(int *tab, int *row);
+extern u32 ui_start_language;  /* the language kai started with */
+
+/* Restart kai (ui_restart.c): the note that brings the player back where
+ * they were, and the relaunch itself. */
+typedef struct
+{
+  int pending;      /* a note was read at this start */
+  int tab, row;     /* Settings tab and row */
+  char game[MAX_PATH];  /* the game to reopen from Last; empty: none */
+} ui_restart_note_t;
+extern ui_restart_note_t ui_restart_note;
+void ui_restart_note_read(void);
+void ui_restart_now(int tab, int row, const char *game);
+void ui_restart_exec(void);  /* from quit(3) */
 
 #endif
