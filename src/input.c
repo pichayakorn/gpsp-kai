@@ -396,7 +396,12 @@ u32 update_input()
         break;
 
       case BUTTON_ID_FPS:
+#ifdef UI4
+        /* the same switch as Settings' Show FPS: the status chip */
+        g_gpsp_config.show_fps = !g_gpsp_config.show_fps;
+#else
         psp_fps_debug ^= 1;
+#endif
         break;
     }
 
