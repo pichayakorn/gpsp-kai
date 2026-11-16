@@ -482,9 +482,30 @@ static u16 __attribute__((aligned(16))) bars_edges[BARS_N * 16];  /* 16 wide: le
 static int bars_dirty;  /* buffers still to paint */
 static int bars_tick;
 
+/* Two colours within a step or two of each other per channel. */
+static int bars_near(u32 a, u32 b, int tol)
+{
+  int i;
+
+  for(i = 0; i < 15; i += 5)
+  {
+    int d = (int)((a >> i) & 31) - (int)((b >> i) & 31);
+    if((d > tol) || (d < -tol))
+      return 0;
+  }
+  return 1;
+}
+
+/* Game colours follow the picture's edges, but only once the new colours
+ * have held for BARS_SETTLE samples (15 frames apart, about a second), so
+ * flashes and quick scrolling never make the bars flicker. */
+#define BARS_SETTLE 4
+
 static void bars_sample(void)
 {
-  int side, j, k;
+  static u16 cand[2 * BARS_N];
+  static int stable;
+  int side, j, k, same = 1, moved = 0;
   u16 *src = screen_address;
 
   if((g_gpsp_config.side_bars != SIDE_BARS_GAME) || (video_draw_frame != FRAME_GAME))
@@ -504,13 +525,20 @@ static void bars_sample(void)
           r += p & 31; g += (p >> 5) & 31; b += (p >> 10) & 31; n++;
         }
       c = (r / n) | ((g / n) << 5) | ((b / n) << 10);
-      if(bars_edges[j * 16 + side * 8] != c)
-      {
-        for(k = 0; k < 8; k++)
-          bars_edges[j * 16 + side * 8 + k] = c;
-        bars_dirty = 2;
-      }
+      if(!bars_near(cand[side * BARS_N + j], c, 2))
+        same = 0;
+      cand[side * BARS_N + j] = c;
+      if(!bars_near(bars_edges[j * 16 + side * 8], c, 1))
+        moved = 1;
     }
+  stable = same ? stable + 1 : 0;
+  if(!moved || (stable < BARS_SETTLE - 1))
+    return;
+  for(side = 0; side < 2; side++)
+    for(j = 0; j < BARS_N; j++)
+      for(k = 0; k < 8; k++)
+        bars_edges[j * 16 + side * 8 + k] = cand[side * BARS_N + j];
+  bars_dirty = 2;
 }
 
 /* Sprites over the parts of the LCD outside the game picture. */

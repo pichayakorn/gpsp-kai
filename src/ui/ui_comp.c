@@ -562,7 +562,9 @@ void ui_hold_bar(int x, int y, int w, int p, u16 color)
 }
 
 /* Hold progress in 1/256: fills while the key is down (UI_F_HOLD frames),
- * drains in UI_F_HOLD_DRAIN after an early release. Call once a frame. */
+ * drains in UI_F_HOLD_DRAIN after an early release. Once the hold has done
+ * its job the bar goes at once, even while the key is still down. Call once
+ * a frame. */
 int ui_hold_step(ui_hold_t *h, u32 key)
 {
   u32 frames = ui_hold_frames(key);
@@ -578,8 +580,13 @@ int ui_hold_step(ui_hold_t *h, u32 key)
       {
         h->fired = 1;
         h->done = 1;
+        h->p = 256;
       }
-      h->p = 256;
+      else
+      {
+        h->p = 0;  /* done: no full bar left waiting for the release */
+        h->shown = 0;
+      }
     }
     else
       h->p = (frames * 256) / UI_F_HOLD;

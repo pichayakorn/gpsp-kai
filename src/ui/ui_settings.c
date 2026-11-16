@@ -213,12 +213,6 @@ static int is_lang_row(int tab, int i)
   return (tab == LANG_TAB) && (rows[tab][i].value == &g_gpsp_config.language);
 }
 
-/* Restart kai is a tap, unless play could be lost: Save when leaving a game
- * is off (a game always runs under Settings). */
-static int restart_is_hold(void)
-{
-  return !g_gpsp_config.save_on_leave;
-}
 
 static int action_of(int tab, int i)
 {
@@ -775,7 +769,7 @@ static void draw_hints(void)
       break;
     case ACT_RESTART:
       hints[n].keys = ui_key_confirm;
-      hints[n++].verb = restart_is_hold() ? "Hold: restart" : "Restart";
+      hints[n++].verb = "Hold: restart";
       break;
     default:
       if(rows[s.tab][s.cur].kind == K_SWITCH)
@@ -786,7 +780,7 @@ static void draw_hints(void)
       hints[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[n++].verb = "Change";
       if(is_lang_row(s.tab, s.cur) && lang_pending())
       {
-        hints[n].keys = ui_key_confirm; hints[n++].verb = "Restart now";
+        hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: restart now";
       }
       break;
   }
@@ -1033,10 +1027,10 @@ int ui_settings(int tab, int row)
       break;
 
     /* tabs */
-    if(ui_pressed(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
+    if(ui_repeat(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER))
     {
       s.tab_prev = s.tab;
-      s.tab = (s.tab + (ui_pressed(PSP_CTRL_RTRIGGER) ? 1 : TABS - 1)) % TABS;
+      s.tab = (s.tab + (ui_repeat(PSP_CTRL_RTRIGGER) ? 1 : TABS - 1)) % TABS;
       s.tab_f = 0;
       s.reset_hold.p = 0;
       s.dir = -1;
@@ -1153,32 +1147,15 @@ int ui_settings(int tab, int row)
       s.dirty = 1;
     }
 
-    /* Language: × restarts now when the pick differs from the running one */
-    if(is_lang_row(s.tab, s.cur) && lang_pending() && ui_pressed(ui_key_confirm))
+    /* Restart kai, or a changed Language: hold × so a stray press never
+       restarts */
+    if((action_of(s.tab, s.cur) == ACT_RESTART) || (is_lang_row(s.tab, s.cur) && lang_pending()))
     {
-      s.restart = 1;
-      break;
-    }
-
-    /* Restart kai: a tap, or a hold when play could be lost */
-    if(action_of(s.tab, s.cur) == ACT_RESTART)
-    {
-      if(!restart_is_hold())
+      ui_hold_step(&s.action_hold, ui_key_confirm);
+      if(s.action_hold.done)
       {
-        if(ui_pressed(ui_key_confirm))
-        {
-          s.restart = 1;
-          break;
-        }
-      }
-      else
-      {
-        ui_hold_step(&s.action_hold, ui_key_confirm);
-        if(s.action_hold.done)
-        {
-          s.restart = 1;
-          break;
-        }
+        s.restart = 1;
+        break;
       }
     }
 
@@ -1242,8 +1219,10 @@ int ui_settings(int tab, int row)
     {
       const char *tip = rows[s.tab][s.cur].tip;
       if(is_lang_row(s.tab, s.cur) && lang_pending())
-        tip = "Applies after a restart: \xC3\x97 restarts now, or it waits for the next start.";
-      if(tip)
+        tip = "Applies after a restart: hold \xC3\x97 to restart now, or it waits for the next start.";
+      if(is_lang_row(s.tab, s.cur) && (s.action_hold.p > 0))
+        ui_hold_bar(UI_MARGIN, 233, 184, s.action_hold.p, UI_COL_SKY);  /* in the tip's place */
+      else if(tip)
         ui_print_fit(UI_MARGIN, 231, tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
     }
     if(s.pick && !draw_picker())
