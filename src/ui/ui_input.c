@@ -42,6 +42,8 @@ void ui_input_init(void)
 
   /* PSP_SYSTEMPARAM_ID_INT_UNKNOWN (9): 0 = ○ confirms (Japanese models) */
   sceUtilityGetSystemParamInt(9, &enter);
+  if(g_gpsp_config.confirm_button != CONFIRM_SYSTEM)  /* Settings › Confirm button */
+    enter = (g_gpsp_config.confirm_button == CONFIRM_CROSS);
   ui_key_confirm = enter ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
   ui_key_back    = enter ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
 

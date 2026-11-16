@@ -69,7 +69,8 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SCREEN, 0, 3, { "Original", "Fit", "Full" }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
     { "Smoothing", "Sharp keeps pixels crisp at any size; Smooth blurs them; Off shows them as they fall.",
       K_SEG, 0, 3, { "Off", "Smooth", "Sharp" }, &g_gpsp_config.screen_filter, NULL, filter_sharp_bilinear },
-    { "Side bars", NULL, K_OFF, 0, 0, { "Comes later" } },
+    { "Side bars", "What fills the screen beside the picture: black, the menu's pattern, or the game's own edge colours.",
+      K_SEG, 0, 3, { "Black", "Pattern", "Game colours" }, &g_gpsp_config.side_bars, NULL, SIDE_BARS_BLACK },
     { "Frameskip", "Auto skips drawing only when the game can't keep up.",
       K_SEG, 1, 3, { "Off", "Auto", "Fixed" }, &g_game_config.frameskip_type, map_frameskip, auto_frameskip },
     { "Skip up to", "The most frames in a row that may go undrawn.",
@@ -107,7 +108,8 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Write game saves", "Right away writes the game's own save as soon as it changes.",
       K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
     { "Start games with", NULL, K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
-    { "Confirm button", NULL, K_OFF, 0, 0, { "Comes later" } },
+    { "Confirm button", "Which button confirms in kai's menus. In a game, \xE2\x97\x8B is A and \xC3\x97 is B either way.",
+      K_SEG, 0, 3, { "PSP setting", "\xC3\x97", "\xE2\x97\x8B" }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
     { "Reset all settings (hold)", "Every setting on every tab goes back to its default.",
@@ -1039,6 +1041,11 @@ int ui_settings(int tab, int row)
         s.dirty = 1;  /* the hint strip gains or loses "Restart now" */
       if((s.tab == PAD_TAB) && (ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT) || ui_pressed(ui_key_confirm)))
         s.dirty = 1;  /* the drawn stick follows the sensitivity */
+      if((rows[s.tab][s.cur].value == &g_gpsp_config.confirm_button) && ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT))
+      {
+        ui_input_init();  /* the new confirm and back keys, at once */
+        s.dirty = 1;      /* every hint shows them */
+      }
       if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
         change_value(1);  /* a switch also flips on confirm, as in Cheats */
     }

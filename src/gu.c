@@ -438,6 +438,7 @@ static u32 sharp_setup(SPRITE *s)
 #define GE_CMD_ATST  0xDB
 #define GE_CMD_STST  0xDC
 #define GE_CMD_SOP   0xDD
+#define GE_CMD_TWRAP 0xC7
 #define STENCIL_KEEP    0
 #define STENCIL_ZERO    1
 #define STENCIL_REPLACE 2
@@ -453,9 +454,9 @@ int (*osd_tick)(int *x, int *y, int *w, int *h) = NULL;
 u16 __attribute__((aligned(16))) osd_chip_pixels[OSD_CHIP_W * OSD_CHIP_H];
 int osd_chip_rect[4];
 static u16 __attribute__((aligned(16))) osd_black[8 * 8];
-static u32 __attribute__((aligned(16))) osd_cmd[96];
+static u32 __attribute__((aligned(16))) osd_cmd[128];
 static u32 __attribute__((aligned(16))) osd_end_cmd[8];
-static float __attribute__((aligned(16))) osd_vertex[12 * 10];
+static float __attribute__((aligned(16))) osd_vertex[16 * 10];
 static int osd_last[2][4];  /* x, y, w, h per layer; w 0: nothing on the LCD */
 static int osd_was_on;      /* a list went before the game sprite last frame */
 static int osd_active;      /* osd_before() enqueued a list this frame */
@@ -465,6 +466,77 @@ static u32 game_filter = GU_LINEAR;
 void osd_fade_start(void)
 {
   osd_fade_f = 0;
+}
+
+/* Side bars (#104): what fills the LCD beside the game picture. Black is
+ * what the clears leave, so it needs nothing. Pattern is the 4.0 ground's
+ * 8 px check; Game colours stretch samples of the picture's left and right
+ * edges (16 each, every 15 frames) over the bars. The bars are drawn only
+ * when they change, into both buffers, so they cost nothing per frame. */
+static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
+ int x, int y, int w, int h);
+
+#define BARS_N 16
+static u16 __attribute__((aligned(16))) bars_check[16 * 16];
+static u16 __attribute__((aligned(16))) bars_edges[BARS_N * 16];  /* 16 wide: left 0-7, right 8-15 */
+static int bars_dirty;  /* buffers still to paint */
+static int bars_tick;
+
+static void bars_sample(void)
+{
+  int side, j, k;
+  u16 *src = screen_address;
+
+  if((g_gpsp_config.side_bars != SIDE_BARS_GAME) || (video_draw_frame != FRAME_GAME))
+    return;
+  if(++bars_tick < 15)
+    return;
+  bars_tick = 0;
+  for(side = 0; side < 2; side++)
+    for(j = 0; j < BARS_N; j++)
+    {
+      u32 r = 0, g = 0, b = 0, c;
+      int y0 = j * 160 / BARS_N, y1 = (j + 1) * 160 / BARS_N, y, n = 0;
+      for(y = y0; y < y1; y++)
+        for(k = 0; k < 2; k++)
+        {
+          u16 p = src[y * screen_pitch + (side ? 238 + k : k)];
+          r += p & 31; g += (p >> 5) & 31; b += (p >> 10) & 31; n++;
+        }
+      c = (r / n) | ((g / n) << 5) | ((b / n) << 10);
+      if(bars_edges[j * 16 + side * 8] != c)
+      {
+        for(k = 0; k < 8; k++)
+          bars_edges[j * 16 + side * 8 + k] = c;
+        bars_dirty = 2;
+      }
+    }
+}
+
+/* Sprites over the parts of the LCD outside the game picture. */
+static float *bars_sprites(float *v, int *n, int mode)
+{
+  int gx, gy, gw, gh, gr, gb;
+
+  get_game_rect(&gx, &gy, &gw, &gh);
+  gr = gx + gw;
+  gb = gy + gh;
+  if(mode == SIDE_BARS_PATTERN)
+  {
+    /* the check's texels are the LCD's pixels */
+    if(gy > 0) { v = osd_sprite(v, 0, 0, 480, gy, 0, 0, 480, gy); (*n)++; }
+    if(gb < 272) { v = osd_sprite(v, 0, gb, 480, 272, 0, gb, 480, 272 - gb); (*n)++; }
+    if(gx > 0) { v = osd_sprite(v, 0, gy, gx, gb, 0, gy, gx, gh); (*n)++; }
+    if(gr < 480) { v = osd_sprite(v, gr, gy, 480, gb, gr, gy, 480 - gr, gh); (*n)++; }
+    return v;
+  }
+  /* edge colours: down the side bars; across the top and bottom ones from
+     the left edge's colour to the right edge's */
+  if(gy > 0) { v = osd_sprite(v, 4, 0.5f, 12, 0.5f, 0, 0, 480, gy); (*n)++; }
+  if(gb < 272) { v = osd_sprite(v, 4, BARS_N - 0.5f, 12, BARS_N - 0.5f, 0, gb, 480, 272 - gb); (*n)++; }
+  if(gx > 0) { v = osd_sprite(v, 4, 0.5f, 4, BARS_N - 0.5f, 0, gy, gx, gh); (*n)++; }
+  if(gr < 480) { v = osd_sprite(v, 12, 0.5f, 12, BARS_N - 0.5f, gr, gy, 480 - gr, gh); (*n)++; }
+  return v;
 }
 
 static float *osd_sprite(float *v, float u1, float v1, float u2, float v2,
@@ -527,8 +599,8 @@ static float *osd_erase(float *v, const int *r, int *n)
  * the game sprite runs with, and the fade. */
 static void osd_before(void)
 {
-  int now[2][4], on[2], first, i, n = 0, fade = 0;
-  float *v = osd_vertex, *pv;
+  int now[2][4], on[2], first, i, n = 0, bn, fade = 0;
+  float *v = osd_vertex, *pv, *bv;
   u32 *c = osd_cmd;
 
   osd_active = 0;
@@ -558,7 +630,8 @@ static void osd_before(void)
       osd_fade_f = -1;
   }
 
-  if(!on[0] && !on[1] && !osd_last[0][2] && !osd_last[1][2] && !fade)
+  if(!on[0] && !on[1] && !osd_last[0][2] && !osd_last[1][2] && !fade &&
+   (!bars_dirty || (g_gpsp_config.side_bars == SIDE_BARS_BLACK)))
   {
     osd_was_on = 0;
     return;
@@ -574,6 +647,16 @@ static void osd_before(void)
   for(i = 0; i < 2; i++)
     if(osd_last[i][2] && memcmp(osd_last[i], now[i], sizeof(now[i])))
       v = osd_erase(v, osd_last[i], &n);
+  /* the bars after the erase bands, which are black */
+  if(n && (g_gpsp_config.side_bars != SIDE_BARS_BLACK))
+    bars_dirty = 2;
+  bn = 0;
+  bv = v;
+  if(bars_dirty && (g_gpsp_config.side_bars != SIDE_BARS_BLACK))
+  {
+    v = bars_sprites(v, &bn, g_gpsp_config.side_bars);
+    bars_dirty--;
+  }
   pv = v;
   if(now[0][2])
     v = osd_sprite(v, 0, 0, now[0][2], now[0][3], now[0][0], now[0][1], now[0][2], now[0][3]);
@@ -592,6 +675,29 @@ static void osd_before(void)
     OSD_CMD(STST, GU_ALWAYS | (0 << 8) | (0xFF << 16));
     OSD_CMD(SOP, STENCIL_ZERO | (STENCIL_ZERO << 8) | (STENCIL_ZERO << 16));
     OSD_CMD(PRIM, (6 << 16) | (n * 2));
+  }
+  if(bn)
+  {
+    if(g_gpsp_config.side_bars == SIDE_BARS_PATTERN)
+    {
+      if(bars_check[0] == 0)
+        for(i = 0; i < 16 * 16; i++)  /* UI_COL_PLUM and UI_COL_PLUM_2 */
+          bars_check[i] = ((((i & 15) >> 3) ^ ((i >> 4) >> 3)) & 1) ?
+           ((11 << 10) | (4 << 5) | 6) : ((9 << 10) | (3 << 5) | 5);
+      OSD_TEXTURE(bars_check, 16, (4 << 8) | 4);
+      OSD_CMD(TWRAP, 0);  /* repeat; the game list clamps */
+    }
+    else
+    {
+      OSD_TEXTURE(bars_edges, 16, (4 << 8) | 4);
+      OSD_CMD(TFILTER, (GU_LINEAR << 8) | GU_LINEAR);
+    }
+    OSD_CMD(VADDR, (u32)bv & 0x00FFFFFF);
+    OSD_CMD(STST, GU_ALWAYS | (0 << 8) | (0xFF << 16));
+    OSD_CMD(SOP, STENCIL_ZERO | (STENCIL_ZERO << 8) | (STENCIL_ZERO << 16));
+    OSD_CMD(PRIM, (6 << 16) | (bn * 2));
+    OSD_CMD(TFILTER, (GU_NEAREST << 8) | GU_NEAREST);
+    OSD_CMD(TWRAP, (GU_CLAMP << 8) | GU_CLAMP);
   }
   if(now[0][2] || now[1][2])
   {
@@ -663,6 +769,9 @@ void flip_screen()
 {
   u32 *old_ge_cmd_ptr = ge_cmd_ptr;
 
+#ifdef UI4
+  bars_sample();  /* the frame just drawn, before the flip */
+#endif
   sceKernelDcacheWritebackAll();
 
   if(sharp_active)
@@ -878,6 +987,10 @@ static void set_resolution(u32 frame, u32 keep)
       flip_screen();
     }
   }
+#ifdef UI4
+  if(frame == FRAME_GAME)
+    bars_dirty = 2;  /* the menus drew over the bars: paint both buffers */
+#endif
 }
 
 void clear_screen(u16 color)
