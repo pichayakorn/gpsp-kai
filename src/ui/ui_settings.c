@@ -185,25 +185,26 @@ static int rows_bottom(int tab)
   return row_y(tab, row_count(tab));
 }
 
-/* Keep the selected row a row clear of the bottom edge when it can. */
+/* Scroll by whole rows, so the first row in view always sits at ROWS_Y and
+ * no row is ever cut at the top. Keep the row after the cursor in view when
+ * there is one, and the row before it when moving up. */
 static void scroll_to_cursor(void)
 {
-  int bottom = rows_bottom(s.tab), y = row_y(s.tab, s.cur), h = row_height(&rows[s.tab][s.cur]);
-  int top = s.top;
+  int n = row_count(s.tab), first = 0, top;
 
-  if(bottom <= VIEW_B)
-    top = 0;
-  else
+  if(rows_bottom(s.tab) > VIEW_B)
   {
-    if(y + h + UI_ROW_PITCH - top > VIEW_B)
-      top = y + h + UI_ROW_PITCH - VIEW_B;
-    if(y - top < VIEW_T + 2)
-      top = y - VIEW_T - 2;
-    if(top > bottom - VIEW_B)
-      top = bottom - VIEW_B;
-    if(top < 0)
-      top = 0;
+    int want = (s.cur + 1 < n) ? s.cur + 1 : s.cur;
+
+    while((first < n - 1) && (row_y(s.tab, first + 1) - ROWS_Y <= s.top))
+      first++;  /* the first row in view now */
+    if((s.cur <= first) && (first > 0))
+      first = (s.cur > 0) ? s.cur - 1 : 0;
+    while((first < s.cur) && (row_y(s.tab, want) + row_height(&rows[s.tab][want])
+                              - (row_y(s.tab, first) - ROWS_Y) > VIEW_B))
+      first++;
   }
+  top = row_y(s.tab, first) - ROWS_Y;
   if(top != s.top)
   {
     s.top = top;
@@ -305,7 +306,14 @@ static void draw_hints(void)
 {
   ui_hint_t hints[4];
 
-  hints[0].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[0].verb = "Change";
+  if(rows[s.tab][s.cur].kind == K_SWITCH)
+  {
+    hints[0].keys = ui_key_confirm;               hints[0].verb = "Switch";
+  }
+  else
+  {
+    hints[0].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[0].verb = "Change";
+  }
   hints[1].keys = PSP_CTRL_START;                 hints[1].verb = "Hold: reset tab";
   hints[2].keys = PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER; hints[2].verb = "Tabs";
   hints[3].keys = ui_key_back;                    hints[3].verb = "Back";
@@ -338,7 +346,7 @@ static void build_ground(void)
   if(bottom > VIEW_B)
   {
     int track = VIEW_B - VIEW_T - 4, th = track * (VIEW_B - VIEW_T) / (bottom - VIEW_T);
-    int ty = VIEW_T + 2 + (track - th) * s.top / (bottom - VIEW_B);
+    int ty = VIEW_T + 2 + (track - th) * ((s.top < bottom - VIEW_B) ? s.top : bottom - VIEW_B) / (bottom - VIEW_B);
     ui_round_fill(468, VIEW_T + 2, 4, track, 1, UI_COL_CARD);
     ui_round_fill(468, ty, 4, th, 1, UI_COL_MUTE);
   }
@@ -534,6 +542,8 @@ void ui_settings(void)
     {
       if(ui_repeat(PSP_CTRL_RIGHT)) change_value(1);
       if(ui_repeat(PSP_CTRL_LEFT)) change_value(-1);
+      if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
+        change_value(1);  /* a switch also flips on confirm, as in Cheats */
     }
 
     /* SELECT: Undo while the toast offers it */
