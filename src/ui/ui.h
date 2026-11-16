@@ -138,6 +138,7 @@ void ui_status_read(void);
 void ui_status_chip(void);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 void ui_game_battery(int level, int on_battery);  /* once a second in a game */
+void ui_game_fps(int fps);  /* once a second in a game; < 0 hides it */
 
 typedef struct
 {

@@ -412,8 +412,8 @@ static u32 sharp_setup(SPRITE *s)
  * Two layers: the toast (osd_pixels, OSD_W x OSD_H, moved by osd_tick, which
  * flip_screen() calls once a frame and which returns 0 when it is done) and
  * the low-battery chip (osd_chip_pixels, OSD_CHIP_W x OSD_CHIP_H, shown at
- * osd_chip_rect while its w is not 0). Both are 5551; alpha bit 0 is
- * see-through.
+ * osd_chip_rect while its w is not 0) and the Show FPS pill (osd_fps_pixels,
+ * at osd_fps_rect the same way). All are 5551; alpha bit 0 is see-through.
  *
  * The LCD shows the buffer the GE draws into, so a picture drawn after the
  * game sprite would be missing whenever the LCD scans those rows between
@@ -453,11 +453,14 @@ u16 __attribute__((aligned(16))) osd_pixels[OSD_W * OSD_H];
 int (*osd_tick)(int *x, int *y, int *w, int *h) = NULL;
 u16 __attribute__((aligned(16))) osd_chip_pixels[OSD_CHIP_W * OSD_CHIP_H];
 int osd_chip_rect[4];
+u16 __attribute__((aligned(16))) osd_fps_pixels[OSD_FPS_W * OSD_FPS_H];
+int osd_fps_rect[4];
+#define OSD_LAYERS 3
 static u16 __attribute__((aligned(16))) osd_black[8 * 8];
-static u32 __attribute__((aligned(16))) osd_cmd[128];
+static u32 __attribute__((aligned(16))) osd_cmd[160];
 static u32 __attribute__((aligned(16))) osd_end_cmd[8];
-static float __attribute__((aligned(16))) osd_vertex[16 * 10];
-static int osd_last[2][4];  /* x, y, w, h per layer; w 0: nothing on the LCD */
+static float __attribute__((aligned(16))) osd_vertex[24 * 10];
+static int osd_last[OSD_LAYERS][4];  /* x, y, w, h per layer; w 0: nothing on the LCD */
 static int osd_was_on;      /* a list went before the game sprite last frame */
 static int osd_active;      /* osd_before() enqueued a list this frame */
 static int osd_fade_f = -1; /* frame of the fade, -1: none */
@@ -627,7 +630,7 @@ static float *osd_erase(float *v, const int *r, int *n)
  * the game sprite runs with, and the fade. */
 static void osd_before(void)
 {
-  int now[2][4], on[2], first, i, n = 0, bn, fade = 0;
+  int now[OSD_LAYERS][4], on[OSD_LAYERS], first, i, n = 0, bn, fade = 0;
   float *v = osd_vertex, *pv, *bv;
   u32 *c = osd_cmd;
 
@@ -650,6 +653,9 @@ static void osd_before(void)
   on[1] = osd_chip_rect[2] != 0;
   if(on[1])
     memcpy(now[1], osd_chip_rect, sizeof(now[1]));
+  on[2] = osd_fps_rect[2] != 0;
+  if(on[2])
+    memcpy(now[2], osd_fps_rect, sizeof(now[2]));
   if(osd_fade_f >= 0)
   {
     if(osd_fade_f < OSD_FADE_FRAMES)
@@ -658,7 +664,7 @@ static void osd_before(void)
       osd_fade_f = -1;
   }
 
-  if(!on[0] && !on[1] && !osd_last[0][2] && !osd_last[1][2] && !fade &&
+  if(!on[0] && !on[1] && !on[2] && !osd_last[0][2] && !osd_last[1][2] && !osd_last[2][2] && !fade &&
    (!bars_dirty || (g_gpsp_config.side_bars == SIDE_BARS_BLACK)))
   {
     osd_was_on = 0;
@@ -666,13 +672,13 @@ static void osd_before(void)
   }
   first = !osd_was_on;
   if(first)  /* the first frame clears stale marks only */
-    now[0][2] = now[1][2] = 0;
+    now[0][2] = now[1][2] = now[2][2] = 0;
 
   if(osd_black[0] == 0)
     for(i = 0; i < 8 * 8; i++)
       osd_black[i] = 0x8000;
 
-  for(i = 0; i < 2; i++)
+  for(i = 0; i < OSD_LAYERS; i++)
     if(osd_last[i][2] && memcmp(osd_last[i], now[i], sizeof(now[i])))
       v = osd_erase(v, osd_last[i], &n);
   /* the bars after the erase bands, which are black */
@@ -690,6 +696,8 @@ static void osd_before(void)
     v = osd_sprite(v, 0, 0, now[0][2], now[0][3], now[0][0], now[0][1], now[0][2], now[0][3]);
   if(now[1][2])
     v = osd_sprite(v, 0, 0, now[1][2], now[1][3], now[1][0], now[1][1], now[1][2], now[1][3]);
+  if(now[2][2])
+    v = osd_sprite(v, 0, 0, now[2][2], now[2][3], now[2][0], now[2][1], now[2][2], now[2][3]);
 
   OSD_CMD(VTYPE, (1 << 23) | (3 << 7) | 3);
   OSD_CMD(BASE, ((u32)osd_vertex & 0xFF000000) >> 8);
@@ -727,7 +735,7 @@ static void osd_before(void)
     OSD_CMD(TFILTER, (GU_NEAREST << 8) | GU_NEAREST);
     OSD_CMD(TWRAP, (GU_CLAMP << 8) | GU_CLAMP);
   }
-  if(now[0][2] || now[1][2])
+  if(now[0][2] || now[1][2] || now[2][2])
   {
     /* the overlays' opaque pixels, marked */
     OSD_CMD(ATE, 1);
@@ -744,6 +752,13 @@ static void osd_before(void)
     if(now[1][2])
     {
       OSD_TEXTURE(osd_chip_pixels, OSD_CHIP_W, (4 << 8) | 6);
+      OSD_CMD(VADDR, (u32)pv & 0x00FFFFFF);
+      OSD_CMD(PRIM, (6 << 16) | 2);
+      pv += 10;
+    }
+    if(now[2][2])
+    {
+      OSD_TEXTURE(osd_fps_pixels, OSD_FPS_W, (4 << 8) | 5);
       OSD_CMD(VADDR, (u32)pv & 0x00FFFFFF);
       OSD_CMD(PRIM, (6 << 16) | 2);
     }

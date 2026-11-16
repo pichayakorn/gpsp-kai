@@ -453,6 +453,54 @@ void ui_game_battery(int level, int on_battery)
   osd_chip_rect[2] = w;  /* last: the chip shows from here */
 }
 
+/* Show FPS: the number alone in a shade pill in the PSP screen's top left,
+ * never on the game picture's corner (spec: Show FPS). Centred in the side
+ * bar when it is narrower than 60 px (Fit), else 6 px in from the corner.
+ * Cream, tangerine below 50. Called once a second; fps < 0 hides it. */
+void ui_game_fps(int fps)
+{
+  static int shown = -1, shown_x = -1;
+  u16 *saved = ui_fb;
+  u32 saved_pitch = ui_fb_pitch, i;
+  char num[8];
+  int w, x, gx, gy, gw, gh;
+
+  if(fps < 0)
+  {
+    osd_fps_rect[2] = 0;
+    shown = -1;
+    return;
+  }
+  if(fps > 999)
+    fps = 999;
+  snprintf(num, sizeof(num), "%d", fps);
+  w = ui_print_width(num, UI_FONT_SMALL, 0) + 10;
+  if(w > OSD_FPS_W)
+    w = OSD_FPS_W;
+  get_game_rect(&gx, &gy, &gw, &gh);
+  x = ((gx > 0) && (gx < 60)) ? (gx - w) / 2 : 6;
+  if((fps == shown) && (x == shown_x))
+    return;
+  shown = fps;
+  shown_x = x;
+
+  for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
+    osd_fps_pixels[i] = GAME_TOAST_KEY;
+  ui_fb = osd_fps_pixels;
+  ui_fb_pitch = OSD_FPS_W;
+  ui_round_fill(0, 0, w, 14, 2, UI_COL_SHADE);
+  ui_print(5, 1, num, (fps < 50) ? UI_COL_TANGERINE : UI_COL_CREAM, UI_FONT_SMALL, 0);
+  ui_fb = saved;
+  ui_fb_pitch = saved_pitch;
+  for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
+    osd_fps_pixels[i] = (osd_fps_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_fps_pixels[i] | 0x8000);
+
+  osd_fps_rect[0] = x;
+  osd_fps_rect[1] = 6;
+  osd_fps_rect[3] = 14;
+  osd_fps_rect[2] = w;  /* last: the pill shows from here */
+}
+
 static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
 
 /* The status chip, top right and as wide as its content: the clock (the
