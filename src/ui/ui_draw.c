@@ -193,6 +193,47 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
   }
 }
 
+/* A picture (sw x sh, pitch sw) shrunk into dst (w x h, w <= 160) by
+ * averaging the source pixels each one covers: smooth, unlike the nearest
+ * pixel. Up to 4 x 4 source pixels per pixel; no division per pixel. */
+void ui_shrink_box(const u16 *src, int sw, int sh, u16 *dst, int w, int h)
+{
+  static u16 x0[161];
+  static u32 recip[17];  /* 65536 / n: no divide per pixel */
+  int i, j;
+
+  if(!recip[1])
+    for(i = 1; i <= 16; i++)
+      recip[i] = (65536 + i - 1) / i;  /* rounded up: 3 x 31 stays 31 */
+
+  if((w <= 0) || (h <= 0) || (w > 160))
+    return;
+  for(i = 0; i <= w; i++)
+    x0[i] = i * sw / w;
+  for(j = 0; j < h; j++)
+  {
+    int ya = j * sh / h, yb = (j + 1) * sh / h;
+    if(yb > ya + 4) yb = ya + 4;
+    if(yb == ya) yb = ya + 1;
+    for(i = 0; i < w; i++)
+    {
+      int xa = x0[i], xb = x0[i + 1], x, y;
+      u32 r = 0, g = 0, b = 0, n, inv;
+      if(xb > xa + 4) xb = xa + 4;
+      if(xb == xa) xb = xa + 1;
+      for(y = ya; y < yb; y++)
+        for(x = xa; x < xb; x++)
+        {
+          u16 p = src[y * sw + x];
+          r += p & 31; g += (p >> 5) & 31; b += (p >> 10) & 31;
+        }
+      n = (xb - xa) * (yb - ya);
+      inv = recip[n];
+      dst[j * w + i] = COLOR16((r * inv) >> 16, (g * inv) >> 16, (b * inv) >> 16);
+    }
+  }
+}
+
 /* A picture (w x h, pitch in pixels) at x, y as it is. */
 void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h)
 {
