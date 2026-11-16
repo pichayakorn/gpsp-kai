@@ -512,6 +512,7 @@ static int chip_step(int i, u32 dir)
 }
 
 #define PAD_TIP "Confirm picks what this button does in this game."
+#define STICK_DIR_TIP "Confirm picks what this direction does in this game."
 
 /* ---- Controls: the action picker ------------------------------------------ */
 
@@ -833,7 +834,7 @@ static void build_ground(void)
   if(s.tab == PAD_TAB)
   {
     /* the Stick page's tip sits under its rows, up to three lines */
-    const char *tip = (s.dir >= 0) ? PAD_TIP : rows[s.tab][s.cur].tip;
+    const char *tip = (s.dir >= 0) ? STICK_DIR_TIP : rows[s.tab][s.cur].tip;
     char line[128];
     for(i = 0; tip && (i < 3) && ui_wrap_line(tip, i, 220, UI_FONT_SMALL, line, sizeof(line)); i++)
       ui_print(236, 150 + i * 14, line, UI_COL_MUTE, UI_FONT_SMALL, 0);
