@@ -412,7 +412,7 @@ static u32 sharp_setup(SPRITE *s)
  * Two layers: the toast (osd_pixels, OSD_W x OSD_H, moved by osd_tick, which
  * flip_screen() calls once a frame and which returns 0 when it is done) and
  * the low-battery chip (osd_chip_pixels, OSD_CHIP_W x OSD_CHIP_H, shown at
- * osd_chip_rect while its w is not 0) and the Show FPS pill (osd_fps_pixels,
+ * osd_chip_rect while its w is not 0) and the status chip (osd_fps_pixels,
  * at osd_fps_rect the same way). All are 5551; alpha bit 0 is see-through.
  *
  * The LCD shows the buffer the GE draws into, so a picture drawn after the
@@ -758,7 +758,7 @@ static void osd_before(void)
     }
     if(now[2][2])
     {
-      OSD_TEXTURE(osd_fps_pixels, OSD_FPS_W, (4 << 8) | 5);
+      OSD_TEXTURE(osd_fps_pixels, OSD_FPS_W, (5 << 8) | 5);
       OSD_CMD(VADDR, (u32)pv & 0x00FFFFFF);
       OSD_CMD(PRIM, (6 << 16) | 2);
     }

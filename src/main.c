@@ -882,14 +882,14 @@ void synchronize()
     frames_drawn_count = 0;
   }
 
+#ifdef UI4
+  // The status chip in the PSP screen's corner: FPS and fast forward. The
+  // count changes once a second; the chip redraws only on a change.
+  ui_game_status(g_gpsp_config.show_fps ? (int)fps : -1, !g_synchronize_flag);
+#else
   if(!g_synchronize_flag)
     PRINT_STRING_BG("--FF--", 0xFFFF, 0x000, 0, 10);
 
-#ifdef UI4
-  // A pill in the PSP screen's corner, redrawn at most once a second
-  if(frames == 0)
-    ui_game_fps(g_gpsp_config.show_fps ? (int)fps : -1);
-#else
   // Small counter in the bottom right corner, away from most games' HUD
   // at the top. Drawn into the game frame, so it scales with the picture.
   if(g_gpsp_config.show_fps)

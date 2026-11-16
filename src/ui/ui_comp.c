@@ -453,43 +453,72 @@ void ui_game_battery(int level, int on_battery)
   osd_chip_rect[2] = w;  /* last: the chip shows from here */
 }
 
-/* Show FPS: the number alone in a shade pill in the PSP screen's top left,
- * never on the game picture's corner (spec: Show FPS). Centred in the side
- * bar when it is narrower than 60 px (Fit), else 6 px in from the corner.
- * Cream, tangerine below 50. Called once a second; fps < 0 hides it. */
-void ui_game_fps(int fps)
+/* The in-game status chip (spec: Show FPS and fast forward), in the PSP
+ * screen's top left, never on the game picture's corner: centred in the
+ * side bar when it is narrower than 60 px (Fit), else 6 px in from the
+ * corner. 28 px wide. Show FPS: the number on shade, cream, pink below 50.
+ * Fast forward: a tangerine part with plum arrows, under the number (a
+ * square join) or alone. Called every frame; it redraws only on a change.
+ * fps < 0: Show FPS is off. */
+#define STATUS_W 28
+
+static void status_arrows(int y)
 {
-  static int shown = -1, shown_x = -1;
+  int a, i;
+
+  for(a = 0; a < 2; a++)  /* two heads 6 px apart, centred: 10 px */
+    for(i = 0; i < 4; i++)
+      ui_fill((STATUS_W - 10) / 2 + a * 6 + i, y + 4 + i, 1, 8 - 2 * i, UI_COL_PLUM);
+}
+
+void ui_game_status(int fps, int ff)
+{
+  static int shown = -2, shown_ff = -1, shown_x = -1;
   u16 *saved = ui_fb;
   u32 saved_pitch = ui_fb_pitch, i;
   char num[8];
-  int w, x, gx, gy, gw, gh;
+  int h, x, gx, gy, gw, gh;
 
-  if(fps < 0)
+  if((fps < 0) && !ff)
   {
     osd_fps_rect[2] = 0;
-    shown = -1;
+    shown = -2;
     return;
   }
   if(fps > 999)
     fps = 999;
-  snprintf(num, sizeof(num), "%d", fps);
-  w = ui_print_width(num, UI_FONT_SMALL, 0) + 10;
-  if(w > OSD_FPS_W)
-    w = OSD_FPS_W;
   get_game_rect(&gx, &gy, &gw, &gh);
-  x = ((gx > 0) && (gx < 60)) ? (gx - w) / 2 : 6;
-  if((fps == shown) && (x == shown_x))
+  x = ((gx > 0) && (gx < 60)) ? (gx - STATUS_W) / 2 : 6;
+  if((fps == shown) && (ff == shown_ff) && (x == shown_x))
     return;
   shown = fps;
+  shown_ff = ff;
   shown_x = x;
 
   for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
     osd_fps_pixels[i] = GAME_TOAST_KEY;
   ui_fb = osd_fps_pixels;
   ui_fb_pitch = OSD_FPS_W;
-  ui_round_fill(0, 0, w, 14, 2, UI_COL_SHADE);
-  ui_print(5, 1, num, (fps < 50) ? UI_COL_TANGERINE : UI_COL_CREAM, UI_FONT_SMALL, 0);
+  if(fps >= 0)
+  {
+    h = ff ? 30 : 16;
+    if(ff)
+    {
+      ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
+      ui_fill(0, 8, STATUS_W, 8, UI_COL_SHADE);  /* the square join */
+      status_arrows(16);
+    }
+    ui_round_fill(0, 0, STATUS_W, ff ? 12 : 16, 2, UI_COL_SHADE);
+    snprintf(num, sizeof(num), "%d", fps);
+    ui_print((STATUS_W - ui_print_width(num, UI_FONT_SMALL, 0)) / 2, 1, num,
+     (fps < 50) ? UI_COL_PINK : UI_COL_CREAM, UI_FONT_SMALL, 0);
+  }
+  else
+  {
+    h = 16;
+    ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
+    status_arrows(0);
+  }
   ui_fb = saved;
   ui_fb_pitch = saved_pitch;
   for(i = 0; i < OSD_FPS_W * OSD_FPS_H; i++)
@@ -497,8 +526,8 @@ void ui_game_fps(int fps)
 
   osd_fps_rect[0] = x;
   osd_fps_rect[1] = 6;
-  osd_fps_rect[3] = 14;
-  osd_fps_rect[2] = w;  /* last: the pill shows from here */
+  osd_fps_rect[3] = h;
+  osd_fps_rect[2] = STATUS_W;  /* last: the chip shows from here */
 }
 
 static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
