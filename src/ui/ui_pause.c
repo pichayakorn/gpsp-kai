@@ -1252,6 +1252,7 @@ static void restart_return(void)
     g_game_config.last_slot = LAST_SLOT;
   }
   end_bar();
+  ui_settings_game = p.game;
   if(ui_settings(tab, row))
     restart_kai();
   build_layer(0);  /* Settings used the layer */
@@ -1567,6 +1568,7 @@ u32 ui_pause(u16 *game_picture)
               /* Settings draws its own ground; the pause screen's comes
                  back after it */
               shot_wait();
+              ui_settings_game = p.game;
               if(ui_settings(0, 0))
                 restart_kai();  /* does not return */
               build_layer(1);
