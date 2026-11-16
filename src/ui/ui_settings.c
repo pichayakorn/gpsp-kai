@@ -310,6 +310,10 @@ static void draw_hints(void)
   {
     hints[0].keys = ui_key_confirm;               hints[0].verb = "Switch";
   }
+  else if(rows[s.tab][s.cur].kind == K_ACTION)
+  {
+    hints[0].keys = ui_key_confirm;               hints[0].verb = "Hold: reset all";
+  }
   else
   {
     hints[0].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[0].verb = "Change";
