@@ -84,10 +84,12 @@ static row_t rows[TABS][MAX_ROWS] =
       K_BLOCKS, 1, 11, { NULL }, &g_game_config.audio_buffer_size_number, NULL, 2 },
   },
   { /* Controls: the Stick page; the Buttons page is drawn on its own */
-    { "Use the stick", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
+    { "Use the stick", "The stick works like the d-pad, or does what you pick for each direction.",
+      K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
     { "Sensitivity", "The ring shows where a push starts to count.",
       K_BLOCKS, 0, 10, { NULL }, &g_gpsp_config.analog_sensitivity_level, NULL, 4, 0, 0, "%d" },
-    { "Tilt sensor", NULL, K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
+    { "Tilt sensor", "For games made for a tilt cartridge: tilt the PSP to play.",
+      K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
   { /* Play */
     { "Save when leaving a game", "Exit and Library save to Last first; Continue picks up there.",
@@ -183,6 +185,8 @@ static struct
   /* Controls */
   int page;                       /* 0 Buttons, 1 Stick */
   int btn;                        /* the selected chip on the Buttons page */
+  int dir;                        /* the selected stick chip, or -1 on the rows */
+  int pick_map;                   /* the map entry the picker edits */
   int pick, pick_f, pick_out;     /* the action picker: open, its motion */
   int pcur, pcur_from, pcur_f;    /* the picker's cursor */
   u32 undo_map[MAX_GAMEPAD_CONFIG_MAP];
@@ -507,6 +511,8 @@ static int chip_step(int i, u32 dir)
   return i;
 }
 
+#define PAD_TIP "Confirm picks what this button does in this game."
+
 /* ---- Controls: the action picker ------------------------------------------ */
 
 #define PICK_W 400
@@ -528,10 +534,11 @@ static int menu_reachable_without(int m, u32 id)
   return 0;
 }
 
-static void open_picker(void)
+static void open_picker(int map)
 {
-  u32 id = gamepad_config_map[chips[s.btn].map];
+  u32 id = gamepad_config_map[map];
 
+  s.pick_map = map;
   s.pick = 1;
   s.pick_f = 0;
   s.pick_out = 0;
@@ -554,7 +561,7 @@ static void picker_input(void)
   }
   if(ui_pressed(ui_key_confirm))
   {
-    int m = chips[s.btn].map;
+    int m = s.pick_map;
     if(!menu_reachable_without(m, s.pcur))
     {
       show_toast("One button has to open the menu", 0);
@@ -667,9 +674,18 @@ static void draw_page_switch(void)
   ui_glyph(x + 6, 40, PSP_CTRL_SELECT);
 }
 
+/* The direction chips, in map order 12-15: up, down, left, right. */
+static const u32 stick_keys[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
+
+/* They can be picked while the stick is in use (the old menu remapped them
+ * too). */
+static int stick_pickable(void)
+{
+  return g_gpsp_config.enable_analog != NO;
+}
+
 static void draw_stick(void)
 {
-  static const u32 keys[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
   static const s8 dirs[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
   int sens = g_gpsp_config.analog_sensitivity_level + 1;
   int dz = STICK_R * (75 - sens * 6) / 100, i;
@@ -682,16 +698,33 @@ static void draw_stick(void)
   ui_ring(STICK_CX, STICK_CY, dz, 2, UI_COL_LIME);
   ui_disc(STICK_CX, STICK_CY, 12, UI_COL_CREAM);
   ui_disc(STICK_CX, STICK_CY, 8, UI_COL_MUTE);
-  /* what each push does: map entries 12-15 */
+  /* what each push does: map entries 12-15; the selected chip is lime and
+     lifted, like on the Buttons page */
   for(i = 0; i < 4; i++)
   {
     const char *name = action_name(gamepad_config_map[12 + i]);
-    int w = ui_print_width(name, UI_FONT_SMALL, 0) + ui_glyph_width(keys[i]) + 14, px, py, gx;
+    int w = ui_print_width(name, UI_FONT_SMALL, 0) + ui_glyph_width(stick_keys[i]) + 14, px, py, gx;
+    int sel = (i == s.dir);
     px = STICK_CX + dirs[i][0] * (STICK_R + 10) - ((dirs[i][0] == 0) ? w / 2 : ((dirs[i][0] < 0) ? w : 0));
     py = STICK_CY + dirs[i][1] * (STICK_R + 10) - ((dirs[i][1] == 0) ? 9 : ((dirs[i][1] < 0) ? 18 : 0));
-    ui_round_fill(px, py, w, 18, 2, UI_COL_PLUM_2);
-    gx = ui_glyph(px + 4, py + 3, keys[i]) + 4;
-    ui_print(gx, py + 2, name, UI_COL_CREAM, UI_FONT_SMALL, 0);
+    /* a long name slides the side chips over the disc's edge rather than
+       off the screen or into the rows */
+    if(w > 100)
+      w = 100;
+    if(px < 4)
+      px = 4;
+    if(px + w > 230)
+      px = 230 - w;
+    if(sel)
+    {
+      ui_round_fill(px + 1, py + 1, w, 18, 2, UI_COL_SHADE);
+      px -= UI_LIFT;
+      py -= UI_LIFT;
+    }
+    ui_round_fill(px, py, w, 18, 2, sel ? UI_COL_LIME : UI_COL_PLUM_2);
+    gx = ui_glyph(px + 4, py + 3, stick_keys[i]) + 4;
+    ui_print_fit(gx, py + 2, name, sel ? UI_COL_PLUM : (stick_pickable() ? UI_COL_CREAM : UI_COL_MUTE),
+     UI_FONT_SMALL, 0, px + w - 4 - gx);
   }
 }
 
@@ -726,7 +759,7 @@ static void draw_hints(void)
   if(s.tab == PAD_TAB)
   {
     hints[n].keys = PSP_CTRL_SELECT; hints[n++].verb = s.page ? "Buttons" : "Stick";
-    if(s.page == 0)
+    if((s.page == 0) || (s.dir >= 0))
     {
       hints[n].keys = ui_key_confirm; hints[n++].verb = "Pick";
       ui_hint_packed(hints, n, 14);
@@ -786,7 +819,7 @@ static void build_ground(void)
   for(i = 0; i < n; i++)
   {
     int y = row_y(s.tab, i) - s.top, h = row_height(&rows[s.tab][i]);
-    if((i == s.cur) || (y < VIEW_T) || (y + h > VIEW_B))
+    if(((i == s.cur) && (s.dir < 0)) || (y < VIEW_T) || (y + h > VIEW_B))
       continue;
     draw_row(s.tab, i, y, 0, UI_F_VALUE);
   }
@@ -797,11 +830,12 @@ static void build_ground(void)
     ui_round_fill(468, VIEW_T + 2, 4, track, 1, UI_COL_CARD);
     ui_round_fill(468, ty, 4, th, 1, UI_COL_MUTE);
   }
-  if((s.tab == PAD_TAB) && rows[s.tab][s.cur].tip)
+  if(s.tab == PAD_TAB)
   {
     /* the Stick page's tip sits under its rows, up to three lines */
+    const char *tip = (s.dir >= 0) ? PAD_TIP : rows[s.tab][s.cur].tip;
     char line[128];
-    for(i = 0; (i < 3) && ui_wrap_line(rows[s.tab][s.cur].tip, i, 220, UI_FONT_SMALL, line, sizeof(line)); i++)
+    for(i = 0; tip && (i < 3) && ui_wrap_line(tip, i, 220, UI_FONT_SMALL, line, sizeof(line)); i++)
       ui_print(236, 150 + i * 14, line, UI_COL_MUTE, UI_FONT_SMALL, 0);
   }
   draw_hints();
@@ -964,6 +998,7 @@ int ui_settings(int tab, int row)
   s.tab_f = UI_F_TAB;
   s.value_f = UI_F_VALUE;
   s.toast_f = -1;
+  s.dir = -1;
   /* the language row's default is the PSP's own language */
   {
     int lang = 1;
@@ -1002,6 +1037,7 @@ int ui_settings(int tab, int row)
       s.tab = (s.tab + (ui_pressed(PSP_CTRL_RTRIGGER) ? 1 : TABS - 1)) % TABS;
       s.tab_f = 0;
       s.reset_hold.p = 0;
+      s.dir = -1;
       first_row();
       s.dirty = 1;
       moved = 1;
@@ -1025,12 +1061,41 @@ int ui_settings(int tab, int row)
           break;
         }
       if(ui_pressed(ui_key_confirm))
-        open_picker();
+        open_picker(chips[s.btn].map);
     }
-    /* rows */
+    else if((s.tab == PAD_TAB) && (s.dir >= 0))
+    {
+      /* the stick's direction chips: each arrow takes its own chip; → on
+         the right one goes back to the rows beside it */
+      int d;
+      for(d = 0; d < 4; d++)
+        if(!moved && ui_repeat(stick_keys[d]))
+        {
+          if((d == 3) && (s.dir == 3))
+            s.dir = -1;
+          else
+            s.dir = d;
+          s.dirty = 1;
+          s.rest = 0;
+          break;
+        }
+      if((s.dir >= 0) && ui_pressed(ui_key_confirm))
+        open_picker(12 + s.dir);
+    }
+    /* rows; ↓ from the last row on the Stick page goes to the stick's chips */
     else if(!moved && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
-      move_cursor(next_row(ui_repeat(PSP_CTRL_DOWN) ? 1 : -1));
-    if(!((s.tab == PAD_TAB) && (s.page == 0)) && row_selectable(&rows[s.tab][s.cur]))
+    {
+      int dn = ui_repeat(PSP_CTRL_DOWN) != 0, to = next_row(dn ? 1 : -1);
+      if((s.tab == PAD_TAB) && dn && (to <= s.cur) && stick_pickable())
+      {
+        s.dir = 3;  /* the right chip sits nearest the rows */
+        s.dirty = 1;
+        s.rest = 0;
+      }
+      else
+        move_cursor(to);
+    }
+    if(!((s.tab == PAD_TAB) && ((s.page == 0) || (s.dir >= 0))) && row_selectable(&rows[s.tab][s.cur]))
     {
       int pending = lang_pending();
       if(ui_repeat(PSP_CTRL_RIGHT)) change_value(1);
@@ -1054,6 +1119,7 @@ int ui_settings(int tab, int row)
       else if(s.tab == PAD_TAB)
       {
         s.page ^= 1;
+        s.dir = -1;
         first_row();
         s.dirty = 1;
       }
@@ -1071,6 +1137,12 @@ int ui_settings(int tab, int row)
       show_toast(text, 1);
       s.reset_hold.p = 0;
       s.reset_hold.shown = 0;
+      s.dirty = 1;
+    }
+
+    if((s.dir >= 0) && !stick_pickable())
+    {
+      s.dir = -1;  /* a reset turned the stick off */
       s.dirty = 1;
     }
 
@@ -1144,7 +1216,7 @@ int ui_settings(int tab, int row)
     {
       int y = row_y(s.tab, s.cur) - s.top, h = row_height(&rows[s.tab][s.cur]);
       int cy = ui_ease_out_back(s.cursor_from, y, s.cursor_f, UI_F_CURSOR);
-      if(row_selectable(&rows[s.tab][s.cur]))
+      if(row_selectable(&rows[s.tab][s.cur]) && (s.dir < 0))
       {
         draw_row(s.tab, s.cur, y, 1, s.value_f);
         ui_cursor_frame(row_x(s.tab) - UI_LIFT, cy - UI_LIFT, row_w(s.tab), h);
@@ -1156,7 +1228,7 @@ int ui_settings(int tab, int row)
     else if(s.tab == PAD_TAB)
     {
       if(s.page == 0)
-        ui_print_fit(UI_MARGIN, 231, "Confirm picks what this button does in the game.",
+        ui_print_fit(UI_MARGIN, 231, PAD_TIP,
          UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
     }
     else
