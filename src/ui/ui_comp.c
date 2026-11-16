@@ -161,6 +161,27 @@ void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int
 
 /* Segments: the chosen one filled; on a change the fill springs from the
  * old segment to the new one. */
+/* A segment label of UI_SEG_CROSS or UI_SEG_CIRCLE is drawn as the
+ * button's disc, 9 px, its mark cut in the colour under it. */
+static int seg_disc(const char *label)
+{
+  return (label[0] == '\x01') ? label[1] : 0;
+}
+
+static void seg_disc_draw(int x, int y, int which, u16 col, u16 under)
+{
+  static const u8 cross[5] = { 0x11, 0x0A, 0x04, 0x0A, 0x11 };
+  static const u8 circle[5] = { 0x0E, 0x11, 0x11, 0x11, 0x0E };
+  const u8 *mark = (which == 'x') ? cross : circle;
+  int i, j;
+
+  ui_disc(x + 4, y + 4, 4, col);
+  for(j = 0; j < 5; j++)
+    for(i = 0; i < 5; i++)
+      if(mark[j] & (0x10 >> i))
+        ui_fill(x + 2 + i, y + 2 + j, 1, 1, under);
+}
+
 void ui_row_segments(int xr, int y, const char **labels, int count, int k,
  int from, int f, int selected, u16 group)
 {
@@ -176,7 +197,7 @@ void ui_row_segments(int xr, int y, const char **labels, int count, int k,
     k = 0;
   for(j = 0; j < count; j++)
   {
-    widths[j] = small_width(labels[j]) + 12;
+    widths[j] = (seg_disc(labels[j]) ? 9 : small_width(labels[j])) + 12;
     sx -= widths[j];
   }
   for(j = 0; j < count; j++)
@@ -201,7 +222,11 @@ void ui_row_segments(int xr, int y, const char **labels, int count, int k,
       col = selected ? group : UI_COL_PLUM;
     else
       col = selected ? UI_COL_PLUM : UI_COL_MUTE;
-    small_text(starts[j] + 6, y + 3 + ((ui_font_loaded()) ? 0 : 3), labels[j], col);
+    if(seg_disc(labels[j]))
+      seg_disc_draw(starts[j] + 6, y + 6, seg_disc(labels[j]), col,
+       (j == k) ? fill : (selected ? group : UI_COL_CARD));
+    else
+      small_text(starts[j] + 6, y + 3 + ((ui_font_loaded()) ? 0 : 3), labels[j], col);
   }
 }
 
