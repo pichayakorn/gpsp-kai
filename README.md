@@ -165,6 +165,15 @@ tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
   - **Markus Kuhn** and the X11 misc-fixed contributors: most glyphs of `gpsp10.fbm`
 - **ITOU Hiroki**: bdf2bmp/bmp2bdf font tools (`tools/fonts/bdf_tool`)
 
+Code ported from other GPL projects (each port is also credited in its
+commit message):
+
+- **Normmatt and the VBA/VBA-M team**: the open-source GBA BIOS replacement
+  built into kai (`bios/`, GPL-2.0-or-later)
+- **libretro gpSP** (GPL-2.0-or-later): the built-in BIOS and its fallback,
+  and CPU and interrupt fixes
+- **GBAdhoc** (GPL-2.0): the sharp bilinear screen filter and dynarec fixes
+
 ## License
 
 Source files that carry a GPL header are licensed under the **GNU General
