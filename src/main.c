@@ -202,11 +202,27 @@ int exit_callback(int arg1, int arg2, void *common)
   return 0;
 }
 
+#ifdef UI4
+extern u32 video_draw_frame;
+#endif
+
 SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *common)
 {
   if (powerInfo & PSP_POWER_CB_POWER_SWITCH)
   {
     power_flag = 1;
+#ifdef UI4
+    // With "Save when leaving a game" on, Last is written before the PSP
+    // sleeps (spec: Sleep): hold the suspend off until the pause screen
+    // has written it. Only while a game runs, where the pause screen opens
+    // next frame and lets go.
+    if(g_gpsp_config.save_on_leave && gamepak_filename[0] &&
+     (video_draw_frame == FRAME_GAME) && !ui_power_locked)
+    {
+      if(scePowerLock(0) >= 0)
+        ui_power_locked = 1;
+    }
+#endif
 
 #ifdef USE_EXT_MEM
     // PSP-2000+: save part of the extra memory into main memory
@@ -220,6 +236,9 @@ SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *commo
   else if (powerInfo & PSP_POWER_CB_RESUME_COMPLETE)
   {
     power_flag = 0;
+#ifdef UI4
+    ui_woke = 1;  // the pause screen says why the game is paused
+#endif
 
 #ifdef USE_EXT_MEM
     // PSP-2000+: restore it from main memory into the extra memory
@@ -555,7 +574,11 @@ u32 into_suspend()
 {
   FILE_CLOSE(gamepak_file_large);
   u16 *screen_copy = copy_screen();
+#ifdef UI4
+  u32 ret_val = ui_pause(screen_copy);
+#else
   u32 ret_val = menu(screen_copy);
+#endif
   free(screen_copy);
   FILE_OPEN(gamepak_file_large, gamepak_filename_full_path, READ);
   return ret_val;

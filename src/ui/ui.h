@@ -143,6 +143,7 @@ int ui_toast_up(int f);
  * value a frame, over each second. */
 void ui_status_read(void);
 void ui_status_chip(void);
+void ui_status_chip_at(int y);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 void ui_game_battery(int level, int on_battery);  /* once a second in a game */
 /* Every frame in a game. fps < 0: Show FPS off. ff: 0 off, 1 Max, 2 or 3
@@ -192,5 +193,9 @@ extern ui_restart_note_t ui_restart_note;
 void ui_restart_note_read(void);
 void ui_restart_now(int tab, int row, const char *game);
 void ui_restart_exec(void);  /* from quit(3) */
+
+/* Sleep: set by the power callback, handled by the pause screen. */
+extern volatile int ui_power_locked;
+extern volatile int ui_woke;
 
 #endif
