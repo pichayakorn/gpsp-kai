@@ -421,7 +421,7 @@ void ui_game_battery(int level, int on_battery)
   u16 *saved = ui_fb;
   u32 saved_pitch = ui_fb_pitch, i;
   char pct[8];
-  int w;
+  int w, gx, gy, gw, gh, bar;
 
   if(!on_battery || (level < 0) || (level > 10))
   {
@@ -429,28 +429,37 @@ void ui_game_battery(int level, int on_battery)
     shown = -1;
     return;
   }
-  if(level == shown)
-    return;
-  shown = level;
-
   sprintf(pct, "%d%%", level);
-  w = ui_text_width(pct) + 26;
+  w = ui_text_width(pct) + 18;  /* 3 px clear after the % */
   if(w > OSD_CHIP_W)
     w = OSD_CHIP_W;
-  for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
-    osd_chip_pixels[i] = GAME_TOAST_KEY;
-  ui_fb = osd_chip_pixels;
-  ui_fb_pitch = OSD_CHIP_W;
-  ui_round_fill(0, 0, w, 16, 2, UI_COL_PINK);
-  ui_fill(6, 5, 9, 6, UI_COL_PLUM);
-  ui_text(20, 1, pct, UI_COL_PLUM);
-  ui_fb = saved;
-  ui_fb_pitch = saved_pitch;
-  for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
-    osd_chip_pixels[i] = (osd_chip_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_chip_pixels[i] | 0x8000);
+  if(level != shown)
+  {
+    shown = level;
+    for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
+      osd_chip_pixels[i] = GAME_TOAST_KEY;
+    ui_fb = osd_chip_pixels;
+    ui_fb_pitch = OSD_CHIP_W;
+    ui_round_fill(0, 0, w, 16, 2, UI_COL_PINK);
+    /* an 8 x 6 battery outline with its nub, then the % */
+    ui_fill(4, 5, 8, 1, UI_COL_PLUM);
+    ui_fill(4, 10, 8, 1, UI_COL_PLUM);
+    ui_fill(4, 5, 1, 6, UI_COL_PLUM);
+    ui_fill(11, 5, 1, 6, UI_COL_PLUM);
+    ui_fill(12, 7, 1, 2, UI_COL_PLUM);
+    ui_text(15, 1, pct, UI_COL_PLUM);
+    ui_fb = saved;
+    ui_fb_pitch = saved_pitch;
+    for(i = 0; i < OSD_CHIP_W * OSD_CHIP_H; i++)
+      osd_chip_pixels[i] = (osd_chip_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_chip_pixels[i] | 0x8000);
+  }
 
-  osd_chip_rect[0] = 466 - w;
-  osd_chip_rect[1] = UI_SCREEN_H - 6 - 16;
+  /* centred in the right side bar when it is wide enough (Fit), so it never
+     covers the game; else 6 px from the PSP screen's bottom-right corner */
+  get_game_rect(&gx, &gy, &gw, &gh);
+  bar = UI_SCREEN_W - (gx + gw);
+  osd_chip_rect[0] = (bar >= w) ? gx + gw + (bar - w) / 2 : 474 - w;
+  osd_chip_rect[1] = 250;
   osd_chip_rect[3] = 16;
   osd_chip_rect[2] = w;  /* last: the chip shows from here */
 }
@@ -474,7 +483,8 @@ static void status_foot(int y, int h, int ff)
   {
     const char *t = (ff == 2) ? "2\xC3\x97" : "3\xC3\x97";
     /* the 14 px text line, centred in the part */
-    ui_print((STATUS_W - ui_print_width(t, UI_FONT_SMALL, 0)) / 2, y + (h - 14) / 2, t, UI_COL_PLUM,
+    /* centred on the ink: the advance of "×" ends in a blank column */
+    ui_print((STATUS_W - ui_print_width(t, UI_FONT_SMALL, 0)) / 2 + 1, y + (h - 14) / 2, t, UI_COL_PLUM,
      UI_FONT_SMALL, 0);
     return;
   }
