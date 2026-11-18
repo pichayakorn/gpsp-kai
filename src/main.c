@@ -524,6 +524,22 @@ int main(int argc, char *argv[])
     s32 loaded = -1;
 
     // On a failed load, the error has been shown; pick another file
+#ifdef UI4
+    {
+      char dir[MAX_PATH];
+
+      while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename)))
+      {
+        chdir(dir);
+        snprintf(rom_path, sizeof(rom_path), "%s", dir);
+        loaded = load_gamepak(load_filename);
+        if(loaded != -1)
+          break;
+      }
+    }
+    // without pool memory for the library, the old file list
+    if(loaded == -1)
+#endif
     while(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
     {
       loaded = load_gamepak(load_filename);

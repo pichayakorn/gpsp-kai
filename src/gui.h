@@ -68,6 +68,7 @@ typedef struct
   u32 side_bars;           // SIDE_BARS_*: what fills the space beside the picture
   u32 confirm_button;      // CONFIRM_*: which key confirms in the 4.0 menus
   u32 ff_speed;            // FF_SPEED_*: how fast fast forward runs
+  u32 library_view;        // Library: bit 0 list view, bits 1-2 the sort (name, recent, size)
 #if 0
   u32 solar_level;
 #endif

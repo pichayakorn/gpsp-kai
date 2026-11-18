@@ -81,6 +81,8 @@ void ui_layer_init(void);  /* once, after ui_pool_init() */
 int ui_layer_begin(void);
 void ui_layer_end(void);
 void ui_layer_reset(void);
+int ui_target_begin(u16 *buf, int pitch, int w, int h);
+void ui_target_end(void);
 int ui_layer_ready(void);
 void ui_rect(int x, int y, int w, int h, int thickness, u16 color);
 void ui_card(int x, int y, int w, int h, u16 color, int lifted);
@@ -173,6 +175,14 @@ void ui_components(void);
 /* The pause screen (the menu button in a game); returns 1 when the game's
  * state changed (a load or a restart), like menu(). */
 u32 ui_pause(u16 *game_picture);
+
+/* The Library (ui_library.c). ui_library() lets the player pick a game and
+ * returns 1 with its folder and file name, 0 without pool memory for it.
+ * ui_library_switch() is the pause screen's Library: it leaves the game
+ * running (the caller has saved Last), loads the one picked and returns 1,
+ * or 0 when the library could not open. */
+int ui_library(char *dir, int dir_size, char *name, int name_size);
+u32 ui_library_switch(void);
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
  * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on

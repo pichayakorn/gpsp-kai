@@ -142,6 +142,39 @@ void ui_layer_init(void)
   alloc_ground_layer();
 }
 
+/* Draw into any 16-bit picture (w x h) with the ui_* calls, e.g. a cover
+ * kept in a cache with its title; ui_target_end() goes back. Not nested,
+ * and not inside ui_layer_begin(). */
+static u16 *target_fb;
+static u32 target_fb_pitch;
+static int target_clip[4];
+
+int ui_target_begin(u16 *buf, int pitch, int w, int h)
+{
+  target_fb = fb;
+  target_fb_pitch = fb_pitch;
+  target_clip[0] = ui_clip_x0;
+  target_clip[1] = ui_clip_y0;
+  target_clip[2] = ui_clip_x1;
+  target_clip[3] = ui_clip_y1;
+  fb = buf;
+  fb_pitch = pitch;
+  ui_clip_x0 = ui_clip_y0 = 0;
+  ui_clip_x1 = w;
+  ui_clip_y1 = h;
+  return 1;
+}
+
+void ui_target_end(void)
+{
+  fb = target_fb;
+  fb_pitch = target_fb_pitch;
+  ui_clip_x0 = target_clip[0];
+  ui_clip_y0 = target_clip[1];
+  ui_clip_x1 = target_clip[2];
+  ui_clip_y1 = target_clip[3];
+}
+
 /* Draw the static parts of a screen into the ground layer once: between
  * ui_layer_begin() and ui_layer_end() every ui_* drawing goes to the layer.
  * ui_layer_begin() starts from the plain ground and returns 0 without
