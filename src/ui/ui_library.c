@@ -1370,6 +1370,9 @@ static void draw_loading(int t, int fill_256)
   int x = (UI_SCREEN_W - 332) / 2, y = 98, w = 332, h = 54, ex, i;
   int k = (30 * fill_256 + 128) / 256 - 1;
 
+  /* nothing can be pressed while a game loads: the hint strip is empty */
+  ui_fill(0, UI_STRIP_Y, UI_SCREEN_W, UI_STRIP_H, UI_COL_SHADE);
+
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CARD);
   ui_fill(x, y + 4, 4, h - 8, UI_COL_TANGERINE);
