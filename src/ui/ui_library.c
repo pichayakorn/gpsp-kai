@@ -2925,7 +2925,9 @@ u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
   reset_gba();
   state_no_question = 1;
   progress_hook = no_progress;
-  load_state(file, slot);
+  /* from the file, even for Last: slot 10 would load the new game's own
+     Last from memory instead (the number only names the slot) */
+  load_state(file, (slot == MEM_STATE_NUM) ? 0 : slot);
   progress_hook = NULL;
   state_no_question = 0;
   reg[CHANGED_PC_STATUS] = 1;
