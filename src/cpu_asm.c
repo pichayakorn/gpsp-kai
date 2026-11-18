@@ -2706,7 +2706,10 @@ u32 bios_block_tag_top = 0x0101;
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    pc = (pc + 2) & ~0x03;                                                    \
+    /* the bus ignores address bit 1: a BX into ARM state with it set         \
+       runs the word below (a Thumb "bx pc" at a halfword address,            \
+       e.g. Golden Sun 2's interrupt code), not the one above */              \
+    pc &= ~0x03;                                                              \
     reg[REG_CPSR] &= ~0x20;                                                   \
   }                                                                           \
 
