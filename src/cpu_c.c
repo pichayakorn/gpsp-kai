@@ -2098,7 +2098,7 @@ u32 spsr[6];
           }                                                                   \
           else                                                                \
           {                                                                   \
-            arm_pc_offset_update_direct(src);                                 \
+            arm_pc_offset_update_direct(src & ~0x03);                         \
           }                                                                   \
         }                                                                     \
         else                                                                  \
@@ -3419,8 +3419,8 @@ u32 spsr[6];
         }                                                                     \
         else                                                                  \
         {                                                                     \
-          /* Switch to ARM mode */                                            \
-          thumb_pc_offset_update_direct(src);                                 \
+          /* Switch to ARM mode: the word below if bit 1 is set */           \
+          thumb_pc_offset_update_direct(src & ~0x03);                         \
           reg[REG_CPSR] &= ~0x20;                                             \
           collapse_flags();                                                   \
           goto arm_loop;                                                      \
