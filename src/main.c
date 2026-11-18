@@ -443,9 +443,13 @@ int main(int argc, char *argv[])
     // Built-in BIOS (#73). Ported from libretro gpSP (GPL-2.0-or-later),
     // which falls back the same way.
     load_builtin_bios();
+#ifdef UI4
+    ui_no_bios = 1;  /* the library says so on a banner */
+#else
     PRINT_STRING_BG(msg[MSG_BIOS_BUILTIN], 0xFFFF, 0x0000, 0, 0);
     flip_screen();
     sceKernelDelayThread(3000000);
+#endif
   }
   update_progress();
   if(bios_ret == -2) // MD5 mismatch

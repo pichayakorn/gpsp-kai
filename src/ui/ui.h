@@ -188,6 +188,7 @@ u32 ui_pause(u16 *game_picture);
 int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot);
 void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start */
 u32 ui_library_switch(void);
+extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
  * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on

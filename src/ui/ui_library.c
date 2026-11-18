@@ -16,6 +16,7 @@
 
 #define MAX_GAMES   1024
 #define MAX_DIRS    128
+#define MAX_FOLD_ROWS (MAX_DIRS + MAX_GAMES + 1)
 #define ARENA_SIZE  (64 * 1024)
 #define SCAN_DEPTH  4
 
@@ -49,7 +50,7 @@
 #define POP_H  (LIBRARY_GRID ? 98 : 64)
 
 enum { VIEW_GRID, VIEW_LIST };
-enum { TAB_RECENT, TAB_ALL, TAB_FAV };
+enum { TAB_RECENT, TAB_ALL, TAB_FAV, TAB_FOLDERS };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
 typedef struct
@@ -100,7 +101,12 @@ static struct
   u64 cont_time;              /* that slot's save time */
   int chosen_game, chosen_slot;
 
-  int sorts[2], tab_cur[4];   /* All and Favourites: the sort; every tab: its cursor */
+  int sorts[3], tab_cur[4];   /* All, Favourites, Folders: the sort; every tab: its cursor */
+  int dir_parent[MAX_DIRS], dir_games[MAX_DIRS];  /* a folder's parent; its games, all levels */
+  int fold_dir, fold_count, fold_open;           /* Folders: the folder shown, its rows */
+  int fold_kind[MAX_FOLD_ROWS], fold_item[MAX_FOLD_ROWS];
+  int fold_cur, fold_from, fold_f;               /* the cursor and its flight */
+  int fold_top, fold_top_from, fold_top_f;       /* the first row in view, its slide */
   int card, card_f, card_out, card_game;  /* the game card, its motion, its game */
   u32 card_mark;              /* pool mark: the card's memory goes when it closes */
   u16 *thumbs, *card_cover;   /* the tiles' 60 x 40 pictures; the 96 px cover */
@@ -141,6 +147,7 @@ static char *arena_str(const char *s, int n)
 
 static const char *display_name(const char *name, int n);
 static const u16 icon_heart[11];
+static const u16 icon_folder[11];
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
 static void read_favourites(void);
 static void cover_heart(int x, int y, int game);
@@ -153,7 +160,7 @@ static int is_game_file(const char *name)
   return dot && (!strcasecmp(dot, ".gba") || !strcasecmp(dot, ".zip"));
 }
 
-static void scan_dir(const char *path, int depth)
+static void scan_dir(const char *path, int depth, int parent)
 {
   SceUID d;
   SceIoDirent e;
@@ -167,6 +174,7 @@ static void scan_dir(const char *path, int depth)
     return;
   dir = L.dir_count++;
   L.dirs[dir] = dir_path;
+  L.dir_parent[dir] = parent;
 
   d = sceIoDopen(path);
   if(d < 0)
@@ -183,7 +191,7 @@ static void scan_dir(const char *path, int depth)
         char sub[MAX_PATH];
         path_printf(sub, sizeof(sub), "%s/%s", dir_path, e.d_name);
         sceIoDclose(d);
-        scan_dir(sub, depth + 1);
+        scan_dir(sub, depth + 1, dir);
         /* reopen and skip back to where this folder was */
         {
           char seen[256];
@@ -340,7 +348,18 @@ static int load_games(void)
   if(!L.games || !L.order || !L.dirs || !L.arena || !L.ys)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
-  scan_dir(g_default_rom_dir, 0);
+  scan_dir(g_default_rom_dir, 0, -1);
+  /* every folder's games, its subfolders' included */
+  memset(L.dir_games, 0, sizeof(L.dir_games));
+  for(i = 0; i < L.count; i++)
+  {
+    int d = L.games[i].dir;
+    while(d >= 0)
+    {
+      L.dir_games[d]++;
+      d = L.dir_parent[d];
+    }
+  }
   read_recent();
   read_favourites();
   for(i = 0; i < L.count; i++)
@@ -1540,6 +1559,265 @@ static void card_step(void)
   if(L.fav_flash < UI_F_FLASH) L.fav_flash++;
 }
 
+/* ---- Folders (spec section 4, Folders; r5 folders, folder_empty) ---------------------------
+ * The ROM folder as it is on the Memory Stick: a breadcrumb path, then
+ * ".." (below the top), the subfolders with their game counts, then the
+ * games. × opens a folder or plays a game, ○ goes up a folder. */
+
+#define FOLD_Y      60
+#define FOLD_PITCH  22
+#define FOLD_ROWS   8     /* rows in view, y 60-236 */
+enum { ROW_UP, ROW_DIR, ROW_GAME };
+
+static const u16 icon_up[11] =
+ { 0x000, 0x020, 0x070, 0x0A8, 0x124, 0x020, 0x020, 0x020, 0x020, 0x000, 0x000 };
+
+/* the rows of the folder shown: ".." below the top, its folders, its
+   games (in the Folders tab's sort) */
+static void fold_fill(void)
+{
+  int i, n = 0;
+
+  if(L.fold_dir != 0)
+  {
+    L.fold_kind[n] = ROW_UP;
+    L.fold_item[n++] = L.dir_parent[L.fold_dir];
+  }
+  for(i = 1; i < L.dir_count; i++)
+    if((L.dir_parent[i] == L.fold_dir) && (n < MAX_FOLD_ROWS))
+    {
+      L.fold_kind[n] = ROW_DIR;
+      L.fold_item[n++] = i;
+    }
+  /* folders by name */
+  {
+    int a, b, first = (L.fold_dir != 0) ? 1 : 0;
+    for(a = first + 1; a < n; a++)
+      for(b = a; (b > first) &&
+       (strcasecmp(L.dirs[L.fold_item[b - 1]], L.dirs[L.fold_item[b]]) > 0); b--)
+      {
+        int t = L.fold_item[b];
+        L.fold_item[b] = L.fold_item[b - 1];
+        L.fold_item[b - 1] = t;
+      }
+  }
+  /* its games, sorted like a list tab */
+  L.n = 0;
+  for(i = 0; i < L.count; i++)
+    if(L.games[i].dir == L.fold_dir)
+      L.order[L.n++] = i;
+  L.sort = L.sorts[2];
+  L.cur = 0;
+  sort_games();
+  for(i = 0; (i < L.n) && (n < MAX_FOLD_ROWS); i++)
+  {
+    L.fold_kind[n] = ROW_GAME;
+    L.fold_item[n++] = L.order[i];
+  }
+  L.fold_count = n;
+}
+
+static const char *dir_name(int dir)
+{
+  const char *s = strrchr(L.dirs[dir], '/');
+  return s ? s + 1 : L.dirs[dir];
+}
+
+static void fold_go(int dir, int focus_dir)
+{
+  int i;
+
+  L.fold_dir = dir;
+  fold_fill();
+  L.fold_cur = 0;
+  /* going up: the cursor on the folder we came from */
+  for(i = 0; i < L.fold_count; i++)
+    if((L.fold_kind[i] == ROW_DIR) && (L.fold_item[i] == focus_dir))
+      L.fold_cur = i;
+  if((focus_dir < 0) && (L.fold_count > 0) && (L.fold_kind[0] == ROW_UP) &&
+   (L.fold_count > 1))
+    L.fold_cur = 1;  /* opening a folder: its first entry, not ".." */
+  L.fold_from = L.fold_cur;
+  L.fold_f = UI_F_CURSOR;
+  L.fold_top = (L.fold_cur >= FOLD_ROWS) ? L.fold_cur - FOLD_ROWS + 1 : 0;
+  L.fold_top_from = L.fold_top * FOLD_PITCH;
+  L.fold_top_f = UI_F_SCROLL;
+  L.marq_f = 0;
+  L.dirty = 1;
+}
+
+static int fold_top_px(void)
+{
+  return ui_ease_out_back(L.fold_top_from, L.fold_top * FOLD_PITCH, L.fold_top_f, UI_F_SCROLL);
+}
+
+static void fold_breadcrumb(void)
+{
+  int chain[16], n = 0, d = L.fold_dir, j, x = 20;
+
+  while((d > 0) && (n < 15))
+  {
+    chain[n++] = d;
+    d = L.dir_parent[d];
+  }
+  chain[n++] = 0;
+  for(j = n - 1; j >= 0; j--)
+  {
+    const char *p = (chain[j] == 0) ? L.dirs[0] : dir_name(chain[j]);
+    int last = (j == 0), w = ui_print_width(p, UI_FONT_SMALL, 0) + 12;
+    if(x + w > 460)
+      w = 460 - x;
+    if(w < 20)
+      break;
+    ui_round_fill(x, 38, w, 16, 2, last ? UI_COL_TANGERINE : UI_COL_CARD);
+    ui_print_fit(x + 6, 39, p, last ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, w - 12);
+    x += w + 4;
+    if(!last)
+    {
+      ui_print(x, 39, "/", UI_COL_MUTE, UI_FONT_SMALL, 0);
+      x += 8;
+    }
+  }
+}
+
+/* one row at y; sel: drawn lifted in tangerine */
+static void fold_row(int i, int y, int sel)
+{
+  int lift = sel ? UI_LIFT : 0, kind = L.fold_kind[i], item = L.fold_item[i];
+  u16 ink = sel ? UI_COL_PLUM : UI_COL_CREAM;
+  char meta[24];
+  const char *name;
+
+  if(sel)
+    ui_round_fill(21, y + 1, 440, 20, 2, UI_COL_SHADE);
+  ui_round_fill(20 - lift, y - lift, 440, 20, 2, sel ? UI_COL_TANGERINE : UI_COL_CARD);
+  if(kind == ROW_GAME)
+  {
+    const game_t *g = &L.games[item];
+    draw_cover_any(23 - lift, y + 2 - lift, 16, g->title, 0);
+    name = g->title;
+    size_text(g->size, meta, sizeof(meta));
+  }
+  else
+  {
+    draw_icon11(25 - lift, y + 4 - lift, (kind == ROW_UP) ? icon_up : icon_folder,
+     sel ? UI_COL_PLUM : UI_COL_TANGERINE, 1);
+    name = (kind == ROW_UP) ? ".." : dir_name(item);
+    if(kind == ROW_UP)
+      snprintf(meta, sizeof(meta), "Up a folder");
+    else
+      snprintf(meta, sizeof(meta), "%d games", L.dir_games[item]);
+  }
+  ui_print_fit(46 - lift, y + 2 - lift, name, ink, UI_FONT_BODY, 0, 300);
+  if((kind == ROW_GAME) && L.games[item].fav)
+    draw_icon11(400 - lift, y + 4 - lift, icon_heart, sel ? UI_COL_PLUM : UI_COL_PINK, 1);
+  ui_print(452 - lift - ui_print_width(meta, UI_FONT_SMALL, 0), y + 3 - lift, meta,
+   sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+}
+
+static void fold_ground(void)
+{
+  int i, top = fold_top_px();
+
+  fold_breadcrumb();
+  if((L.fold_count == 0) || ((L.fold_count == 1) && (L.fold_kind[0] == ROW_UP)))
+  {
+    static const char t[] = "This folder is empty";
+    static const char b[] = "Only .gba and .zip files show here.";
+    ui_round_fill(208, 82, 64, 52, 3, UI_COL_CARD);
+    draw_icon11(224, 92, icon_folder, UI_COL_TANGERINE, 3);
+    ui_print(240 - ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) / 2, 146, t, UI_COL_CREAM,
+     UI_FONT_BODY, UI_TEXT_BOLD);
+    ui_print(240 - ui_print_width(b, UI_FONT_SMALL, 0) / 2, 166, b, UI_COL_MUTE,
+     UI_FONT_SMALL, 0);
+    return;
+  }
+  ui_clip_set(0, FOLD_Y - 3, UI_SCREEN_W, VIEW_B - FOLD_Y + 3);
+  for(i = 0; i < L.fold_count; i++)
+  {
+    int y = FOLD_Y + i * FOLD_PITCH - top;
+    if((y + 20 < FOLD_Y - 3) || (y > VIEW_B))
+      continue;
+    fold_row(i, y, 0);
+  }
+  ui_clip_reset();
+  if(L.fold_count > FOLD_ROWS)
+  {
+    int track = 176, th = track * FOLD_ROWS / L.fold_count;
+    int ty = (track - th) * top / ((L.fold_count - FOLD_ROWS) * FOLD_PITCH);
+    ui_round_fill(468, FOLD_Y, 4, track, 1, UI_COL_CARD);
+    ui_round_fill(468, FOLD_Y + ty, 4, th, 1, UI_COL_MUTE);
+  }
+}
+
+static void fold_selection(void)
+{
+  int top = fold_top_px(), y0, y1;
+
+  if((L.fold_count == 0) || ((L.fold_count == 1) && (L.fold_kind[0] == ROW_UP)))
+    return;
+  ui_clip_set(0, FOLD_Y - 5, UI_SCREEN_W, VIEW_B - FOLD_Y + 5);
+  fold_row(L.fold_cur, FOLD_Y + L.fold_cur * FOLD_PITCH - top, 1);
+  y0 = FOLD_Y + L.fold_from * FOLD_PITCH - top;
+  y1 = FOLD_Y + L.fold_cur * FOLD_PITCH - top;
+  ui_cursor_frame(18, ui_ease_out_back(y0, y1, L.fold_f, UI_F_CURSOR) - 2, 440, 20);
+  ui_clip_reset();
+}
+
+static void fold_move(void)
+{
+  int i;
+
+  if(L.fold_count == 0)
+    return;
+  i = ui_step(L.fold_cur, L.fold_count, PSP_CTRL_UP, PSP_CTRL_DOWN);
+  if(i == L.fold_cur)
+    return;
+  L.fold_from = L.fold_cur;
+  L.fold_cur = i;
+  L.fold_f = 0;
+  L.marq_f = 0;
+  if((i < L.fold_top) || (i >= L.fold_top + FOLD_ROWS))
+  {
+    L.fold_top_from = fold_top_px();
+    L.fold_top = (i < L.fold_top) ? i : i - FOLD_ROWS + 1;
+    L.fold_top_f = 0;
+  }
+  L.dirty = 1;  /* × reads Open or Play */
+}
+
+/* ---- the No BIOS banner (spec section 4, No BIOS; r4 bios) ----------------------------------
+ * Without gba_bios.bin kai runs games on its built-in BIOS. A cream banner
+ * says so, once per start, until the first game is launched; the library
+ * keeps working under it. */
+
+int ui_no_bios = 0;       /* set at start when the built-in BIOS is in use */
+static int banner_gone = 0;
+
+static int banner_up(void)
+{
+  return ui_no_bios && !banner_gone;
+}
+
+static void draw_banner(void)
+{
+  static const char t[] = "No GBA BIOS";
+  static const char b[] = "Games will start in Game Cart mode. Most games run fine.";
+  int y = 148, w = 440, h = 86, j, bx = 299, by = y + 32;
+  char line[128];
+
+  ui_round_fill(23, y + 3, w, h, 3, UI_COL_SHADE);
+  ui_round_fill(20, y, w, h, 3, UI_COL_CREAM);
+  ui_fill(20, y + 4, 6, h - 8, UI_COL_TANGERINE);
+  ui_print(36, y + 19, t, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
+  for(j = 0; j < 2; j++)
+    if(ui_wrap_line(b, j, 250, UI_FONT_SMALL, line, sizeof(line)))
+      ui_print(36, y + 38 + j * 14, line, UI_COL_PLUM, UI_FONT_SMALL, 0);
+  ui_round_frame(bx, by, 150, 22, 2, UI_COL_PLUM);
+  ui_glyph_inverted(bx + 6, by + 4, PSP_CTRL_SQUARE);
+  ui_print_fit(bx + 22, by + 3, "How to add one", UI_COL_PLUM, UI_FONT_BODY, 0, 150 - 28);
+}
+
 /* ---- View & sort ------------------------------------------------------------------- */
 
 static const char *view_labels[2] = { "Grid", "List" };
@@ -1588,7 +1866,7 @@ static void draw_popup(void)
 
 /* ---- hints, the empty library, the ground --------------------------------------------- */
 
-static const char *tab_names[3] = { "Recent", "All", "\xE2\x98\x85 Favourites" };
+static const char *tab_names[4] = { "Recent", "All", "\xE2\x98\x85 Favourites", "Folders" };
 
 static int tab_is(int id)
 {
@@ -1621,6 +1899,8 @@ static void tabs_init(void)
     L.tab_ids[L.tab_count++] = TAB_RECENT;
   L.tab_ids[L.tab_count++] = TAB_ALL;
   L.tab_ids[L.tab_count++] = TAB_FAV;
+  L.tab_ids[L.tab_count++] = TAB_FOLDERS;
+  L.fold_open = 0;
   L.tab = 0;  /* Recent when there is one, else All */
   L.tab_prev = 0;
   L.tab_f = UI_F_TAB;
@@ -1640,7 +1920,16 @@ static void turn_tab(int d)
   L.tab += d;
   L.tab_f = 0;
   L.marq_f = 0;
-  if(!tab_is(TAB_RECENT))
+  if(tab_is(TAB_FOLDERS))
+  {
+    /* the folder left open last time, else the top */
+    if(!L.fold_open)
+      fold_go(0, -1);
+    else
+      fold_fill();
+    L.fold_open = 1;
+  }
+  else if(!tab_is(TAB_RECENT))
   {
     fill_order();
     view_reset();
@@ -1689,6 +1978,28 @@ static void draw_hints(void)
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? "Play" : "Continue";
+  }
+  else if(tab_is(TAB_FOLDERS))
+  {
+    int empty = (L.fold_count == 0) || ((L.fold_count == 1) && (L.fold_kind[0] == ROW_UP));
+    if(L.fold_dir != 0)
+    {
+      h[n].keys = ui_key_back;     h[n++].verb = "Up a folder";
+    }
+    if(!empty && (L.fold_kind[L.fold_cur] == ROW_GAME))
+    {
+      h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
+    }
+    if(!empty)
+    {
+      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    }
+    h[n].keys = PSP_CTRL_START;    h[n++].verb = "Settings";
+    if(!empty)
+    {
+      h[n].keys = ui_key_confirm;  h[n++].verb =
+       (L.fold_kind[L.fold_cur] == ROW_GAME) ? "Play" : "Open";
+    }
   }
   else if(L.n == 0)  /* Favourites, nothing hearted: nothing to play */
   {
@@ -1751,12 +2062,17 @@ static void build_ground(void)
     draw_empty();
   else if(tab_is(TAB_RECENT))
     recent_ground();
+  else if(tab_is(TAB_FOLDERS))
+    fold_ground();
   else if(L.n == 0)
     draw_no_favourites();
   else if(L.view == VIEW_GRID)
     grid_ground();
   else
     list_ground();
+  /* on the tab the library opens on (Recent, or All before any game) */
+  if((L.count > 0) && banner_up() && (L.tab == 0) && !L.card)
+    draw_banner();
   /* the game card: the library, its tabs and chip stay behind the screen
      door (they are drawn here, not each frame, while it is up) */
   if(L.card)
@@ -1889,9 +2205,11 @@ static void popup_input(void)
     L.pop_out = 1;
     L.pop_f = 0;
     /* written when the popup closes (spec section 7) */
-    L.sorts[tab_is(TAB_FAV)] = L.sort;  /* the sort is kept per tab */
+    /* the sort is kept per tab */
+    L.sorts[tab_is(TAB_FOLDERS) ? 2 : tab_is(TAB_FAV) ? 1 : 0] = L.sort;
     g_gpsp_config.library_view = (LIBRARY_GRID ? (L.view & 1) :
-     (g_gpsp_config.library_view & 1)) | ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3);
+     (g_gpsp_config.library_view & 1)) | ((L.sorts[0] & 3) << 1) |
+     ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5);
     save_config_file();
     return;
   }
@@ -1916,8 +2234,21 @@ static void popup_input(void)
       if((v >= 0) && (v < SORTS))
       {
         L.sort = v;
-        sort_games();
-        view_reset();
+        if(tab_is(TAB_FOLDERS))
+        {
+          int keep = L.fold_item[L.fold_cur], kind = L.fold_kind[L.fold_cur], i;
+          L.sorts[2] = v;
+          fold_fill();
+          for(i = 0; i < L.fold_count; i++)  /* the cursor stays on its row */
+            if((L.fold_kind[i] == kind) && (L.fold_item[i] == keep))
+              L.fold_cur = L.fold_from = i;
+          L.dirty = 1;
+        }
+        else
+        {
+          sort_games();
+          view_reset();
+        }
         L.pop_flash = 0;
       }
     }
@@ -1971,6 +2302,9 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   L.view = LIBRARY_GRID ? (g_gpsp_config.library_view & 1) : VIEW_LIST;
   L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
   L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;  /* Favourites */
+  L.sorts[2] = (g_gpsp_config.library_view >> 5) & 3;  /* Folders */
+  if(L.sorts[2] >= SORTS)
+    L.sorts[2] = SORT_NAME;
   if(L.sorts[0] >= SORTS)
     L.sorts[0] = SORT_NAME;
   if(L.sorts[1] >= SORTS)
@@ -2040,6 +2374,43 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         chosen = 1;
       }
     }
+    else if(tab_is(TAB_FOLDERS))
+    {
+      int kind = L.fold_kind[L.fold_cur], item = L.fold_item[L.fold_cur];
+      int has = (L.fold_count > 0) && !((L.fold_count == 1) && (kind == ROW_UP));
+      fold_move();
+      kind = L.fold_kind[L.fold_cur];
+      item = L.fold_item[L.fold_cur];
+      if(ui_pressed(ui_key_back) && (L.fold_dir != 0))
+        fold_go(L.dir_parent[L.fold_dir], L.fold_dir);
+      else if(has && (kind == ROW_GAME) && ui_pressed(PSP_CTRL_TRIANGLE))
+        card_open(item);
+      else if(has && ui_pressed(PSP_CTRL_SELECT))
+      {
+        L.pop = 1;
+        L.pop_f = 0;
+        L.pop_out = 0;
+        L.pop_row = POP_FIRST_ROW;
+        L.pop_flash = UI_F_VALUE;
+        L.dirty = 1;
+      }
+      else if(ui_pressed(PSP_CTRL_START))
+        open_settings();
+      else if(has && ui_pressed(ui_key_confirm))
+      {
+        if(kind == ROW_UP)
+          fold_go(item, L.fold_dir);
+        else if(kind == ROW_DIR)
+          fold_go(item, -1);
+        else
+        {
+          u64 t;
+          L.chosen_game = item;
+          L.chosen_slot = resume_slot(item, &t);
+          chosen = 1;
+        }
+      }
+    }
     else
     {
       move();
@@ -2070,6 +2441,12 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
     if(L.tab_f < UI_F_TAB) L.tab_f++;
     if(L.rec_f < UI_F_CURSOR) L.rec_f++;
+    if(L.fold_f < UI_F_CURSOR) L.fold_f++;
+    if(L.fold_top_f < UI_F_SCROLL)
+    {
+      L.fold_top_f++;
+      L.dirty = 1;
+    }
     if(L.card)
     {
       int was = L.card;
@@ -2117,6 +2494,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     {
       if(tab_is(TAB_RECENT))
         recent_selection();
+      else if(tab_is(TAB_FOLDERS))
+        fold_selection();
       else if(L.view == VIEW_GRID)
         grid_selection();
       else
@@ -2139,7 +2518,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         L.dirty = 1;  /* the hints change with it */
     }
     if(chosen)
+    {
       draw_loading(0);
+      banner_gone = 1;  /* the banner hides after the first launch */
+    }
     ui_frame_end();
   }
 
