@@ -231,9 +231,8 @@ static void scan_dir(const char *path, int depth, int parent)
  * "(USA, Europe)", "[!]" or "(Rev 1)" go, so does a leading release number
  * ("1986 - Golden Sun"), and underscores become spaces. The cover is drawn
  * from this name, so these rules must not change once released. */
-static const char *display_name(const char *name, int n)
+static int clean_name(const char *name, int n, char *out)
 {
-  char out[256];
   int i = 0, o = 0, depth = 0;
 
   if(n > 255)
@@ -276,8 +275,27 @@ static const char *display_name(const char *name, int n)
   while((o > 0) && ((out[o - 1] == ' ') || (out[o - 1] == '-')))
     o--;
   if(o == 0)
-    return arena_str(name, n);  /* nothing left: the plain name */
+  {
+    memcpy(out, name, n);  /* nothing left: the plain name */
+    o = n;
+  }
+  out[o] = 0;
+  return o;
+}
+
+static const char *display_name(const char *name, int n)
+{
+  char out[256];
+  int o = clean_name(name, n, out);
   return arena_str(out, o);
+}
+
+/* The name the library shows for a file (for the pause screen's chip). */
+void ui_display_name(const char *file, char *out)
+{
+  const char *dot = strrchr(file, '.');
+  int n = dot ? dot - file : (int)strlen(file);
+  clean_name(file, n, out);
 }
 
 /* recent.txt (written on leaving a game): full paths, newest first */

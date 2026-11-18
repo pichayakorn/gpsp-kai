@@ -192,6 +192,7 @@ u32 ui_library_switch(void);
 /* Cheats (ui_cheats.c), from the pause screen's Cheats tile. */
 void ui_cheats(void);
 extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
+void ui_display_name(const char *file, char *out);  /* out: 256 bytes */
 s32 ui_library_load(const char *dir, char *name);  /* with the Loading card */
 void ui_startup_hook(int current, int total);  /* kai's start-up steps */
 

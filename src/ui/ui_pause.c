@@ -121,6 +121,7 @@ static struct
   char toast[64];
   u16 toast_edge;
   int toast_f, toast_undo;
+  int title_f;      /* frames since the screen opened: the name's marquee */
   int undo_ended;            /* the cursor moved: the toast leaves, no Undo */
   int undo, undo_slot;
   ui_hold_t hold;
@@ -622,22 +623,63 @@ static void build_layer(int full)
   p.layer_full = full;
 }
 
+/* The header chip: the game's name (as the library shows it) and "Paused".
+ * It ends by x 380, clear of the clock and battery chip: a longer name is
+ * cut with "…", and once the screen has rested 40 f it runs sideways
+ * inside its width (shift > 0; spec section 4, Long game names). */
+static int header_width(const char *title, int *full)
+{
+  int pw = ui_text_width("Paused"), maxw = 380 - 14 - 34 - pw;
+
+  *full = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD);
+  return (*full < maxw) ? *full : maxw;
+}
+
+static void draw_header_shift(int hy, int shift)
+{
+  char title[256];
+  int full, tw;
+
+  ui_display_name(gamepak_filename, title);
+  tw = header_width(title, &full);
+  ui_round_fill(14, hy, tw + ui_text_width("Paused") + 34, 24, 3, UI_COL_PLUM);
+  if((shift <= 0) || (full <= tw))
+    ui_print_fit(22, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, tw);
+  else
+  {
+    ui_clip_set(22, hy + 4, tw, 16);
+    ui_print(22 - shift, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+    ui_clip_reset();
+  }
+  ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
+}
+
 static void draw_header(int hy)
 {
-  char title[MAX_FILE];
-  char *dot;
-  int tw, pw = ui_text_width("Paused");
+  draw_header_shift(hy, 0);
+}
 
-  strcpy(title, gamepak_filename);
-  dot = strrchr(title, '.');
-  if(dot)
-    *dot = 0;
-  tw = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD);
-  if(tw > 300)
-    tw = 300;
-  ui_round_fill(14, hy, tw + pw + 34, 24, 3, UI_COL_PLUM);
-  ui_print_fit(22, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, 300);
-  ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
+/* the marquee: 40 f at rest, then 1 px a frame to the end, a wait as
+   long, and again */
+static void header_marquee(void)
+{
+  char title[256];
+  int full, tw, over, t, cycle;
+
+  ui_display_name(gamepak_filename, title);
+  tw = header_width(title, &full);
+  over = full - tw;
+  t = p.title_f - UI_MARQUEE_DELAY;
+  if((over <= 0) || (t <= 0))
+    return;
+  cycle = over + 2 * UI_MARQUEE_DELAY;
+  t %= cycle;
+  t = (t < over) ? t : (t < over + UI_MARQUEE_DELAY) ? over : 0;
+  if(t > 0)
+  {
+    ui_fill(22, 6 + 4, tw, 16, UI_COL_PLUM);
+    draw_header_shift(6, t);
+  }
 }
 
 
@@ -912,6 +954,9 @@ static void draw_screen(int bar_fill)
   motion(&hy, &dy, tile_dy, &done);
   if(!p.layer_full)
     draw_header(hy);
+  else if(done && !p.closing)
+    header_marquee();
+  p.title_f++;
   if(done && !p.closing && !ui_toast_up(p.toast_f))
     ui_status_chip_at(10);
   PERF_SECTION(1);
