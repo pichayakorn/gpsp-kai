@@ -152,6 +152,8 @@ static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
 static void read_favourites(void);
 static void cover_heart(int x, int y, int game);
 static void view_reset(void);
+static int list_banner(void);
+static void draw_banner_at(int y);
 
 static int is_game_file(const char *name)
 {
@@ -676,6 +678,23 @@ static void list_layout(int pos)
     if(d > LIST_FIRST - L.ys[0])
       d = LIST_FIRST - L.ys[0];
   }
+  if(list_banner())
+  {
+    /* No BIOS before the first game: the banner is the list's top item,
+       never selectable, 86 high and 8 px above row 0. On the first game it
+       shows whole at y 40 with the card under it; over the first rows the
+       card glides back to y 88 and the banner slides up under the tabs. */
+    int bt = L.ys[0] + d - 8 - 86, sel = (pos + 128) >> 8, push;
+    if(sel > L.n - 1)
+      sel = L.n - 1;
+    push = 40 - bt;
+    if(LIST_LAST - (L.ys[sel] + d + list_h(sel)) < push)
+      push = LIST_LAST - (L.ys[sel] + d + list_h(sel));
+    if(94 - 26 * pos / 256 < push)
+      push = 94 - 26 * pos / 256;
+    if(push > 0)
+      d += push;
+  }
   for(i = 0; i < L.n; i++)
     L.ys[i] += d;
 }
@@ -796,6 +815,8 @@ static void list_ground(void)
     if(y + h > VIEW_B)
       ui_door(20, y, 440, h);
   }
+  if(list_banner() && (L.ys[0] - 94 + 86 > VIEW_T - 2))
+    draw_banner_at(L.ys[0] - 94);
   ui_clip_reset();
   if(L.n > 1)
   {
@@ -1799,11 +1820,18 @@ static int banner_up(void)
   return ui_no_bios && !banner_gone;
 }
 
-static void draw_banner(void)
+/* before the first game (no Recent tab) it is the top item of the All
+   list instead, so it hides no game (design session, 2026-11-19) */
+static int list_banner(void)
+{
+  return banner_up() && (L.recent_count == 0) && (L.tab_ids[L.tab] == TAB_ALL) && (L.n > 0);
+}
+
+static void draw_banner_at(int y)
 {
   static const char t[] = "No GBA BIOS";
   static const char b[] = "Games will start in Game Cart mode. Most games run fine.";
-  int y = 148, w = 440, h = 86, j, bx = 299, by = y + 32;
+  int w = 440, h = 86, j, bx = 299, by = y + 32;
   char line[128];
 
   ui_round_fill(23, y + 3, w, h, 3, UI_COL_SHADE);
@@ -2070,9 +2098,9 @@ static void build_ground(void)
     grid_ground();
   else
     list_ground();
-  /* on the tab the library opens on (Recent, or All before any game) */
-  if((L.count > 0) && banner_up() && (L.tab == 0) && !L.card)
-    draw_banner();
+  /* on Recent over the Recent row; before any game, in the All list */
+  if((L.count > 0) && banner_up() && tab_is(TAB_RECENT) && !L.card)
+    draw_banner_at(148);
   /* the game card: the library, its tabs and chip stay behind the screen
      door (they are drawn here, not each frame, while it is up) */
   if(L.card)
