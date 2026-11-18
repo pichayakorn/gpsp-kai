@@ -2801,3 +2801,38 @@ u32 ui_library_switch(void)
   }
   return 0;
 }
+
+/* ---- start-up (spec section 4, Start-up; r4 startup) --------------------------------------
+ * While kai starts (about a second), its start-up steps call this instead
+ * of drawing the old dialog: the plum ground from the first step; once the
+ * 4.0 fonts are in, "gpSP kai" at 2x and the version under it; past 30 f,
+ * the Loading card's three dots under them (squares, no font needed). The
+ * library then cuts in. */
+void ui_startup_hook(int current, int total)
+{
+  static u32 t0 = 0;
+  u32 now = sceKernelGetSystemTimeLow(), f;
+  char ver[16];
+  int i;
+
+  (void)total;
+  if((current == 0) && (t0 == 0))
+    t0 = now ? now : 1;
+  f = (now - t0) / 16667;  /* frames since the first */
+  ui_frame_begin();
+  ui_ground();
+  if(ui_font_loaded())
+  {
+    static const char name[] = "gpSP kai";
+    snprintf(ver, sizeof(ver), "%d.%d", VERSION_MAJOR, VERSION_MINOR);
+    ui_print(240 - ui_print_width(name, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) / 2, 104,
+     name, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+    ui_print(240 - ui_print_width(ver, UI_FONT_SMALL, 0) / 2, 140, ver, UI_COL_MUTE,
+     UI_FONT_SMALL, 0);
+  }
+  if(f >= 30)
+    for(i = 0; i < 3; i++)
+      ui_fill(230 + i * 8, 168 - ((i == (f / UI_F_LOADING) % 3) ? 3 : 0), 4, 4,
+       UI_COL_TANGERINE);
+  ui_frame_end_now();
+}

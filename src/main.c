@@ -383,10 +383,15 @@ int main(int argc, char *argv[])
   video_resolution(FRAME_GAME);
   video_resolution(FRAME_MENU);
 
+#ifdef UI4
+  // the 4.0 start-up screen instead of the old dialog (ui_library.c)
+  progress_hook = ui_startup_hook;
+#else
   clear_screen(COLOR_BG);
   flip_screen();
   clear_screen(COLOR_BG);
   flip_screen();
+#endif
 
   init_progress(7, "");
 
@@ -461,6 +466,9 @@ int main(int argc, char *argv[])
   update_progress();
 
   show_progress(msg[MSG_INIT_END]);
+#ifdef UI4
+  progress_hook = NULL;
+#endif
 
 #ifdef UI4
   {
