@@ -879,7 +879,7 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
 
   ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
   if(closing)
-    y = 66 + ui_ease_in_cubic(0, 24, f, UI_F_DIALOG_OUT);
+    y = 66 + ui_ease_in_cubic(0, UI_SCREEN_H - 66, f, UI_F_DIALOG_OUT);  /* off the bottom edge */
   else
     y = 66 - ui_ease_out_back(24, 0, f, UI_F_DIALOG_IN);
 
@@ -1049,4 +1049,102 @@ void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
       dst[y * 144 + x] = COLOR16(ch[0], ch[1], ch[2]);
     }
   }
+}
+
+/* ---- the help card (the square key) (spec section 4, Help; r5 help_text) -------------------------------
+ * A 440 px cream card with a 6 px group-colour edge over a screen door: the
+ * title at 2x, the text in 12 px on 16 px lines, 36 px narrower than the
+ * card; 50 px high plus 16 per line. In: 10 f out-back up from +30 px;
+ * out: 8 f in-cubic, off the bottom edge. The hint strip reads "Close" after
+ * (either key closes). f counts frames since it opened or began closing. */
+void ui_help_card(const char *title, const char *body, u16 edge, int f, int closing)
+{
+  ui_hint_t h[1];
+  char line[200];
+  int lines = 0, w = 440, x = (UI_SCREEN_W - w) / 2, y, hgt, j;
+
+  while(ui_wrap_line(body, lines, w - 36, UI_FONT_BODY, line, sizeof(line)) && (lines < 9))
+    lines++;
+  hgt = 38 + lines * 16 + 12;
+  if(closing)
+    y = 26 + ui_ease_in_cubic(0, UI_SCREEN_H - 26, f, UI_F_HELP_OUT);
+  else
+    y = 26 + 30 - ui_ease_out_back(0, 30, f, UI_F_HELP_IN);
+  if(!(closing && (f >= UI_F_HELP_OUT)))  /* the door goes with the last frame */
+    ui_door(0, 0, UI_SCREEN_W, UI_STRIP_Y);
+  ui_round_fill(x + 4, y + 4, w, hgt, 3, UI_COL_SHADE);
+  ui_round_fill(x, y, w, hgt, 3, UI_COL_CREAM);
+  ui_fill(x, y + 4, 6, hgt - 8, edge);
+  ui_print_fit(x + 18, y + 4, title, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X, w - 36);
+  for(j = 0; j < lines; j++)
+    if(ui_wrap_line(body, j, w - 36, UI_FONT_BODY, line, sizeof(line)))
+      ui_print(x + 18, y + 38 + j * 16, line, UI_COL_PLUM, UI_FONT_BODY, 0);
+  /* keys that share a verb sit together */
+  h[0].keys = PSP_CTRL_SQUARE | ui_key_back;
+  h[0].verb = "Close";
+  ui_hint_packed(h, 1, 14);
+}
+
+/* ---- error cards (spec section 4, Errors; motion: dialog in / out) ---------------------
+ * An error over whatever is on screen: it comes in over 12 f (out-back,
+ * from 24 px higher) and leaves over 8 f (in-cubic, off the bottom edge).
+ * × takes the first button, ○ always closes (the second button when there
+ * is one). The screen behind is kept for the frames in between. Returns
+ * 1 for the first button, 0 for close. */
+int ui_error_card(const char *title, const char *body, const char *ok, const char *cancel,
+ u16 edge)
+{
+  const char *buttons[2];
+  u32 mark = ui_pool_mark();
+  u16 *under = ui_pool_alloc(UI_SCREEN_W * UI_SCREEN_H * 2);
+  int f = 0, closing = 0, result = 0, y, count = cancel ? 2 : 1;
+  ui_hint_t h[2];
+
+  buttons[0] = ok;
+  buttons[1] = cancel;
+  h[0].keys = ui_key_confirm; h[0].verb = (char *)ok;
+  h[1].keys = ui_key_back;    h[1].verb = (char *)(cancel ? cancel : "Close");
+  if(under)
+  {
+    /* the frame on screen now: both buffers hold it after the last flips */
+    u16 *src = (u16 *)((u32)screen_address | 0x40000000);
+    for(y = 0; y < UI_SCREEN_H; y++)
+      memcpy(under + y * UI_SCREEN_W, src + y * screen_pitch, UI_SCREEN_W * 2);
+  }
+  ui_input_init();
+  while(1)
+  {
+    ui_input_update();
+    if(!closing)
+    {
+      if(ui_pressed(ui_key_confirm))
+      {
+        result = 1;
+        closing = 1;
+        f = 0;
+      }
+      else if(ui_pressed(ui_key_back))
+      {
+        closing = 1;
+        f = 0;
+      }
+    }
+    ui_frame_begin();
+    if(under)
+      ui_blit(under, UI_SCREEN_W, 0, 0, UI_SCREEN_W, UI_SCREEN_H);
+    if(!(closing && (f >= UI_F_DIALOG_OUT)))
+    {
+      ui_dialog(title, body, buttons, count, 0, edge, f, closing);
+      ui_hint_packed(h, closing ? 0 : 2, 14);
+    }
+    ui_frame_end();
+    if(f < (closing ? UI_F_DIALOG_OUT : UI_F_DIALOG_IN))
+      f++;
+    else if(closing)
+      break;
+    if(!under && !closing && (f >= UI_F_DIALOG_IN))
+      f = UI_F_DIALOG_IN;  /* without the copy it stays still */
+  }
+  ui_pool_release(mark);
+  return result;
 }

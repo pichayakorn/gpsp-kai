@@ -543,6 +543,7 @@ int main(int argc, char *argv[])
     {
       char dir[MAX_PATH];
 
+      ui_first_run();  /* once: how to pause, confirm and back, help */
       while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename),
        &ui_start_slot))
       {

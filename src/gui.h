@@ -70,6 +70,7 @@ typedef struct
   u32 ff_speed;            // FF_SPEED_*: how fast fast forward runs
   u32 library_view;        // Library: bit 0 list view, bits 1-2 the sort (name, recent, size)
   u32 bios_note;           // YES: the library notes a missing GBA BIOS
+  u32 first_run_done;      // YES once the 4.0 first-run cards were shown
 #if 0
   u32 solar_level;
 #endif

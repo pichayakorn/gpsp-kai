@@ -200,6 +200,7 @@ static struct
   int dir;                        /* the selected stick chip, or -1 on the rows */
   int pick_map;                   /* the map entry the picker edits */
   int pick, pick_f, pick_out;     /* the action picker: open, its motion */
+  int help, help_f, help_out;     /* the □ help card: open, its motion */
   int pcur, pcur_from, pcur_f;    /* the picker's cursor */
   u32 undo_map[MAX_GAMEPAD_CONFIG_MAP];
   u32 undo_map_default;
@@ -789,12 +790,66 @@ static void pad_undo(void)
 }
 
 /* Steady hints first, then the row's own (spec: Hint strip). */
+/* ---- help (the square key) -------------------------------------------------------------------------
+ * The selected row's help card. Written help: Smoothing and Frameskip
+ * (spec, help_smooth / help_skip); every other row shows its tip as the
+ * text until its own help copy is written (PROTOTYPE: help copy uses the
+ * tip). Smoothing's three pictures are not drawn yet: their captions stand
+ * in as text. Returns 0 when the selection has no help. */
+static int help_topic(const char **title, const char **body)
+{
+  static char text[400];
+  const row_t *r;
+  const char *t, *b;
+
+  if((s.tab == PAD_TAB) && (s.page == 0))
+  {
+    t = "Buttons";
+    b = PAD_TIP;
+  }
+  else if((s.tab == PAD_TAB) && (s.dir >= 0))
+  {
+    t = "Stick";
+    b = STICK_DIR_TIP;
+  }
+  else
+  {
+    r = &rows[s.tab][s.cur];
+    if(!r->label || (r->kind == K_OFF))
+      return 0;
+    t = r->label;
+    b = r->tip;
+    if(!strcmp(t, "Smoothing"))
+    {
+      snprintf(text, sizeof(text), "How the GBA picture is drawn when it is scaled up to the "
+       "PSP screen.\nOff: pixels stay hard but uneven.\nSmooth: soft, a little blurry.\n"
+       "Sharp: crisp and even. Best for most games.");
+      b = text;
+    }
+    else if(!strcmp(t, "Frameskip"))
+      b = "When the PSP can't draw every frame, skipping some keeps the game at full speed. "
+       "Auto skips only when the game would slow down; Fixed always skips the number set in "
+       "Skip up to.";
+    if(!b)
+      return 0;
+  }
+  if(title)
+    *title = t;
+  if(body)
+    *body = b;
+  return 1;
+}
+
 static void draw_hints(void)
 {
-  ui_hint_t hints[5];
+  ui_hint_t hints[6];
   int n = 0;
 
   hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
+  if(help_topic(NULL, NULL))
+  {
+    hints[n].keys = PSP_CTRL_SQUARE; hints[n++].verb = "Help";
+  }
   hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
   if(s.tab == PAD_TAB)
   {
@@ -1197,6 +1252,23 @@ int ui_settings(int tab, int row)
       picker_input();  /* the picker takes every key while it is up */
       goto draw;
     }
+    if(s.help)
+    {
+      /* the help card takes every key; □ or ○ closes it */
+      if(!s.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
+      {
+        s.help_out = 1;
+        s.help_f = 0;
+      }
+      goto draw;
+    }
+    if(ui_pressed(PSP_CTRL_SQUARE) && help_topic(NULL, NULL))
+    {
+      s.help = 1;
+      s.help_out = 0;
+      s.help_f = 0;
+      goto draw;
+    }
     if(ui_pressed(ui_key_back))
       break;
 
@@ -1377,6 +1449,16 @@ int ui_settings(int tab, int row)
     draw_tip_line();
     if(s.pick && !draw_picker())
       s.dirty = 1;  /* closed: the chip shows its new job */
+    if(s.help)
+    {
+      const char *t, *b;
+      if(help_topic(&t, &b))
+        ui_help_card(t, b, UI_COL_LIME, s.help_f, s.help_out);
+      if(s.help_f < (s.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
+        s.help_f++;
+      else if(s.help_out)
+        s.help = 0;
+    }
     if(s.toast_f >= 0)
     {
       if(!ui_toast(s.toast, s.toast_edge, s.toast_undo ? "Undo" : NULL, s.toast_f))

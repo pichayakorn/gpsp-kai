@@ -167,6 +167,9 @@ void ui_hold_bar(int x, int y, int w, int p, u16 color);
 
 int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size);
 void ui_tip_line(const char *text, int k);  /* k: 1..8 frames into its fade */
+void ui_help_card(const char *title, const char *body, u16 edge, int f, int closing);
+int ui_error_card(const char *title, const char *body, const char *ok, const char *cancel,
+ u16 edge);  /* 1: the first button, 0: closed */
 void ui_dialog(const char *title, const char *body, const char **buttons,
  int button_count, int selected, u16 edge, int f, int closing);
 
@@ -189,12 +192,14 @@ u32 ui_pause(u16 *game_picture);
 int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot);
 void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start */
 u32 ui_library_switch(void);
+u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot);
 /* Cheats (ui_cheats.c), from the pause screen's Cheats tile. */
 void ui_cheats(void);
 extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
 void ui_display_name(const char *file, char *out);  /* out: 256 bytes */
 s32 ui_library_load(const char *dir, char *name);  /* with the Loading card */
 void ui_startup_hook(int current, int total);  /* kai's start-up steps */
+void ui_first_run(void);  /* the first-run cards, once (ui_first.c) */
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
  * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on

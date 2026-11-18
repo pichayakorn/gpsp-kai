@@ -120,6 +120,7 @@ static struct
   u16 toast_edge;
   int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
   char facts[96];             /* the card's cheats and settings line */
+  int help, help_f, help_out; /* the No BIOS help card */
   int dirty;
   u32 frame;
 
@@ -2040,6 +2041,16 @@ static int banner_up(void)
   return ui_no_bios && !banner_gone && g_gpsp_config.bios_note;
 }
 
+/* is any of the notice on screen (□ Help works then)? */
+static int notice_in_view(void)
+{
+  if(!banner_up() || (L.count == 0))
+    return 0;
+  if(L.tab_ids[L.tab] == TAB_RECENT)
+    return 1;
+  return list_banner() && (L.ys[0] - 24 + 16 > VIEW_T);
+}
+
 /* before the first game (no Recent tab) it is the top item of the All
    list instead, so it hides no game (design session, 2026-11-19) */
 static int list_banner(void)
@@ -2543,31 +2554,8 @@ s32 ui_library_load(const char *dir, char *name)
   loaded = load_gamepak(name);
   progress_hook = NULL;
   if(loaded == -1)
-  {
-    /* spec err_rom: one button, OK; × OK and ○ both go back to the
-       library. Drawn into both buffers over the library, then held until a
-       key (the error step adds its motion). */
-    static const char *ok[1] = { "OK" };
-    ui_hint_t h[2];
-    int i;
-    h[0].keys = ui_key_confirm; h[0].verb = "OK";
-    h[1].keys = ui_key_back;    h[1].verb = "Close";
-    for(i = 0; i < 2; i++)
-    {
-      ui_frame_begin();
-      ui_dialog("This game won't open", "The file is damaged, or it is not a GBA game.",
-       ok, 1, 0, UI_COL_PINK, UI_F_DIALOG_IN, 0);
-      ui_hint_packed(h, 2, 14);
-      ui_frame_end();
-    }
-    ui_input_init();
-    do
-    {
-      sceDisplayWaitVblankStart();
-      ui_input_update();
-    }
-    while(!ui_pressed(ui_key_confirm) && !ui_pressed(ui_key_back));
-  }
+    ui_error_card("This game won't open", "The file is damaged, or it is not a GBA game.",
+     "OK", NULL, UI_COL_PINK);
   return loaded;
 }
 
@@ -2629,7 +2617,23 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     L.frame++;
     ui_input_update();
 
-    if(L.pop)
+    if(L.help)
+    {
+      /* □ or ○ closes it */
+      if(!L.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
+      {
+        L.help_out = 1;
+        L.help_f = 0;
+      }
+    }
+    else if(notice_in_view() && !L.card && !L.pop && ui_pressed(PSP_CTRL_SQUARE))
+    {
+      /* □ Help on the No BIOS notice */
+      L.help = 1;
+      L.help_out = 0;
+      L.help_f = 0;
+    }
+    else if(L.pop)
       popup_input();
     else if(L.count == 0)
     {
@@ -2815,6 +2819,18 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       if(L.pop_f == 1)
         L.dirty = 1;  /* the hints change with it */
     }
+    if(L.help)
+    {
+      ui_help_card("Add a GBA BIOS", "Copy gba_bios.bin into kai's folder, then restart kai.",
+       UI_COL_TANGERINE, L.help_f, L.help_out);
+      if(L.help_f < (L.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
+        L.help_f++;
+      else if(L.help_out)
+      {
+        L.help = 0;
+        L.dirty = 1;
+      }
+    }
     if(chosen)
     {
       draw_loading(0, 0);
@@ -2832,6 +2848,96 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   sceImposeSetHomePopup(g_gpsp_config.enable_home);
   ui_layer_reset();
   ui_pool_release(mark);
+  return 1;
+}
+
+static void no_progress(int current, int total);
+
+/* Find a ROM file by name under the ROM folder (four levels, as the
+   library scans). */
+static int find_rom(const char *path, const char *name, int depth, char *dir, int size)
+{
+  SceUID d = sceIoDopen(path);
+  SceIoDirent e;
+  int found = 0;
+
+  if(d < 0)
+    return 0;
+  memset(&e, 0, sizeof(e));
+  while(!found && (sceIoDread(d, &e) > 0))
+  {
+    if(e.d_name[0] == '.')
+      continue;
+    if(FIO_S_ISDIR(e.d_stat.st_mode))
+    {
+      if(depth < SCAN_DEPTH)
+      {
+        char sub[MAX_PATH];
+        path_printf(sub, sizeof(sub), "%s/%s", path, e.d_name);
+        sceIoDclose(d);
+        found = find_rom(sub, name, depth + 1, dir, size);
+        if(found)
+          return 1;
+        /* reopen and skip back to where this folder was */
+        {
+          char seen[256];
+          snprintf(seen, sizeof(seen), "%s", e.d_name);
+          d = sceIoDopen(path);
+          if(d < 0)
+            return 0;
+          while(sceIoDread(d, &e) > 0)
+            if(!strcmp(e.d_name, seen))
+              break;
+        }
+      }
+    }
+    else if(!strcasecmp(e.d_name, name))
+    {
+      snprintf(dir, size, "%s", path);
+      found = 1;
+    }
+    memset(&e, 0, sizeof(e));
+  }
+  sceIoDclose(d);
+  return found;
+}
+
+/* The err_state card's way on: leave the running game (as the Library tile
+ * does) for the game a savestate was made with, then load that savestate
+ * file into it. Returns 0 when that game is not in the ROM folder. */
+u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
+{
+  char dir[MAX_PATH], name[MAX_FILE], file[MAX_FILE];
+
+  if(!find_rom(g_default_rom_dir, rom_name, 0, dir, sizeof(dir)))
+    return 0;
+  snprintf(name, sizeof(name), "%s", rom_name);
+  snprintf(file, sizeof(file), "%s", state_file);
+  save_config_file();
+  update_backup_force();
+  note_game_left();
+  save_game_config_file();
+  if(ui_library_load(dir, name) == -1)
+  {
+    gamepak_filename[0] = 0;
+    return 0;
+  }
+  reset_gba();
+  state_no_question = 1;
+  progress_hook = no_progress;
+  load_state(file, slot);
+  progress_hook = NULL;
+  state_no_question = 0;
+  reg[CHANGED_PC_STATUS] = 1;
+  clear_screen(0);
+  flip_screen();
+  clear_screen(0);
+  flip_screen();
+  video_resolution(FRAME_GAME);
+  set_cpu_clock(g_game_config.clock_speed_number);
+  pause_sound(0);
+  real_frame_count = 0;
+  virtual_frame_count = 0;
   return 1;
 }
 

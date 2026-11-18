@@ -122,6 +122,7 @@ static struct
   u16 toast_edge;
   int toast_f, toast_undo;
   int title_f;      /* frames since the screen opened: the name's marquee */
+  int switch_slot;  /* a savestate of another game: play that game from it */
   int undo_ended;            /* the cursor moved: the toast leaves, no Undo */
   int undo, undo_slot;
   ui_hold_t hold;
@@ -1238,6 +1239,24 @@ static int action_load(int slot)
 
   if(!ok)
   {
+    if((state_error_text == msg[MSG_LOAD_STATE_OTHER_GAME]) && state_error_game[0])
+    {
+      /* spec err_state: say which game it belongs to and offer to play
+         it (PROTOTYPE: without the slot's picture on the card) */
+      char who[256], body[400], play[300];
+      ui_display_name(state_error_game, who);
+      snprintf(body, sizeof(body),
+       "This savestate file was made while playing %s. It only loads in that game.", who);
+      snprintf(play, sizeof(play), "Play %s", who);
+      if(ui_error_card("Made by another game", body, play, "Cancel", UI_COL_SKY))
+      {
+        p.switch_slot = slot;
+        return -1;  /* the caller leaves for that game */
+      }
+      build_layer(1);
+      ui_input_init();
+      return 0;
+    }
     show_toast(state_error_text ? state_error_text : "Loading failed", UI_COL_PINK, UNDO_NONE, 0);
     return 0;
   }
@@ -1526,7 +1545,7 @@ static void perf_write(void)
 }
 #endif
 
-enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_QUIT };
+enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_SWITCH, LEAVE_QUIT };
 
 /* Sleep (spec: Sleep): the power callback holds the suspend off while a
  * game runs with the save on; the pause screen writes Last and lets the
@@ -1642,7 +1661,8 @@ u32 ui_pause(u16 *game_picture)
           {
             p.load_hold.p = 0;
             p.load_hold.shown = 0;
-            action_load(cur_slot());
+            if(action_load(cur_slot()) < 0)
+              leave = LEAVE_SWITCH;
           }
         }
         else
@@ -1652,7 +1672,10 @@ u32 ui_pause(u16 *game_picture)
           if(ui_pressed(ui_key_confirm))
           {
             if(p.has[cur_slot()])
-              action_load(cur_slot());
+            {
+              if(action_load(cur_slot()) < 0)
+                leave = LEAVE_SWITCH;
+            }
             else
               action_save(cur_slot());
           }
@@ -1808,6 +1831,18 @@ u32 ui_pause(u16 *game_picture)
 
   if(leave == LEAVE_QUIT)
     quit(0);
+  if(leave == LEAVE_SWITCH)
+  {
+    char name[MAX_FILE];
+    get_savestate_filename_noshot(p.switch_slot, name);
+    if(ui_library_switch_to(state_error_game, name, p.switch_slot))
+      return 1;
+    /* that game is not in the ROM folder: back to this one */
+    video_resolution_keep(FRAME_GAME);
+    set_cpu_clock(g_game_config.clock_speed_number);
+    pause_sound(0);
+    return p.changed;
+  }
   if(leave == LEAVE_LIBRARY)
   {
     if(ui_library_switch())
