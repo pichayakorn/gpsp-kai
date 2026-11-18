@@ -202,11 +202,27 @@ int exit_callback(int arg1, int arg2, void *common)
   return 0;
 }
 
+#ifdef UI4
+extern u32 video_draw_frame;
+#endif
+
 SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *common)
 {
   if (powerInfo & PSP_POWER_CB_POWER_SWITCH)
   {
     power_flag = 1;
+#ifdef UI4
+    // With "Save when leaving a game" on, Last is written before the PSP
+    // sleeps (spec: Sleep): hold the suspend off until the pause screen
+    // has written it. Only while a game runs, where the pause screen opens
+    // next frame and lets go.
+    if(g_gpsp_config.save_on_leave && gamepak_filename[0] &&
+     (video_draw_frame == FRAME_GAME) && !ui_power_locked)
+    {
+      if(scePowerLock(0) >= 0)
+        ui_power_locked = 1;
+    }
+#endif
 
 #ifdef USE_EXT_MEM
     // PSP-2000+: save part of the extra memory into main memory
@@ -220,6 +236,9 @@ SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *commo
   else if (powerInfo & PSP_POWER_CB_RESUME_COMPLETE)
   {
     power_flag = 0;
+#ifdef UI4
+    ui_woke = 1;  // the pause screen says why the game is paused
+#endif
 
 #ifdef USE_EXT_MEM
     // PSP-2000+: restore it from main memory into the extra memory
@@ -555,7 +574,11 @@ u32 into_suspend()
 {
   FILE_CLOSE(gamepak_file_large);
   u16 *screen_copy = copy_screen();
+#ifdef UI4
+  u32 ret_val = ui_pause(screen_copy);
+#else
   u32 ret_val = menu(screen_copy);
+#endif
   free(screen_copy);
   FILE_OPEN(gamepak_file_large, gamepak_filename_full_path, READ);
   return ret_val;
@@ -573,6 +596,7 @@ u32 update_gba()
 {
   // TODO: may need logging here
   IRQ_TYPE irq_raised = IRQ_NONE;
+  u32 dma_alert = 0;
 
   do
     {
@@ -611,13 +635,13 @@ u32 update_gba()
 
           // If in visible area also fire HDMA
           if(dma[0].start_type == DMA_START_HBLANK)
-            dma_transfer(dma);
+            dma_alert |= dma_transfer(dma);
           if(dma[1].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 1);
+            dma_alert |= dma_transfer(dma + 1);
           if(dma[2].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 2);
+            dma_alert |= dma_transfer(dma + 2);
           if(dma[3].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 3);
+            dma_alert |= dma_transfer(dma + 3);
         }
 
         // The HBlank IRQ is raised on every line, including the V-blank
@@ -648,13 +672,13 @@ u32 update_gba()
           affine_reference_y[1] = ((s32)(ADDRESS32(io_registers, 0x3C) << 4) >> 4);
 
           if(dma[0].start_type == DMA_START_VBLANK)
-            dma_transfer(dma);
+            dma_alert |= dma_transfer(dma);
           if(dma[1].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 1);
+            dma_alert |= dma_transfer(dma + 1);
           if(dma[2].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 2);
+            dma_alert |= dma_transfer(dma + 2);
           if(dma[3].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 3);
+            dma_alert |= dma_transfer(dma + 3);
 
        }
         else
@@ -719,6 +743,16 @@ u32 update_gba()
 
     if(irq_raised)
       raise_interrupt(irq_raised);
+
+    // An H-blank or V-blank DMA that wrote over translated code: drop the
+    // old translations, as a CPU write there does, and have the caller look
+    // the PC up again instead of returning into a flushed block.
+    if(dma_alert & CPU_ALERT_SMC)
+    {
+      dma_alert = 0;
+      flush_translation_cache_ram();
+      reg[CHANGED_PC_STATUS] = 1;
+    }
 
     CHECK_TIMER(0);
     CHECK_TIMER(1);
@@ -999,32 +1033,42 @@ void set_cpu_mode(CPU_MODE_TYPE new_mode)
   u32 i;
   CPU_MODE_TYPE cpu_mode = reg[CPU_MODE];
 
+  // FIQ banks r8-r14; every other mode banks only r13-r14 and shares r8-r12,
+  // which wait in reg_mode[MODE_USR][0-4] while FIQ runs (where
+  // user_reg_ptr() finds them). Leaving FIQ saves its own r8-r14 and brings
+  // the shared r8-r12 back, whichever mode comes next.
   if(cpu_mode != new_mode)
   {
-    if(new_mode == MODE_FIQ)
+    if(cpu_mode == MODE_FIQ)
     {
       for(i = 8; i < 15; i++)
-      {
-        reg_mode[cpu_mode][i - 8] = reg[i];
-      }
+        reg_mode[MODE_FIQ][i - 8] = reg[i];
     }
     else
     {
       reg_mode[cpu_mode][5] = reg[REG_SP];
       reg_mode[cpu_mode][6] = reg[REG_LR];
+      if(new_mode == MODE_FIQ)
+      {
+        for(i = 8; i < 13; i++)
+          reg_mode[MODE_USR][i - 8] = reg[i];
+      }
     }
 
-    if(cpu_mode == MODE_FIQ)
+    if(new_mode == MODE_FIQ)
     {
       for(i = 8; i < 15; i++)
-      {
-        reg[i] = reg_mode[new_mode][i - 8];
-      }
+        reg[i] = reg_mode[MODE_FIQ][i - 8];
     }
     else
     {
       reg[REG_SP] = reg_mode[new_mode][5];
       reg[REG_LR] = reg_mode[new_mode][6];
+      if(cpu_mode == MODE_FIQ)
+      {
+        for(i = 8; i < 13; i++)
+          reg[i] = reg_mode[MODE_USR][i - 8];
+      }
     }
 
     reg[CPU_MODE] = new_mode;

@@ -5,15 +5,15 @@
 
 /* colours: COLOR16(r, g, b), 5 bits each (src/draw.h) */
 #define UI_COL_PLUM       COLOR16( 5,  3,  9)  /* ground */
-#define UI_COL_PLUM_2     COLOR16( 6,  4, 11)  /* ground check (8 px squares, cached) */
+#define UI_COL_PLUM_2     COLOR16( 6,  4, 11)  /* ground check (8 px squares; draw once, keep) */
 #define UI_COL_CARD       COLOR16(10,  7, 17)  /* cards, tiles */
-#define UI_COL_SHADE      COLOR16( 2,  1,  4)  /* hard shadows, screen-door dim over the game */
-#define UI_COL_CREAM      COLOR16(31, 29, 24)  /* text, the cursor frame, dialog body */
+#define UI_COL_SHADE      COLOR16( 2,  1,  4)  /* hard shadows, the screen door */
+#define UI_COL_CREAM      COLOR16(31, 29, 24)  /* text, cursor frame, tab pill, button glyph discs, toasts, dialog cards */
 #define UI_COL_MUTE       COLOR16(19, 16, 22)  /* secondary text, off states */
-#define UI_COL_TANGERINE  COLOR16(31, 17,  4)  /* group: game */
-#define UI_COL_SKY        COLOR16( 9, 22, 31)  /* group: savestates */
-#define UI_COL_LIME       COLOR16(19, 28,  6)  /* group: settings, ON */
-#define UI_COL_PINK       COLOR16(31, 11, 19)  /* group: system, destructive choices */
+#define UI_COL_TANGERINE  COLOR16(31, 17,  4)  /* group: game (Play, Restart, Library) */
+#define UI_COL_SKY        COLOR16( 9, 22, 31)  /* group: savestates, screenshots */
+#define UI_COL_LIME       COLOR16(19, 28,  6)  /* group: settings; ON */
+#define UI_COL_PINK       COLOR16(31, 11, 19)  /* group: system and anything that loses data (Exit, delete) */
 
 /* type: Fusion Pixel; line pitch in px */
 #define UI_FONT_BODY_PX   12
@@ -26,9 +26,11 @@
 #define UI_MARGIN      20
 #define UI_HEADER_H    34
 #define UI_ROW_H       20
-#define UI_ROW_PITCH   22
+#define UI_ROW_PITCH   26  /* Settings, Cheats, list view */
+#define UI_ROW_PITCH_COMPACT 22  /* Folders, Stick rows */
 #define UI_LIFT         2
 #define UI_SHADOW       3
+#define UI_SHADOW_MODAL 4  /* Help, picker, error dialogs, progress and Exit cards */
 #define UI_STRIP_Y    248
 #define UI_STRIP_H     24
 #define UI_CHECK        8   /* ground check square */
@@ -52,11 +54,22 @@
 #define UI_F_RESUME_FADE    8  /* out-cubic */
 #define UI_F_HOLD_SHOW     12  /* step */
 #define UI_F_FLASH          8  /* linear */
-#define UI_F_HOLD          60  /* linear; 1 s (maintainer, 2026-11-16) */
+#define UI_F_HOLD          60  /* linear */
 #define UI_F_HOLD_DRAIN    10  /* linear */
 #define UI_F_SAVING        30  /* linear */
+#define UI_F_CARD_RISE     10  /* out-back */
 #define UI_F_TIP_DELAY     18  /* step */
+#define UI_F_LETTER_POP    40  /* out-back */
+#define UI_F_RAIL_IN        8  /* out-cubic */
+#define UI_F_RAIL_OUT       8  /* in-cubic */
+#define UI_F_HELP_IN       12  /* out-back */
+#define UI_F_HELP_OUT       8  /* in-cubic */
+#define UI_F_FIRST_RUN     12  /* out-back */
 #define UI_MARQUEE_DELAY 40
+#define UI_MARQUEE_SPEED  1  /* px per frame */
+#define UI_MARQUEE_GAP   32  /* px between the end of a title and its repeat */
+#define UI_F_REPEAT_DELAY 18  /* d-pad and L/R: a held key repeats after this, */
+#define UI_F_REPEAT_EVERY  4  /* then every this many frames; a repeat never wraps */
 
 /* easing tables, 8.8 fixed point (256 = 1.0), entry i = frame i+1 */
 #ifdef __GNUC__

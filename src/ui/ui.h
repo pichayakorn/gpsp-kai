@@ -54,6 +54,11 @@ int ui_print_fit(int x, int y, const char *utf8, u16 color, int font, int flags,
 /* The frame being drawn (uncached VRAM), for the drawing code. */
 extern u16 *ui_fb;
 extern u32 ui_fb_pitch;
+/* Drawing stays inside the clip rectangle; reset it after use. */
+extern int ui_clip_x0, ui_clip_y0, ui_clip_x1, ui_clip_y1;
+void ui_clip_set(int x, int y, int w, int h);
+void ui_clip_reset(void);
+void ui_ground_rect(int x, int y, int w, int h);
 
 /* Frame: draw into the back buffer, then ui_frame_end() shows it at the
  * next vblank. */
@@ -131,12 +136,14 @@ void ui_row_action(int xr, int y, int selected);
 int ui_tabs(int x, const char **labels, int count, int k, int prev, int f);
 
 int ui_toast(const char *text, u16 edge, const char *undo, int f);
+int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y);
 int ui_toast_up(int f);
 /* The clock and battery chip, top right (pause, settings). ui_status_read()
  * reads everything once, when a screen opens; the chip then refreshes a
  * value a frame, over each second. */
 void ui_status_read(void);
 void ui_status_chip(void);
+void ui_status_chip_at(int y);
 void ui_game_toast(const char *text, u16 edge);  /* over the game, after the pause */
 void ui_game_battery(int level, int on_battery);  /* once a second in a game */
 /* Every frame in a game. fps < 0: Show FPS off. ff: 0 off, 1 Max, 2 or 3
@@ -186,5 +193,9 @@ extern ui_restart_note_t ui_restart_note;
 void ui_restart_note_read(void);
 void ui_restart_now(int tab, int row, const char *game);
 void ui_restart_exec(void);  /* from quit(3) */
+
+/* Sleep: set by the power callback, handled by the pause screen. */
+extern volatile int ui_power_locked;
+extern volatile int ui_woke;
 
 #endif

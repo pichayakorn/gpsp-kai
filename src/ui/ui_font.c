@@ -156,15 +156,15 @@ static int boldable(u32 c)
 
 static void put(int x, int y, u16 color)
 {
-  if((u32)x < UI_SCREEN_W && (u32)y < UI_SCREEN_H)
+  if((x >= ui_clip_x0) && (x < ui_clip_x1) && (y >= ui_clip_y0) && (y < ui_clip_y1))
     ui_fb[y * ui_fb_pitch + x] = color;
 }
 
 /* Draw one glyph's set pixels; scale is 1 or 2. */
 static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, int scale)
 {
-  int j, inside = (x >= 0) && (y >= 0) && (x + font->width * scale <= UI_SCREEN_W) &&
-   (y + font->height * scale <= UI_SCREEN_H);
+  int j, inside = (x >= ui_clip_x0) && (y >= ui_clip_y0) && (x + font->width * scale <= ui_clip_x1) &&
+   (y + font->height * scale <= ui_clip_y1);
 
   for(j = 0; j < font->height; j++, bits += font->row_bytes)
   {

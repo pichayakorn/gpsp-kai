@@ -25,7 +25,9 @@
 // reg[13] and reg[14] into reg_mode[cpu_mode][5] and reg_mode[cpu_mode][6]
 // respectively and load into reg[13] and reg[14] reg_mode[new_mode][5] and
 // reg_mode[new_mode][6]. When swapping to/from FIQ retire/load reg[8]
-// through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6].
+// through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6];
+// the r8-r12 the other modes share wait in reg_mode[MODE_USR][0-4] meanwhile
+// (set_cpu_mode() in main.c).
 
 u32 reg_mode[7][7];
 
@@ -270,7 +272,9 @@ typedef struct
     }                                                                         \
   }                                                                           \
                                                                               \
-  switch((opcode >> 20) & 0xFF) /* bits 20-27 */                             \
+  /* condition NV (0xF) never runs (the scan made it an AL no-op);            \
+     0xC0 emits nothing */                                                    \
+  switch(((opcode >> 28) == 0xF) ? 0xC0 : ((opcode >> 20) & 0xFF))            \
   {                                                                           \
     case 0x00:                                                                \
       if((opcode & 0x90) == 0x90)                                             \
@@ -2706,7 +2710,10 @@ u32 bios_block_tag_top = 0x0101;
   }                                                                           \
   else                                                                        \
   {                                                                           \
-    pc = (pc + 2) & ~0x03;                                                    \
+    /* the bus ignores address bit 1: a BX into ARM state with it set         \
+       runs the word below (a Thumb "bx pc" at a halfword address,            \
+       e.g. Golden Sun 2's interrupt code), not the one above */              \
+    pc &= ~0x03;                                                              \
     reg[REG_CPSR] &= ~0x20;                                                   \
   }                                                                           \
 
@@ -2811,6 +2818,10 @@ u32 translation_flush_count = 0;
   switch(pc >> 24)                                                            \
   {                                                                           \
     case 0x0:                                                                 \
+      /* region 0 holds code only in the 16 KB BIOS: above it the tag would   \
+         land outside bios_rom, so it is no code, like an unmapped region */  \
+      if(pc >= 0x4000)                                                        \
+        goto no_code_region;                                                  \
       bios_region_read_allow();                                               \
       location = (u16 *)(bios_rom + pc + 0x4000);                             \
       block_lookup_translate(type, bios, 0);                                  \
@@ -2880,6 +2891,7 @@ u32 translation_flush_count = 0;
     }                                                                         \
                                                                               \
     default:                                                                  \
+    no_code_region:                                                           \
       /* If we're at the bottom, it means we're actually trying to jump to an \
          address that we can't handle. Otherwise, it means that code scanned  \
          has reached an address that can't be handled, which means that we    \
@@ -2947,6 +2959,15 @@ block_lookup_address_body(dual);
   condition = opcode >> 28;                                                   \
                                                                               \
   opcode &= 0xFFFFFFF;                                                        \
+  /* condition NV (0xF) is "never" on the ARM7TDMI: make the word an AL       \
+     no-op, so it is no exit and closes any conditional run (with no          \
+     case for 0xF, generate_condition emitted no skip and the run             \
+     kept a stale or unset backpatch address) */                              \
+  if(condition == 0x0F)                                                       \
+  {                                                                           \
+    condition = 0x0E;                                                         \
+    opcode = 0;                                                               \
+  }                                                                           \
                                                                               \
   block_end_pc += 4                                                           \
 
@@ -3345,6 +3366,15 @@ s32 translate_block_##type(u32 pc, TRANSLATION_REGION_TYPE                    \
     {                                                                         \
       block_data[(branch_target - block_start_pc) /                           \
        type##_instruction_width].update_cycles = 1;                           \
+      /* a conditional ARM entry point needs its own condition check: the     \
+         translator emits one header per run of same-condition words, so a    \
+         branch landing mid-run ran the rest of it unconditionally (Mario     \
+         Golf). Like the flag-setting 0x20, 0x40 closes the run here and      \
+         opens a fresh header. */                                             \
+      if((type##_instruction_width == 4) &&                                   \
+       ((block_data[(branch_target - block_start_pc) / 4].condition & 0x0F) !=\
+       0x0E))                                                                 \
+        block_data[(branch_target - block_start_pc) / 4].condition |= 0x40;   \
     }                                                                         \
   }                                                                           \
                                                                               \

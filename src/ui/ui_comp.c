@@ -113,8 +113,11 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
 
   if(flags & UI_ROW_DISABLED)
   {
+    /* greyed out: a plum-2 card, the label and its per-game mark mute */
     ui_round_fill(x, y, w, UI_ROW_H, 2, UI_COL_PLUM_2);
-    body_text(x + 8, y + 2, label, UI_COL_MUTE, 0);
+    end = body_text(x + 8, y + 2, label, UI_COL_MUTE, 0);
+    if(flags & UI_ROW_PER_GAME)
+      draw_icon(end + 5, y + 2 + 4, icon_rom, UI_COL_MUTE);
     *vx = x + w - 8;
     *vy = y;
     return;
@@ -326,12 +329,22 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f)
  * once it is gone. */
 int ui_toast(const char *text, u16 edge, const char *undo, int f)
 {
-  int w, x, y = undo ? 214 : 212, right = undo ? 466 : 460, out;
+  return ui_toast_at(text, edge, undo, f, 214);
+}
+
+/* At y: 214 bottom right in menus, 6 top right on the pause screen and over
+ * a running game. The right edge is 466 either way. */
+int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y)
+{
+  int w, x, right = 466, out;
 
   if(f < 0)
     return 0;
-  /* text, SELECT pill and the undo word, with 12 px either side */
-  w = body_width(text, 0) + (undo ? small_width(undo) + ui_glyph_width(PSP_CTRL_SELECT) + 40 : 28);
+  /* 12 px in, the text, then 10 px, the SELECT pill, 4 px and the bold
+     undo word; 12 px clear at the end */
+  w = 12 + body_width(text, 0) + 12;
+  if(undo)
+    w += 10 + ui_glyph_width(PSP_CTRL_SELECT) + 4 + small_width(undo) + 1;
   out = w + 24;
   if(f < UI_F_TOAST_IN)
     x = right - w + ui_ease_out_back(out, 0, f + 1, UI_F_TOAST_IN);
@@ -352,12 +365,12 @@ int ui_toast(const char *text, u16 edge, const char *undo, int f)
     int ex = body_text(x + 12, y + 5, text, UI_COL_PLUM, 0);
     int gx = ui_glyph_inverted(ex + 10, y + 7, PSP_CTRL_SELECT) + 4;
     if(ui_font_loaded())
-      ui_print(gx, y + 5, undo, UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+      ui_print(gx, y + 6, undo, UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
     else
       small_text(gx, y + 6, undo, UI_COL_PLUM);
   }
   else
-    body_text(x + 14, y + 5, text, UI_COL_PLUM, 0);
+    body_text(x + 12, y + 5, text, UI_COL_PLUM, 0);
   return 1;
 }
 
@@ -582,6 +595,13 @@ void ui_status_read(void)
 
 void ui_status_chip(void)
 {
+  ui_status_chip_at(8);
+}
+
+/* At y: 8 on most screens, 10 on the pause screen (centred on the header's
+ * row there). */
+void ui_status_chip_at(int y)
+{
   int shown_level;
   char clock[16], pct[8];
   int w, x, tx, i, j, critical = 0;
@@ -622,14 +642,14 @@ void ui_status_chip(void)
   w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
    (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
   x = 460 - w;
-  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
-  ui_text(x + 6, 9, clock, UI_COL_CREAM);
+  ui_round_fill(x, y, w, 16, 2, UI_COL_CARD);
+  ui_text(x + 6, y + 1, clock, UI_COL_CREAM);
   if(!status_battery)
     return;
   tx = x + 6 + ui_text_width(clock) + 4;
   if(critical)
   {
-    ui_text(tx, 9, pct, UI_COL_PINK);
+    ui_text(tx, y + 1, pct, UI_COL_PINK);
     tx += ui_text_width(pct) + 4;
   }
   if(status_charging)
@@ -637,12 +657,12 @@ void ui_status_chip(void)
     for(j = 0; j < 7; j++)
       for(i = 0; i < 5; i++)
         if(bolt[j] & (0x10 >> i))
-          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
+          ui_fill(tx + i, y + 4 + j, 1, 1, UI_COL_SKY);
     tx += 7;
   }
   /* the bitmap's first column is empty: one to the left */
-  draw_icon(tx - 1, 11, icon_battery, color);
-  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
+  draw_icon(tx - 1, y + 3, icon_battery, color);
+  ui_fill(tx + 1, y + 6, 7 * shown_level / 100, 3, color);
 }
 
 

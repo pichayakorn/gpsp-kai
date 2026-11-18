@@ -625,13 +625,21 @@ mips_indirect_branch_dual:
 .endm
 
 
-.macro backup_load_core
+# SRAM and flash sit on an 8-bit bus: a 16 or 32-bit read returns the byte
+# in every lane (lanes = 2 or 4).
+.macro backup_load_core lanes=1
   save_registers                  # save the registers
 
   jal read_backup                 # get backup value in $2
   ext $4, $4, 0, 16               # address &= 0xFFFF (delay)
 
   restore_registers               # restore the other registers
+.if \lanes >= 2
+  ins $2, $2, 8, 8                # the byte in bits 8-15 too
+.endif
+.if \lanes == 4
+  ins $2, $2, 16, 16              # and in bits 16-31
+.endif
 
   lw $ra, REG_SAVE($16)           # restore return address
   jr $ra                          # return
@@ -648,6 +656,8 @@ mips_indirect_branch_dual:
   ext $4, $4, 0, 16               # address &= 0xFFFF (delay)
 
   restore_registers               # restore the other registers
+  ins $2, $2, 8, 8                # a 32-bit read: the byte in every lane
+  ins $2, $2, 16, 16
 
   lw $ra, REG_SAVE($16)           # restore return address
   jr $ra                          # return
@@ -661,24 +671,24 @@ mips_indirect_branch_dual:
   backup_load_core
 .endm
 
-.macro backup_load_align align_bits, alignment, patch_handler
+.macro backup_load_align align_bits, alignment, patch_handler, lanes=1
   region_check_align 0xE, \align_bits, \alignment, \patch_handler
   sw $ra, REG_SAVE($16)           # save the return address (delay)
-  backup_load_core
+  backup_load_core \lanes
 .endm
 
 .macro backup_load_align16 align_bits, alignment, patch_handler
   region_check_align 0xE, \align_bits, \alignment, \patch_handler
   sw $ra, REG_SAVE($16)           # save the return address (delay)
   ins $4, $0, 0, 1                # mask out lower bit
-  backup_load_core
+  backup_load_core 2
 .endm
 
 .macro backup_load_align32 align_bits, alignment, patch_handler
   region_check_align 0xE, \align_bits, \alignment, \patch_handler
   sw $ra, REG_SAVE($16)           # save the return address (delay)
   ins $4, $0, 0, 2                # mask out lower two bits
-  backup_load_core
+  backup_load_core 4
 .endm
 
 
@@ -1234,7 +1244,7 @@ execute_load_eeprom_u16:
   eeprom_load_align 1, 0, patch_load_u16
 
 execute_load_backup_u16:
-  backup_load_align 1, 0, patch_load_u16
+  backup_load_align 1, 0, patch_load_u16, 2
   nop
 
 execute_load_open_u16:
@@ -1470,8 +1480,8 @@ execute_load_eeprom_s16:
   eeprom_load_align 1, 0, patch_load_s16
 
 execute_load_backup_s16:
-  backup_load_align 1, 0, patch_load_s16
-  nop
+  backup_load_align 1, 0, patch_load_s16, 2
+  seh $2, $2                      # sign extend result from 16bits
 
 execute_load_open_s16:
   open_load16_align 1, 0, patch_load_s16
@@ -1669,7 +1679,7 @@ execute_load_eeprom_u32:
   eeprom_load_align 2, 0, patch_load_u32
 
 execute_load_backup_u32:
-  backup_load_align 2, 0, patch_load_u32
+  backup_load_align 2, 0, patch_load_u32, 4
   nop
 
 execute_load_open_u32:
