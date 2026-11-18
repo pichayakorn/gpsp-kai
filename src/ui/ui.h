@@ -184,6 +184,7 @@ u32 ui_pause(u16 *game_picture);
  * or 0 when the library could not open. */
 int ui_library(char *dir, int dir_size, char *name, int name_size);
 u32 ui_library_switch(void);
+void ui_display_name(const char *file, char *out);  /* out: 256 bytes */
 s32 ui_library_load(const char *dir, char *name);  /* with the Loading card */
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
