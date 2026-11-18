@@ -644,6 +644,7 @@ static u32 game_played(int game)
   FILE *f;
   char *dot;
   size_t n;
+  u32 head[2];
 
   if(L.played_game == game)
     return L.played;
@@ -657,11 +658,15 @@ static u32 game_played(int game)
   f = fopen(path, "rb");
   if(f == NULL)
     return 0;
+  /* the file: "gcfg", the version, then the settings (gui.c) */
   memset(&cfg, 0, sizeof(cfg));
-  n = fread(&cfg, 1, sizeof(cfg), f);
+  if((fread(head, 4, 2, f) == 2) && !memcmp(head, "gcfg", 4))
+  {
+    n = fread(&cfg, 1, sizeof(cfg), f);
+    if(n >= offsetof(game_config_t, play_seconds) + sizeof(u32))
+      L.played = cfg.play_seconds;
+  }
   fclose(f);
-  if(n >= offsetof(game_config_t, play_seconds) + sizeof(u32))
-    L.played = cfg.play_seconds;
   return L.played;
 }
 
