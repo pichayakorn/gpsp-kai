@@ -2816,6 +2816,10 @@ u32 translation_flush_count = 0;
   switch(pc >> 24)                                                            \
   {                                                                           \
     case 0x0:                                                                 \
+      /* region 0 holds code only in the 16 KB BIOS: above it the tag would   \
+         land outside bios_rom, so it is no code, like an unmapped region */  \
+      if(pc >= 0x4000)                                                        \
+        goto no_code_region;                                                  \
       bios_region_read_allow();                                               \
       location = (u16 *)(bios_rom + pc + 0x4000);                             \
       block_lookup_translate(type, bios, 0);                                  \
@@ -2885,6 +2889,7 @@ u32 translation_flush_count = 0;
     }                                                                         \
                                                                               \
     default:                                                                  \
+    no_code_region:                                                           \
       /* If we're at the bottom, it means we're actually trying to jump to an \
          address that we can't handle. Otherwise, it means that code scanned  \
          has reached an address that can't be handled, which means that we    \
