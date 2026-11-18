@@ -3364,6 +3364,15 @@ s32 translate_block_##type(u32 pc, TRANSLATION_REGION_TYPE                    \
     {                                                                         \
       block_data[(branch_target - block_start_pc) /                           \
        type##_instruction_width].update_cycles = 1;                           \
+      /* a conditional ARM entry point needs its own condition check: the     \
+         translator emits one header per run of same-condition words, so a    \
+         branch landing mid-run ran the rest of it unconditionally (Mario     \
+         Golf). Like the flag-setting 0x20, 0x40 closes the run here and      \
+         opens a fresh header. */                                             \
+      if((type##_instruction_width == 4) &&                                   \
+       ((block_data[(branch_target - block_start_pc) / 4].condition & 0x0F) !=\
+       0x0E))                                                                 \
+        block_data[(branch_target - block_start_pc) / 4].condition |= 0x40;   \
     }                                                                         \
   }                                                                           \
                                                                               \
