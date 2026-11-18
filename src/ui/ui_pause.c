@@ -188,76 +188,6 @@ static void read_slot(int slot)
     shot_failed = -1;  /* the file changed: try again */
 }
 
-/* The big picture is the selected slot's screenshot box-filtered once to
- * 144 x 96 (5:3, every output pixel the area-weighted average of the
- * pixels it covers) and then drawn 1:1, never nearest-sampled. Until it
- * is there, the slot's 60 x 40 picture stands in, stretched by the GE with
- * bilinear filtering. */
-static u8 box_i[144][3], box_w[144][3];  /* source index and weight in thirds */
-
-static void box_tables(void)
-{
-  int x, k;
-
-  for(x = 0; x < 144; x++)
-  {
-    int s0 = x * 5, s1 = s0 + 5;
-    for(k = 0; k < 3; k++)
-    {
-      int i = s0 / 3 + k, a = i * 3, b = a + 3;
-      if(a < s0) a = s0;
-      if(b > s1) b = s1;
-      box_i[x][k] = (i < 240) ? i : 239;
-      box_w[x][k] = (b > a) ? b - a : 0;
-    }
-  }
-}
-
-/* CHUNK_ROWS screenshot rows (240 wide) to the matching rows of p.big. */
-static void shrink_rows(const u16 *src, int rows, u16 *dst)
-{
-  static u16 sum[3][3][144];  /* the three source rows, 5x horizontal sums */
-  int y, x, k, c;
-
-  for(y = 0; y < rows * 3 / 5; y++)
-  {
-    for(k = 0; k < 3; k++)
-    {
-      const u16 *row = src + box_i[y][k] * 240;
-      if(!box_w[y][k])
-        continue;
-      for(x = 0; x < 144; x++)
-      {
-        u32 r = 0, g = 0, b = 0;
-        for(c = 0; c < 3; c++)
-        {
-          u16 px = row[box_i[x][c]];
-          u32 w = box_w[x][c];
-          r += (px & 0x1F) * w;
-          g += ((px >> 5) & 0x1F) * w;
-          b += ((px >> 10) & 0x1F) * w;
-        }
-        sum[k][0][x] = r;
-        sum[k][1][x] = g;
-        sum[k][2][x] = b;
-      }
-    }
-    for(x = 0; x < 144; x++)
-    {
-      u32 ch[3];
-      for(c = 0; c < 3; c++)
-      {
-        u32 t = 0;
-        for(k = 0; k < 3; k++)
-          if(box_w[y][k])
-            t += sum[k][c][x] * box_w[y][k];
-        ch[c] = (t + 12) / 25;
-      }
-      dst[y * 144 + x] = COLOR16(ch[0], ch[1], ch[2]);
-    }
-  }
-}
-
 /* Reading savestate pictures: the screenshot in chunks of CHUNK_ROWS rows
  * (a 9.4 KB buffer, so the pictures fit the UI pool with the Korean font),
  * each box-filtered into p.big (when it is the selected slot) and
@@ -300,7 +230,7 @@ static void shot_wait(void)
 static void shot_take_chunk(int slot, int n)
 {
   if(shot_for_big)
-    shrink_rows(p.chunk, CHUNK_ROWS, p.big + n * (CHUNK_ROWS * 3 / 5) * 144);
+    ui_shrink_53_rows(p.chunk, CHUNK_ROWS, p.big + n * (CHUNK_ROWS * 3 / 5) * 144);
   if(shot_for_thumb)
     make_thumbnail_rows(p.chunk, CHUNK_ROWS, thumb(slot) + n * (CHUNK_ROWS / 4) * THUMB_PITCH,
      THUMB_PITCH);
@@ -1164,7 +1094,7 @@ static void action_save(int slot)
     /* the big picture is the screenshot just saved: no need to read it */
     if(p.big)
     {
-      shrink_rows(p.game, 160, p.big);
+      ui_shrink_53_rows(p.game, 160, p.big);
       p.big_slot = slot;
     }
     sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
@@ -1595,8 +1525,6 @@ u32 ui_pause(u16 *game_picture)
   p.thumbs = ui_pool_alloc(SLOTS * THUMB_PITCH * SMALL_H * 2);
   p.big = ui_pool_alloc(BIG_W * BIG_H * 2);
   p.chunk = ui_pool_alloc(CHUNK_BYTES);
-  if(!box_i[143][0])
-    box_tables();
   for(i = 0; i < SLOTS; i++)
     read_slot(i);
   /* the big picture is sharp from the first frame: it loads while the game

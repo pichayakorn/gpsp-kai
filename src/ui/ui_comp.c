@@ -902,3 +902,77 @@ void ui_ring(int cx, int cy, int r, int t, u16 color)
     ui_fill(cx + wi + 1, cy + y, wo - wi, 1, color);
   }
 }
+
+/* ---- the 5:3 box filter ---------------------------------------------------- */
+
+/* The big picture is the selected slot's screenshot box-filtered once to
+ * 144 x 96 (5:3, every output pixel the area-weighted average of the
+ * pixels it covers) and then drawn 1:1, never nearest-sampled. */
+static u8 box_i[144][3], box_w[144][3];  /* source index and weight in thirds */
+
+static void box_tables(void)
+{
+  int x, k;
+
+  for(x = 0; x < 144; x++)
+  {
+    int s0 = x * 5, s1 = s0 + 5;
+    for(k = 0; k < 3; k++)
+    {
+      int i = s0 / 3 + k, a = i * 3, b = a + 3;
+      if(a < s0) a = s0;
+      if(b > s1) b = s1;
+      box_i[x][k] = (i < 240) ? i : 239;
+      box_w[x][k] = (b > a) ? b - a : 0;
+    }
+  }
+}
+
+/* rows (a multiple of 5) screenshot rows, 240 wide, to rows * 3 / 5 rows of
+   a 144-wide picture: the pause screen's big picture, the Continue card */
+void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
+{
+  static u16 sum[3][3][144];  /* the three source rows, 5x horizontal sums */
+  int y, x, k, c;
+
+  if(!box_i[143][0])
+    box_tables();
+
+  for(y = 0; y < rows * 3 / 5; y++)
+  {
+    for(k = 0; k < 3; k++)
+    {
+      const u16 *row = src + box_i[y][k] * 240;
+      if(!box_w[y][k])
+        continue;
+      for(x = 0; x < 144; x++)
+      {
+        u32 r = 0, g = 0, b = 0;
+        for(c = 0; c < 3; c++)
+        {
+          u16 px = row[box_i[x][c]];
+          u32 w = box_w[x][c];
+          r += (px & 0x1F) * w;
+          g += ((px >> 5) & 0x1F) * w;
+          b += ((px >> 10) & 0x1F) * w;
+        }
+        sum[k][0][x] = r;
+        sum[k][1][x] = g;
+        sum[k][2][x] = b;
+      }
+    }
+    for(x = 0; x < 144; x++)
+    {
+      u32 ch[3];
+      for(c = 0; c < 3; c++)
+      {
+        u32 t = 0;
+        for(k = 0; k < 3; k++)
+          if(box_w[y][k])
+            t += sum[k][c][x] * box_w[y][k];
+        ch[c] = (t + 12) / 25;
+      }
+      dst[y * 144 + x] = COLOR16(ch[0], ch[1], ch[2]);
+    }
+  }
+}
