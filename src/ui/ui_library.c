@@ -980,6 +980,69 @@ static int recent_place(void)
   return L.rec_row ? 1 + L.rec_cur : 0;
 }
 
+/* A headline title (spec section 4, Long game names; the Continue card and
+ * the game card): 12 px bold at 2x when it fits w; else 12 px bold on up
+ * to two lines 16 px apart, 2 px higher, so the block keeps the 2x
+ * title's height. Past two lines the second is cut with "…"; with shift >
+ * 0 (the focused card's marquee) it runs sideways instead, over bg. */
+static void big_title(int x, int y, int w, const char *t, u16 ink, u16 bg, int shift)
+{
+  char line[128], rest[256];
+  int n, k;
+
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= w)
+  {
+    ui_print(x, y, t, ink, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+    return;
+  }
+  rest[0] = 0;
+  for(n = 0; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  {
+    char *l = line;
+    while(*l == ' ')
+      l++;
+    if(n == 0)
+      ui_print(x, y - 2, l, ink, UI_FONT_BODY, UI_TEXT_BOLD);
+    else
+    {
+      k = strlen(rest);
+      snprintf(rest + k, sizeof(rest) - k, "%s%s", k ? " " : "", l);
+    }
+  }
+  if(rest[0] == 0)
+    return;
+  if(shift <= 0)
+  {
+    ui_print_fit(x, y + 14, rest, ink, UI_FONT_BODY, UI_TEXT_BOLD, w);
+    return;
+  }
+  ui_fill(x, y + 14, w, 16, bg);
+  ui_clip_set(x, y + 14, w, 16);
+  ui_print(x - shift, y + 14, rest, ink, UI_FONT_BODY, UI_TEXT_BOLD);
+  ui_clip_reset();
+}
+
+/* how far a headline's second line runs past w (0: it fits, or one line) */
+static int big_title_over(const char *t, int w)
+{
+  char line[128], rest[256];
+  int n, k;
+
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= w)
+    return 0;
+  rest[0] = 0;
+  for(n = 1; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  {
+    char *l = line;
+    while(*l == ' ')
+      l++;
+    k = strlen(rest);
+    snprintf(rest + k, sizeof(rest) - k, "%s%s", k ? " " : "", l);
+  }
+  k = ui_print_width(rest, UI_FONT_BODY, UI_TEXT_BOLD) - w;
+  return (k > 0) ? k : 0;
+}
+
 static void draw_continue(int hero)
 {
   int game = L.recent[0], lift = hero ? UI_LIFT : 0, x, y, w;
@@ -1000,8 +1063,7 @@ static void draw_continue(int hero)
   w = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
   ui_round_fill(x + 160, y + 10, w, 16, 2, hero ? UI_COL_PLUM : UI_COL_TANGERINE);
   ui_print(x + 166, y + 11, chip, hero ? UI_COL_TANGERINE : UI_COL_PLUM, UI_FONT_SMALL, 0);
-  ui_print_fit(x + 160, y + 30, L.games[game].title, ink, UI_FONT_BODY,
-   UI_TEXT_BOLD | UI_TEXT_2X, 270);
+  big_title(x + 160, y + 30, 270, L.games[game].title, ink, 0, 0);
   when_text(L.cont_time, when, sizeof(when));
   played_text(game_played(game), played, sizeof(played));
   if(L.cont_slot == 10)
@@ -1036,6 +1098,15 @@ static void recent_selection(void)
     ui_fill(x + 1, RECENT_Y + 1, COVER, COVER, UI_COL_SHADE);
     draw_cover(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
     grid_marquee(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
+  }
+  /* the focused Continue card: a long name's second line runs sideways */
+  if((L.rec_row == 0) && (L.rec_f >= UI_F_CURSOR))
+  {
+    const char *t = L.games[L.recent[0]].title;
+    int shift = marquee_shift(big_title_over(t, 270));
+    if(shift > 0)
+      big_title(CONT_X - UI_LIFT + 160, CONT_Y - UI_LIFT + 30, 270, t, UI_COL_PLUM,
+       UI_COL_TANGERINE, shift);
   }
   /* the frame flies straight to the new place, also between the card and
      the row */
