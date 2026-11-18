@@ -2667,6 +2667,8 @@ s32 load_gamepak(char *name)
     return 0;
   }
 
+  if(progress_hook)
+    return -1;  // the 4.0 library shows its own error card
   show_progress(msg[MSG_LOAD_ROM_ERROR]);
   button_up_wait();
   error_msg("");  // wait for any button
