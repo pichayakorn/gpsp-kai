@@ -530,9 +530,7 @@ int main(int argc, char *argv[])
 
       while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename)))
       {
-        chdir(dir);
-        snprintf(rom_path, sizeof(rom_path), "%s", dir);
-        loaded = load_gamepak(load_filename);
+        loaded = ui_library_load(dir, load_filename);
         if(loaded != -1)
           break;
       }
