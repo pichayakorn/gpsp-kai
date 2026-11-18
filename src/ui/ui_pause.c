@@ -1691,7 +1691,12 @@ u32 ui_pause(u16 *game_picture)
               ui_input_init();
               break;
             case TILE_CHEATS:
-              leave = LEAVE_OLD_MENU;
+              /* Cheats draws its own ground; the pause screen's comes back */
+              shot_wait();
+              ui_cheats();
+              build_layer(1);
+              ui_status_read();
+              ui_input_init();
               break;
             case TILE_LIBRARY:
               action_library();

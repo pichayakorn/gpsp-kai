@@ -93,6 +93,8 @@ typedef struct
   u32 play_seconds;        // time spent in the game, menus not counted
   u32 last_played;         // when the game was last left, Unix time (UTC); 0 = never
   u32 last_slot;           // savestate slot last saved or loaded (0-9, 10 = Last)
+  u32 cheat_locks;         // bit n: cheat n is locked on (the 4.0 Cheats screen)
+  u32 cheat_locks_set;     // YES once the locks were first set (fixes and masters)
 } game_config_t;
 
 #define ASM_CORE 0
