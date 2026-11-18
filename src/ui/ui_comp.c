@@ -751,12 +751,19 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
       len = next - p;
       if(len >= (int)sizeof(buf))
         break;
+      /* a space never makes a line too wide: lines are measured without
+         their trailing spaces, as in the design's wrap */
+      if(*q == ' ')
+      {
+        last_space = q;
+        q = next;
+        end = q;
+        continue;
+      }
       memcpy(buf, p, len);
       buf[len] = 0;
       if(((font == UI_FONT_BODY) ? body_width(buf, 0) : small_width(buf)) > max_width)
         break;
-      if(*q == ' ')
-        last_space = q;
       q = next;
       end = q;
     }
