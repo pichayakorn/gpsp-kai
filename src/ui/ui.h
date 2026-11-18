@@ -179,11 +179,14 @@ void ui_components(void);
 u32 ui_pause(u16 *game_picture);
 
 /* The Library (ui_library.c). ui_library() lets the player pick a game and
- * returns 1 with its folder and file name, 0 without pool memory for it.
+ * returns 1 with its folder and file name, and in *slot the savestate to
+ * resume once it has started (Continue: 10 Last or 0-9; -1 from the
+ * start), 0 without pool memory for it.
  * ui_library_switch() is the pause screen's Library: it leaves the game
  * running (the caller has saved Last), loads the one picked and returns 1,
  * or 0 when the library could not open. */
-int ui_library(char *dir, int dir_size, char *name, int name_size);
+int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot);
+void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start */
 u32 ui_library_switch(void);
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row

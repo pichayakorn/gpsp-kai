@@ -49,6 +49,7 @@
 #define POP_H  (LIBRARY_GRID ? 98 : 64)
 
 enum { VIEW_GRID, VIEW_LIST };
+enum { TAB_RECENT, TAB_ALL };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
 typedef struct
@@ -86,6 +87,16 @@ static struct
   int close_row, close_from, close_f;  /* list: the card closing, from how open */
   int *ys;                    /* list: every row's top this frame */
   int marq_f;                 /* frames the selection has rested (marquee) */
+
+  int tab, tab_prev, tab_f;   /* the tab shown (TAB_*), the one before, its slide */
+  int tab_ids[4], tab_count;  /* the tabs on the bar */
+  int recent[30], recent_count;  /* games in recent.txt order */
+  int rec_row, rec_cur;       /* Recent: 0 the Continue card, 1 the covers; which */
+  int rec_from, rec_f;        /* the place the frame flies from, its frames */
+  u16 *pic;                   /* the Continue card's picture, 144 x 96 */
+  int pic_ok, cont_slot;      /* it was read; the slot Continue resumes (-1 none) */
+  u64 cont_time;              /* that slot's save time */
+  int chosen_game, chosen_slot;
   int dirty;
   u32 frame;
 
@@ -786,6 +797,273 @@ static void list_selection(void)
   }
 }
 
+/* ---- Recent and the Continue card (spec section 4, Home) -----------------------------
+ * The first tab once a game has been played: the Continue card for the last
+ * game (its Last picture, name, when, play time) and the recent games as
+ * covers below it. × resumes a game from Last, or from its newest
+ * savestate, here and on every list row (only the game card differs). Before any game has been played there is no Recent
+ * tab and the library opens on All. */
+
+#define RECENT_MAX   30
+#define RECENT_ROW   5
+#define CONT_X       20
+#define CONT_Y       40
+#define CONT_W       440
+#define CONT_H       104
+#define RECENT_Y     166
+#define PIC_W        144
+#define PIC_H        96
+#define SVS_SHOT     8                       /* the screenshot follows the 8-byte header */
+#define SVS_TIME     (SVS_SHOT + 240 * 160 * 2)
+#define SHOT_ROWS    20
+
+/* a game's savestate file for slot 0-10 */
+static void state_path(int game, int slot, char *out)
+{
+  char ext[16], name[MAX_FILE];
+
+  sprintf(ext, "_%d.svs", slot);
+  change_ext((char *)L.games[game].name, name, ext);
+  if(g_default_save_dir[0])
+    path_printf(out, MAX_PATH, "%s/%s", g_default_save_dir, name);
+  else
+    snprintf(out, MAX_PATH, "%s", name);
+}
+
+/* the save time of a game's slot (RTC ticks); 0 when the slot is empty or
+   too old to have one; -1 in *has when there is no file */
+static u64 state_time(int game, int slot, int *has)
+{
+  char path[MAX_PATH];
+  u8 head[4];
+  u64 t = 0;
+  SceUID fd;
+
+  state_path(game, slot, path);
+  fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+  *has = fd >= 0;
+  if(fd < 0)
+    return 0;
+  if((sceIoRead(fd, head, 4) == 4) && !memcmp(head, "SVS", 4) &&
+   (sceIoLseek32(fd, SVS_TIME, PSP_SEEK_SET) == SVS_TIME) &&
+   (sceIoRead(fd, &t, 8) != 8))
+    t = 0;
+  sceIoClose(fd);
+  return t;
+}
+
+/* Where Continue resumes a game: Last (10) when it has one, else its newest
+ * savestate, else -1 (from the start). */
+static int resume_slot(int game, u64 *when)
+{
+  int has, slot, best = -1;
+  u64 t, best_t = 0;
+
+  t = state_time(game, 10, &has);
+  if(has)
+  {
+    *when = t;
+    return 10;
+  }
+  for(slot = 0; slot < 10; slot++)
+  {
+    t = state_time(game, slot, &has);
+    if(has && ((best < 0) || (t > best_t)))
+    {
+      best = slot;
+      best_t = t;
+    }
+  }
+  *when = best_t;
+  return best;
+}
+
+/* The Continue card's picture: the resume slot's screenshot box-filtered
+ * 5:3 to 144 x 96, read SHOT_ROWS rows at a time. */
+static int load_resume_picture(int game, int slot)
+{
+  char path[MAX_PATH];
+  u8 head[8];
+  u16 *rows;
+  SceUID fd;
+  int n, ok = 0;
+  u32 mark = ui_pool_mark();
+
+  if((slot < 0) || !L.pic)
+    return 0;
+  rows = ui_pool_alloc(240 * SHOT_ROWS * 2);
+  if(rows == NULL)
+    return 0;
+  state_path(game, slot, path);
+  fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+  if(fd >= 0)
+  {
+    if((sceIoRead(fd, head, 8) == 8) && !memcmp(head, "SVS", 4))
+    {
+      for(n = 0; n < 160 / SHOT_ROWS; n++)
+      {
+        if(sceIoRead(fd, rows, 240 * SHOT_ROWS * 2) != 240 * SHOT_ROWS * 2)
+          break;
+        ui_shrink_53_rows(rows, SHOT_ROWS, L.pic + n * (SHOT_ROWS * 3 / 5) * PIC_W);
+      }
+      ok = (n == 160 / SHOT_ROWS);
+    }
+    sceIoClose(fd);
+  }
+  ui_pool_release(mark);  /* the rows only lived for the read */
+  return ok;
+}
+
+/* "today 21:46" or "11/13" from RTC ticks in UTC */
+static void when_text(u64 tick, char *out, int n)
+{
+  u64 local;
+  ScePspDateTime t, now;
+
+  out[0] = 0;
+  if((tick == 0) || (sceRtcConvertUtcToLocalTime(&tick, &local) < 0) ||
+   (sceRtcSetTick(&t, &local) < 0))
+    return;
+  sceRtcGetCurrentClockLocalTime(&now);
+  if((t.year == now.year) && (t.month == now.month) && (t.day == now.day))
+    snprintf(out, n, "today %02d:%02d", t.hour, t.minute);
+  else
+    snprintf(out, n, "%02d/%02d", t.month, t.day);
+}
+
+static void recent_init(void)
+{
+  int i, k, n = 0;
+
+  /* games in recent.txt order (read_recent numbered them) */
+  for(k = 0; (k < RECENT_MAX) && (n < RECENT_MAX); k++)
+    for(i = 0; i < L.count; i++)
+      if(L.games[i].recent == k)
+        L.recent[n++] = i;
+  L.recent_count = n;
+  L.rec_row = 0;
+  L.rec_cur = L.rec_from = 0;
+  L.rec_f = UI_F_CURSOR;
+  if(n == 0)
+    return;
+  L.pic = ui_pool_alloc(PIC_W * PIC_H * 2);
+  L.cont_slot = resume_slot(L.recent[0], &L.cont_time);
+  L.pic_ok = load_resume_picture(L.recent[0], L.cont_slot);
+}
+
+/* the cursor's box for a place on the Recent tab: 0 the Continue card,
+   1 + k the k-th cover (both as lifted) */
+static void recent_box(int place, int *x, int *y, int *w, int *h)
+{
+  if(place == 0)
+  {
+    *x = CONT_X - UI_LIFT;
+    *y = CONT_Y - UI_LIFT;
+    *w = CONT_W;
+    *h = CONT_H;
+  }
+  else
+  {
+    *x = GRID_X + (place - 1) * GRID_PX - UI_LIFT;
+    *y = RECENT_Y - UI_LIFT;
+    *w = *h = COVER;
+  }
+}
+
+static int recent_place(void)
+{
+  return L.rec_row ? 1 + L.rec_cur : 0;
+}
+
+static void draw_continue(int hero)
+{
+  int game = L.recent[0], lift = hero ? UI_LIFT : 0, x, y, w;
+  u16 ink = hero ? UI_COL_PLUM : UI_COL_CREAM;
+  char meta[96], when[32], played[32];
+  const char *chip = "CONTINUE";
+
+  if(hero)
+    ui_round_fill(CONT_X + 1, CONT_Y + 1, CONT_W, CONT_H, 3, UI_COL_SHADE);
+  x = CONT_X - lift;
+  y = CONT_Y - lift;
+  ui_round_fill(x, y, CONT_W, CONT_H, 3, hero ? UI_COL_TANGERINE : UI_COL_CARD);
+  ui_fill(x + 4, y + 4, PIC_W, PIC_H, UI_COL_PLUM);
+  if(L.pic_ok)
+    ui_blit(L.pic, PIC_W, x + 4, y + 4, PIC_W, PIC_H);
+  else  /* nothing saved yet: its cover */
+    draw_cover_any(x + 4 + (PIC_W - PIC_H) / 2, y + 4, PIC_H, L.games[game].title, 0);
+  w = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
+  ui_round_fill(x + 160, y + 10, w, 16, 2, hero ? UI_COL_PLUM : UI_COL_TANGERINE);
+  ui_print(x + 166, y + 11, chip, hero ? UI_COL_TANGERINE : UI_COL_PLUM, UI_FONT_SMALL, 0);
+  ui_print_fit(x + 160, y + 30, L.games[game].title, ink, UI_FONT_BODY,
+   UI_TEXT_BOLD | UI_TEXT_2X, 270);
+  when_text(L.cont_time, when, sizeof(when));
+  played_text(game_played(game), played, sizeof(played));
+  if(L.cont_slot == 10)
+    snprintf(meta, sizeof(meta), "Last \xC2\xB7 %s  \xC2\xB7  %s", when, played);
+  else if(L.cont_slot >= 0)
+    snprintf(meta, sizeof(meta), "Slot %d \xC2\xB7 %s  \xC2\xB7  %s", L.cont_slot, when, played);
+  else
+    snprintf(meta, sizeof(meta), "%s", played);
+  ui_print_fit(x + 160, y + 64, meta, ink, UI_FONT_SMALL, 0, 270);
+  draw_cover_any(x + 160, y + 82, 16, L.games[game].title, 0);
+  ui_print_fit(x + 182, y + 82, L.games[game].name,
+   hero ? COLOR16(14, 8, 7) : COLOR16(24, 21, 22), UI_FONT_SMALL, 0, 248);
+}
+
+static void recent_ground(void)
+{
+  int i, n = (L.recent_count < RECENT_ROW) ? L.recent_count : RECENT_ROW;
+
+  draw_continue(L.rec_row == 0);
+  ui_print(20, 146, "Recent", UI_COL_MUTE, UI_FONT_SMALL, 0);
+  for(i = 0; i < n; i++)
+    draw_cover(GRID_X + i * GRID_PX, RECENT_Y, L.recent[i]);
+}
+
+static void recent_selection(void)
+{
+  int x0, y0, w0, h0, x1, y1, w1, h1;
+
+  if(L.rec_row == 1)
+  {
+    int x = GRID_X + L.rec_cur * GRID_PX;
+    ui_fill(x + 1, RECENT_Y + 1, COVER, COVER, UI_COL_SHADE);
+    draw_cover(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
+    grid_marquee(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
+  }
+  /* the frame flies straight to the new place, also between the card and
+     the row */
+  recent_box(L.rec_from, &x0, &y0, &w0, &h0);
+  recent_box(recent_place(), &x1, &y1, &w1, &h1);
+  ui_cursor_frame(ui_ease_out_back(x0, x1, L.rec_f, UI_F_CURSOR),
+   ui_ease_out_back(y0, y1, L.rec_f, UI_F_CURSOR),
+   ui_ease_out_back(w0, w1, L.rec_f, UI_F_CURSOR),
+   ui_ease_out_back(h0, h1, L.rec_f, UI_F_CURSOR));
+}
+
+static void recent_move(void)
+{
+  int n = (L.recent_count < RECENT_ROW) ? L.recent_count : RECENT_ROW;
+  int from = recent_place(), row = L.rec_row, cur = L.rec_cur;
+
+  if((row == 0) && ui_repeat(PSP_CTRL_DOWN))
+    row = 1;
+  else if((row == 1) && ui_repeat(PSP_CTRL_UP))
+    row = 0;
+  else if(row == 1)
+    cur = ui_step(cur, n, PSP_CTRL_LEFT, PSP_CTRL_RIGHT);
+  if((row != L.rec_row) || (cur != L.rec_cur))
+  {
+    L.rec_from = from;
+    L.rec_row = row;
+    L.rec_cur = cur;
+    L.rec_f = 0;
+    L.marq_f = 0;
+    L.dirty = 1;  /* the Continue card's look changes with the row */
+  }
+}
+
 /* ---- View & sort ------------------------------------------------------------------- */
 
 static const char *view_labels[2] = { "Grid", "List" };
@@ -834,7 +1112,23 @@ static void draw_popup(void)
 
 /* ---- hints, the empty library, the ground --------------------------------------------- */
 
-static const char *tab_labels[1] = { "All" };
+static const char *tab_names[2] = { "Recent", "All" };
+
+static void tabs_init(void)
+{
+  L.tab_count = 0;
+  if(L.recent_count > 0)
+    L.tab_ids[L.tab_count++] = TAB_RECENT;
+  L.tab_ids[L.tab_count++] = TAB_ALL;
+  L.tab = 0;  /* Recent when there is one, else All */
+  L.tab_prev = 0;
+  L.tab_f = UI_F_TAB;
+}
+
+static int tab_is(int id)
+{
+  return L.tab_ids[L.tab] == id;
+}
 
 static void draw_hints(void)
 {
@@ -854,6 +1148,12 @@ static void draw_hints(void)
   {
     h[n].keys = ui_key_confirm;  h[n++].verb = "Look again";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+  }
+  else if(tab_is(TAB_RECENT))
+  {
+    /* × reads Continue on the Continue card */
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+    h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? "Play" : "Continue";
   }
   else
   {
@@ -898,6 +1198,8 @@ static void build_ground(void)
     return;
   if(L.count == 0)
     draw_empty();
+  else if(tab_is(TAB_RECENT))
+    recent_ground();
   else if(L.view == VIEW_GRID)
     grid_ground();
   else
@@ -1097,7 +1399,7 @@ static void open_settings(void)
 
 /* Pick a game. Returns 1 with its folder and file name (no game running:
  * kai's start; from the pause screen: a game was left). */
-int ui_library(char *dir, int dir_size, char *name, int name_size)
+int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 {
   u32 mark = ui_pool_mark();
   int chosen = 0;
@@ -1115,6 +1417,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
   }
   covers_init();
   view_reset();
+  recent_init();
+  tabs_init();
   ui_status_read();
   ui_input_init();
   /* HOME shows the PSP's own quit screen here (spec section 3): no game
@@ -1140,9 +1444,34 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
         load_games();
         covers_init();
         view_reset();
+        recent_init();
+        tabs_init();
       }
       else if(ui_pressed(PSP_CTRL_START))
         open_settings();
+    }
+    else if((ui_repeat(PSP_CTRL_LTRIGGER) && (L.tab > 0)) ||
+     (ui_repeat(PSP_CTRL_RTRIGGER) && (L.tab + 1 < L.tab_count)))
+    {
+      /* tabs never wrap */
+      L.tab_prev = L.tab;
+      L.tab += ui_down(PSP_CTRL_LTRIGGER) ? -1 : 1;
+      L.tab_f = 0;
+      L.marq_f = 0;
+      L.dirty = 1;
+    }
+    else if(tab_is(TAB_RECENT))
+    {
+      recent_move();
+      if(ui_pressed(PSP_CTRL_START))
+        open_settings();
+      else if(ui_pressed(ui_key_confirm))
+      {
+        u64 t;
+        L.chosen_game = L.rec_row ? L.recent[L.rec_cur] : L.recent[0];
+        L.chosen_slot = L.rec_row ? resume_slot(L.chosen_game, &t) : L.cont_slot;
+        chosen = 1;
+      }
     }
     else
     {
@@ -1159,9 +1488,19 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
       else if(ui_pressed(PSP_CTRL_START))
         open_settings();
       else if(ui_pressed(ui_key_confirm))
+      {
+        u64 t;
+        /* × Play resumes from Last, else the newest savestate, else the
+           start (design session, 2026-11-19): a stray × never boots fresh
+           and then lets Exit save over Last. Only the game card differs. */
+        L.chosen_game = L.order[L.cur];
+        L.chosen_slot = resume_slot(L.chosen_game, &t);
         chosen = 1;
+      }
     }
 
+    if(L.tab_f < UI_F_TAB) L.tab_f++;
+    if(L.rec_f < UI_F_CURSOR) L.rec_f++;
     if(L.top_f < UI_F_SCROLL) { L.top_f++; L.dirty = 1; }
     if(L.view == VIEW_LIST)
       list_step();
@@ -1172,11 +1511,19 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
 
     ui_frame_begin();
     ui_ground();
-    ui_tabs(UI_MARGIN, tab_labels, 1, 0, 0, UI_F_TAB);
+    {
+      const char *labels[4];
+      int i;
+      for(i = 0; i < L.tab_count; i++)
+        labels[i] = tab_names[L.tab_ids[i]];
+      ui_tabs(UI_MARGIN, labels, L.tab_count, L.tab, L.tab_prev, L.tab_f);
+    }
     ui_status_chip();
     if(L.count > 0)
     {
-      if(L.view == VIEW_GRID)
+      if(tab_is(TAB_RECENT))
+        recent_selection();
+      else if(L.view == VIEW_GRID)
         grid_selection();
       else
         list_selection();
@@ -1203,9 +1550,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
   }
 
   {
-    const game_t *g = &L.games[L.order[L.cur]];
+    const game_t *g = &L.games[L.chosen_game];
     snprintf(dir, dir_size, "%s", L.dirs[g->dir]);
     snprintf(name, name_size, "%s", g->name);
+    *slot = L.chosen_slot;
   }
   sceImposeSetHomePopup(g_gpsp_config.enable_home);
   ui_layer_reset();
@@ -1217,22 +1565,53 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
  * the game left is noted in Recent, then the one picked is loaded. A load
  * that fails may have overwritten the old game, so the library opens
  * again until one loads. */
+/* Continue: after the game has started, load the savestate it resumes
+ * from (Last or a slot 0-9), quietly, as the pause screen does. */
+static void no_progress(int current, int total)
+{
+  (void)current;
+  (void)total;
+}
+
+void ui_library_resume(int slot)
+{
+  char name[MAX_FILE];
+
+  if((slot < 0) || (slot > 10))
+    return;
+  state_no_question = 1;
+  progress_hook = no_progress;
+  get_savestate_filename_noshot(slot, name);
+  if(slot == 10)
+  {
+    load_last_state();
+    if(load_state(name, MEM_STATE_NUM))
+      g_game_config.last_slot = 10;
+  }
+  else if(load_state(name, slot))
+    g_game_config.last_slot = slot;
+  progress_hook = NULL;
+  state_no_question = 0;
+}
+
 u32 ui_library_switch(void)
 {
   char dir[MAX_PATH], name[MAX_FILE];
+  int slot;
 
   save_config_file();
   update_backup_force();
   note_game_left();
   save_game_config_file();
 
-  while(ui_library(dir, sizeof(dir), name, sizeof(name)))
+  while(ui_library(dir, sizeof(dir), name, sizeof(name), &slot))
   {
     chdir(dir);
     snprintf(rom_path, sizeof(rom_path), "%s", dir);
     if(load_gamepak(name) != -1)
     {
       reset_gba();
+      ui_library_resume(slot);
       reg[CHANGED_PC_STATUS] = 1;
       clear_screen(0);
       flip_screen();
