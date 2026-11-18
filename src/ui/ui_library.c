@@ -1107,6 +1107,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
   view_reset();
   ui_status_read();
   ui_input_init();
+  /* HOME shows the PSP's own quit screen here (spec section 3): no game
+     runs, so nothing can be lost. kai turns that screen off at start for
+     its games; it goes back to that when the library closes. */
+  sceImposeSetHomePopup(1);
 
   while(!chosen)
   {
@@ -1193,6 +1197,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
     snprintf(dir, dir_size, "%s", L.dirs[g->dir]);
     snprintf(name, name_size, "%s", g->name);
   }
+  sceImposeSetHomePopup(g_gpsp_config.enable_home);
   ui_layer_reset();
   ui_pool_release(mark);
   return 1;
