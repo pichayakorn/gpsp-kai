@@ -3514,6 +3514,13 @@ void flush_translation_cache_ram()
   ram_translation_ptr = ram_translation_cache;
   ram_block_tag_top = 0x0101;
 
+  /* a flush inside the first block comes before its end is known: clear
+     to the end of the copy */
+  if((iwram_code_min != 0xFFFFFFFF) && (iwram_code_max == 0xFFFFFFFF))
+    iwram_code_max = 0x37FFF;
+  if((ewram_code_min != 0xFFFFFFFF) && (ewram_code_max == 0xFFFFFFFF))
+    ewram_code_max = 0x23FFFF;
+
   if(iwram_code_min != 0xFFFFFFFF)
   { // iwram cache was in use
     iwram_code_min &= 0x7FFF;
@@ -3545,7 +3552,10 @@ void flush_translation_cache_ram()
     }
     else
     {
-      memset(ewram + (ewram_code_min_page * 0x10000) + ewram_code_min_offset, 0, 0x8000);
+      /* the tags of a page are its first 0x8000 bytes, its data the next:
+         clear only to the end of the tags */
+      memset(ewram + (ewram_code_min_page * 0x10000) + ewram_code_min_offset,
+       0, 0x8000 - ewram_code_min_offset);
       for(i = ewram_code_min_page + 1; i < ewram_code_max_page; i++)
         memset(ewram + (i * 0x10000), 0, 0x8000);
 
