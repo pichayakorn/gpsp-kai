@@ -585,6 +585,13 @@ void ui_status_read(void)
 
 void ui_status_chip(void)
 {
+  ui_status_chip_at(8);
+}
+
+/* At y: 8 on most screens, 10 on the pause screen (centred on the header's
+ * row there). */
+void ui_status_chip_at(int y)
+{
   int shown_level;
   char clock[16], pct[8];
   int w, x, tx, i, j, critical = 0;
@@ -625,14 +632,14 @@ void ui_status_chip(void)
   w = 6 + ui_text_width(clock) + 4 + (critical ? ui_text_width(pct) + 4 : 0) +
    (status_charging ? 7 : 0) + (status_battery ? 11 + 5 : 2);
   x = 460 - w;
-  ui_round_fill(x, 8, w, 16, 2, UI_COL_CARD);
-  ui_text(x + 6, 9, clock, UI_COL_CREAM);
+  ui_round_fill(x, y, w, 16, 2, UI_COL_CARD);
+  ui_text(x + 6, y + 1, clock, UI_COL_CREAM);
   if(!status_battery)
     return;
   tx = x + 6 + ui_text_width(clock) + 4;
   if(critical)
   {
-    ui_text(tx, 9, pct, UI_COL_PINK);
+    ui_text(tx, y + 1, pct, UI_COL_PINK);
     tx += ui_text_width(pct) + 4;
   }
   if(status_charging)
@@ -640,12 +647,12 @@ void ui_status_chip(void)
     for(j = 0; j < 7; j++)
       for(i = 0; i < 5; i++)
         if(bolt[j] & (0x10 >> i))
-          ui_fill(tx + i, 12 + j, 1, 1, UI_COL_SKY);
+          ui_fill(tx + i, y + 4 + j, 1, 1, UI_COL_SKY);
     tx += 7;
   }
   /* the bitmap's first column is empty: one to the left */
-  draw_icon(tx - 1, 11, icon_battery, color);
-  ui_fill(tx + 1, 14, 7 * shown_level / 100, 3, color);
+  draw_icon(tx - 1, y + 3, icon_battery, color);
+  ui_fill(tx + 1, y + 6, 7 * shown_level / 100, 3, color);
 }
 
 

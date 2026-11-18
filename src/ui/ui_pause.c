@@ -125,8 +125,9 @@ static struct
   int undo, undo_slot;
   ui_hold_t hold;
   ui_hold_t load_hold;       /* hold confirm: load with the save off */
-  ui_hold_t exit_hold;
-  int exit_holding;
+  ui_hold_t exit_hold;       /* hold confirm on Exit, Restart or Library with the save off */
+  int wrap_dir, wrap_from;   /* a wrap of the strip slides the short way */
+  int bar_f;                 /* frames the progress card has shown (card_rise) */
   const char *bar_text;      /* the saving card while a save runs */
   u16 bar_col;               /* its edge and blocks: pink, sky for a restart */
   const char *bar_note;
@@ -768,17 +769,27 @@ static void draw_slot(int slot, int dd, int dy, int selected)
        becomes "Loading slot 3..." while the load runs */
     const char *verb = p.hold.shown ? "Delete (hold)" :
      (p.hold_line[0] ? p.hold_line : "Load (hold)");
-    int cw = ui_text_width((char *)verb) + 20, cx, cy;
+    /* wide enough for both lines, so the card keeps its width when the
+       slow load's line replaces the hold's */
+    int cw = ((p.hold_line[0] && (ui_text_width(p.hold_line) > ui_text_width("Load (hold)"))) ?
+     ui_text_width(p.hold_line) : ui_text_width((char *)verb)) + 20, cx, cy;
 
     if(cw < 96)
       cw = 96;
     cx = x + (w - cw) / 2;
     cy = y + (h - 34) / 2;
     ui_checker(x, y, w, h, UI_COL_SHADE);
-    ui_round_fill(cx + 2, cy + 2, cw, 34, 2, UI_COL_SHADE);
+    ui_round_fill(cx + 3, cy + 3, cw, 34, 2, UI_COL_SHADE);
     ui_round_fill(cx, cy, cw, 34, 2, UI_COL_CARD);
-    ui_text(cx + (cw - ui_text_width((char *)verb)) / 2, cy + 3, (char *)verb, UI_COL_CREAM);
-    ui_hold_bar(cx + 8, cy + 22, cw - 16, hd->p, p.hold.shown ? UI_COL_PINK : UI_COL_LIME);
+    if(p.hold_line[0] && !p.hold.shown)
+      /* the hold fired and the load is slow: its line alone, centred in
+         the same place and width, no bar */
+      ui_text(cx + (cw - ui_text_width((char *)verb)) / 2, cy + 10, (char *)verb, UI_COL_CREAM);
+    else
+    {
+      ui_text(cx + (cw - ui_text_width((char *)verb)) / 2, cy + 3, (char *)verb, UI_COL_CREAM);
+      ui_hold_bar(cx + 8, cy + 22, cw - 16, hd->p, p.hold.shown ? UI_COL_PINK : UI_COL_LIME);
+    }
   }
 
   if(slot == LAST_SLOT)
@@ -797,10 +808,11 @@ static void draw_tile(int i, int ty, int selected)
   int tx = 18 + i * 64, lift = selected ? UI_LIFT : 0, j, lines = 0;
   char line[2][64];
 
+  /* lifted straight up, so with 4 px between tiles the cursor frame keeps
+     clear of both neighbours; the shadow 3 px right and 1 down */
   if(selected)
-    ui_round_fill(tx + 1, ty + 1, TILE_W, TILE_H, 2, UI_COL_SHADE);
-  ui_round_fill(tx - lift, ty - lift, TILE_W, TILE_H, 2, selected ? tiles[i].color : UI_COL_CARD);
-  tx -= lift;
+    ui_round_fill(tx + 3, ty + 1, TILE_W, TILE_H, 2, UI_COL_SHADE);
+  ui_round_fill(tx, ty - lift, TILE_W, TILE_H, 2, selected ? tiles[i].color : UI_COL_CARD);
   ty -= lift;
   /* centred in the tile: 10 px above the icon box, about 11 under the
      label (design repo 4aff042) */
@@ -842,6 +854,21 @@ static void motion(int *hy, int *dy, int tile_dy[TILE_COUNT], int *done)
 
 static int undo_offered(void);
 
+/* With "Save when leaving a game" off, Exit, Restart and Library lose the
+ * play since the last save: they take a 60 f hold, a tap does nothing. */
+static int tile_needs_hold(int i)
+{
+  return !g_gpsp_config.save_on_leave &&
+   ((i == TILE_EXIT) || (i == TILE_RESTART) || (i == TILE_LIBRARY));
+}
+
+static const char *tile_verb(void)
+{
+  if(!tile_needs_hold(p.tile))
+    return "Open";
+  return (p.tile == TILE_EXIT) ? "Hold: quit" : ((p.tile == TILE_RESTART) ? "Hold: restart" : "Hold: leave");
+}
+
 static void draw_hints(int done)
 {
   ui_hint_t c1[2], c[6];
@@ -853,13 +880,6 @@ static void draw_hints(int done)
     ui_hint_strip(c1, 0);  /* nothing to press while saving */
     return;
   }
-  if(p.exit_holding)
-  {
-    c1[0].keys = ui_key_confirm; c1[0].verb = "Hold: quit";
-    c1[1].keys = ui_key_back;    c1[1].verb = "Back";
-    ui_hint_strip(c1, 2);
-    return;
-  }
 
   /* steady hints first, the changing ones last (spec: Hint strip) */
   n = 0;
@@ -869,14 +889,14 @@ static void draw_hints(int done)
     c[n].keys = PSP_CTRL_LTRIGGER; c[n++].verb = "Last";
     c[n].keys = PSP_CTRL_RTRIGGER; c[n++].verb = "Slot 0";
     c[n].keys = PSP_CTRL_SELECT;
-    c[n++].verb = undo_offered() ? "Undo" : "Save \xC2\xB7 hold: Delete";
+    c[n++].verb = undo_offered() ? "Undo" : "Save \xC2\xB7 Hold: delete";
     c[n].keys = ui_key_confirm;
-    c[n++].verb = !full ? "Save" : (g_gpsp_config.save_on_leave ? "Load" : "Load (hold)");
+    c[n++].verb = !full ? "Save" : (g_gpsp_config.save_on_leave ? "Load" : "Hold: load");
   }
   else
   {
     c[n].keys = PSP_CTRL_UP;    c[n++].verb = "Savestates";
-    c[n].keys = ui_key_confirm; c[n++].verb = "Open";
+    c[n].keys = ui_key_confirm; c[n++].verb = (char *)tile_verb();
   }
   ui_hint_packed(c, n, 10);
 }
@@ -884,7 +904,14 @@ static void draw_hints(int done)
 /* The saving card: a title, 30 blocks and a note (spec "exit"). */
 static void draw_bar_card(int fill_256)
 {
-  int w = 332, h = 76, x = (UI_SCREEN_W - w) / 2, y = 98, k = (30 * fill_256 + 128) / 256 - 1;
+  int w = 332, h = p.bar_note ? 76 : 54, x = (UI_SCREEN_W - w) / 2, y = 72;
+  int k = (30 * fill_256 + 128) / 256 - 1;
+
+  /* clear of the slot line (155) and the lifted tiles' frames; it rises
+     20 px into place (card_rise) */
+  if(p.bar_f < UI_F_CARD_RISE)
+    p.bar_f++;
+  y = ui_ease_out_back(y + 20, y, p.bar_f, UI_F_CARD_RISE);
 
   /* no dim behind it: a second door over the screen-doored game reads as
      noise (maintainer, 2026-11-15) */
@@ -901,19 +928,24 @@ static void draw_bar_card(int fill_256)
     ui_print_fit(x + 16, y + 52, p.bar_note, UI_COL_MUTE, UI_FONT_SMALL, 0, w - 28);
 }
 
-/* Exit with "Save when leaving a game" off: hold confirm to quit. */
-static void draw_exit_hold(void)
+/* Exit, Restart or Library with the save off: the hold card, shown from
+ * 12 f (already 20 % full) until it fires or drains. */
+static void draw_tile_hold(void)
 {
-  int w = 312, x = 462 - w, y = 100, gx;
+  int w = 312, x = 462 - w, y = 88, gx;
+  u16 col = (p.tile == TILE_RESTART) ? UI_COL_TANGERINE : UI_COL_PINK;
+  const char *line = (p.tile == TILE_EXIT) ? "Hold to quit without saving" :
+   ((p.tile == TILE_RESTART) ? "Hold to restart without saving" : "Hold to leave without saving");
 
+  if(!p.exit_hold.shown || (p.exit_hold.p <= 0))
+    return;
   ui_round_fill(x + 3, y + 3, w, 56, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, 56, 3, UI_COL_CARD);
-  ui_fill(x, y + 4, 4, 48, UI_COL_PINK);
+  ui_fill(x, y + 4, 4, 48, col);
   gx = ui_glyph(x + 14, y + 9, ui_key_confirm) + 6;
-  ui_print_fit(gx, y + 7, "Hold to quit without saving", UI_COL_CREAM, UI_FONT_BODY, 0, x + w - 10 - gx);
-  ui_hold_bar(x + 14, y + 28, w - 28, p.exit_hold.p, UI_COL_PINK);
+  ui_print_fit(gx, y + 7, line, UI_COL_CREAM, UI_FONT_BODY, 0, x + w - 10 - gx);
+  ui_hold_bar(x + 14, y + 28, w - 28, p.exit_hold.p, col);
   ui_print_fit(x + 14, y + 38, "'Save when leaving a game' is off.", UI_COL_MUTE, UI_FONT_SMALL, 0, w - 28);
-  ui_round_fill(462 - 18, y + 56, 10, 6, 1, UI_COL_CARD);  /* tail toward the Exit tile */
 }
 
 #ifdef UI_PERF
@@ -950,11 +982,27 @@ static void draw_screen(int bar_fill)
   motion(&hy, &dy, tile_dy, &done);
   if(!p.layer_full)
     draw_header(hy);
-  if(done && !p.closing)
-    ui_status_chip();
+  if(done && !p.closing && !ui_toast_up(p.toast_f))
+    ui_status_chip_at(10);
   PERF_SECTION(1);
 
   /* the strip: the selected slot big, its neighbours small */
+  if(p.wrap_dir && (p.pos_f < UI_F_SCROLL))
+  {
+    /* a wrap: the end being left slides out the way the strip moves while
+       the other end comes in from the other side, 4 places each, with a
+       one-slot move's overshoot; the cursor frame stays in the centre */
+    int shift = 3 * 256 * p.pos_f / UI_F_SCROLL + ui_ease_out_back(0, 256, p.pos_f, UI_F_SCROLL);
+    int d = p.wrap_dir;
+    for(i = 0; i < SLOTS; i++)
+    {
+      draw_slot(strip_slot[i], (i - p.wrap_from) * 256 - d * shift, dy, 0);
+      draw_slot(strip_slot[i], (i - p.cur) * 256 + d * (4 * 256 - shift), dy, 0);
+    }
+    if((p.row == 0) && done && !p.closing && !p.bar_text)
+      ui_cursor_frame(STRIP_CX - BIG_W / 2 - 6, 46 + dy - 6, BIG_W + 12, BIG_H + 12);
+  }
+  else
   {
     int pos = (p.pos_f < UI_F_SCROLL) ?
      ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
@@ -976,8 +1024,8 @@ static void draw_screen(int bar_fill)
     /* on a plum pill: cream text alone is lost on a busy game picture */
     {
       int iw = ui_text_width(info);
-      ui_round_fill(STRIP_CX - iw / 2 - 6, 152, iw + 12, 15, 2, UI_COL_PLUM);
-      ui_text(STRIP_CX - iw / 2, 153, info, UI_COL_CREAM);
+      ui_round_fill(STRIP_CX - iw / 2 - 6, 155, iw + 12, 15, 2, UI_COL_PLUM);
+      ui_text(STRIP_CX - iw / 2, 156, info, UI_COL_CREAM);
     }
   }
   PERF_SECTION(3);
@@ -993,15 +1041,17 @@ static void draw_screen(int bar_fill)
   {
     int tx = (p.tile_f < UI_F_CURSOR) ?
      ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
-    ui_cursor_frame(tx - 2, TILE_Y - 2, TILE_W, TILE_H);
+    ui_cursor_frame(tx, TILE_Y - 2, TILE_W, TILE_H);
   }
   PERF_SECTION(4);
 
-  if(p.exit_holding)
-    draw_exit_hold();
+  if((p.row == 1) && done && !p.closing)
+    draw_tile_hold();
+  /* top right, so it never hides the tiles' labels; the status chip makes
+     way while it is up */
   if(p.toast_f >= 0)
   {
-    if(!ui_toast(p.toast, p.toast_edge, p.toast_undo ? "Undo" : NULL, p.toast_f))
+    if(!ui_toast_at(p.toast, p.toast_edge, p.toast_undo ? "Undo" : NULL, p.toast_f, 6))
       p.toast_f = -1;
   }
   if(p.bar_text)
@@ -1032,9 +1082,13 @@ static void bar_hook(int current, int total)
   ui_frame_end_now();
 }
 
-static void run_with_bar(const char *text, const char *note)
+/* col: the action's colour (pink Exit; sky loads, saves and Restart kai;
+ * tangerine the game's own Restart) */
+static void run_with_bar(const char *text, const char *note, u16 col)
 {
   p.bar_text = text;
+  p.bar_col = col;
+  p.bar_f = 0;
   p.bar_note = note;
   p.bar_phase = -1;
   p.bar_phases = 1;
@@ -1100,7 +1154,7 @@ static void action_save(int slot)
   shot_wait();  /* the picture reader shares p.big and the Memory Stick */
   get_savestate_filename_noshot(slot, name);
   slot_name(slot, text);
-  run_with_bar("Saving\xE2\x80\xA6", NULL);
+  run_with_bar("Saving\xE2\x80\xA6", NULL, UI_COL_SKY);
   save_state(name, p.game, slot);
   end_bar();
   read_slot(slot);
@@ -1175,11 +1229,11 @@ static int action_load(int slot)
   else
     sprintf(bar, "Loading slot %d\xE2\x80\xA6", slot);
   if(keep)
-    run_with_bar(bar, NULL);
+    run_with_bar(bar, NULL, UI_COL_SKY);
   else
   {
     /* the save is off: no new card; the filled hold card says it */
-    run_with_bar(NULL, NULL);
+    run_with_bar(NULL, NULL, UI_COL_SKY);
     strcpy(p.hold_line, bar);
     p.load_hold.p = 256;
     p.load_hold.shown = 1;
@@ -1258,19 +1312,49 @@ static void action_undo(void)
   }
 }
 
+/* Exit, with the save on: Last first. (With it off the hold has already
+ * confirmed.) */
 static int action_exit(void)
 {
   shot_wait();
   if(!g_gpsp_config.save_on_leave)
-  {
-    p.exit_holding = 1;
-    memset(&p.exit_hold, 0, sizeof(p.exit_hold));
-    return 0;
-  }
-  run_with_bar("Saving to Last\xE2\x80\xA6", "Then kai closes. Continue picks up here.");
+    return 1;
+  run_with_bar("Saving to Last\xE2\x80\xA6", "Then kai closes. Continue picks up here.", UI_COL_PINK);
   save_last_state(p.game);
   end_bar();
   return 1;
+}
+
+/* Restart the game, like Exit (spec: Restart): with the save on the game
+ * goes to Last first, on a tangerine card, and a toast over the game says
+ * where it is; with it off the hold has confirmed. */
+static void action_restart_game(void)
+{
+  shot_wait();
+  if(g_gpsp_config.save_on_leave)
+  {
+    run_with_bar("Saving to Last\xE2\x80\xA6", "Then the game starts again from the beginning.",
+     UI_COL_TANGERINE);
+    save_last_state(p.game);
+    end_bar();
+    read_slot(LAST_SLOT);
+    strcpy(p.game_toast, "Restarted \xC2\xB7 the game before is in Last");
+  }
+  reset_gba();
+  reg[CHANGED_PC_STATUS] = 1;
+  p.changed = 1;
+  p.closing = 1;
+}
+
+/* Library, like Exit: with the save on Last first. */
+static void action_library(void)
+{
+  shot_wait();
+  if(!g_gpsp_config.save_on_leave)
+    return;
+  run_with_bar("Saving to Last\xE2\x80\xA6", NULL, UI_COL_TANGERINE);
+  save_last_state(p.game);
+  end_bar();
 }
 
 /* Restart kai (spec "Restart kai"): save like Exit, show the sky card and
@@ -1283,16 +1367,17 @@ static void restart_kai(void)
 
   ui_settings_where(&tab, &row);
   build_layer(1);  /* the pause screen behind the card */
-  p.bar_col = UI_COL_SKY;
   if(save)
   {
-    run_with_bar("Saving to Last\xE2\x80\xA6", then);
+    run_with_bar("Saving to Last\xE2\x80\xA6", then, UI_COL_SKY);
     save_last_state(p.game);
     end_bar();
   }
   /* the relaunch itself is the rest of the work: the card shows full */
   p.bar_text = "Restarting kai\xE2\x80\xA6";
   p.bar_note = then;
+  p.bar_col = UI_COL_SKY;
+  p.bar_f = UI_F_CARD_RISE;
   p.busy = 1;
   draw_screen(256);
   ui_frame_end_now();
@@ -1307,7 +1392,7 @@ static void restart_return(void)
   int tab = ui_restart_note.tab, row = ui_restart_note.row;
 
   ui_restart_note.pending = 0;
-  run_with_bar(NULL, NULL);
+  run_with_bar(NULL, NULL, UI_COL_SKY);
   if(load_slot(LAST_SLOT))
   {
     p.changed = 1;
@@ -1330,6 +1415,7 @@ static void move_slot(int to)
   if((to < 0) || (to >= SLOTS) || (to == p.cur))
     return;
   end_undo();
+  p.wrap_dir = 0;
   p.pos_from = (p.pos_f < UI_F_SCROLL) ?
    ui_ease_out_back(p.pos_from, p.cur * 256, p.pos_f, UI_F_SCROLL) : p.cur * 256;
   p.cur = to;
@@ -1338,6 +1424,26 @@ static void move_slot(int to)
   p.hold.shown = 0;
   p.load_hold.p = 0;
   p.load_hold.shown = 0;
+}
+
+/* A d-pad step; a fresh press past an end wraps, and the wrap slides the
+ * short way, as a one-slot move (spec: Pause, maintainer 2026-11-17). */
+static void step_slot(int to)
+{
+  int wrap = 0;
+
+  if((p.cur == SLOTS - 1) && (to == 0))
+    wrap = 1;
+  else if((p.cur == 0) && (to == SLOTS - 1))
+    wrap = -1;
+  if(!wrap)
+  {
+    move_slot(to);
+    return;
+  }
+  move_slot(to);
+  p.wrap_dir = wrap;
+  p.wrap_from = (wrap > 0) ? SLOTS - 1 : 0;
 }
 
 static void move_tile(int to)
@@ -1349,6 +1455,7 @@ static void move_tile(int to)
    ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
   p.tile = to;
   p.tile_f = 0;
+  memset(&p.exit_hold, 0, sizeof(p.exit_hold));
 }
 
 #ifdef UI_PERF
@@ -1446,14 +1553,28 @@ static void perf_write(void)
 
 enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_QUIT };
 
+/* Sleep (spec: Sleep): the power callback holds the suspend off while a
+ * game runs with the save on; the pause screen writes Last and lets the
+ * PSP sleep. On wake it opens on Last and says why the game waits. */
+volatile int ui_power_locked;
+volatile int ui_woke;
+
 u32 ui_pause(u16 *game_picture)
 {
   u32 mark, i;
   int leave = LEAVE_NONE, opened = 0;
 
+  ui_woke = 0;  /* a wake from before this pause is old news */
+  if(ui_power_locked)
+  {
+    if(save_last_state(game_picture))
+      g_game_config.last_slot = LAST_SLOT;
+    scePowerUnlock(0);
+    ui_power_locked = 0;
+  }
+
   memset(&p, 0, sizeof(p));
   p.game = game_picture;
-  p.bar_col = UI_COL_PINK;
   p.big_slot = -1;
   p.toast_f = -1;
   shot_fd = -1;
@@ -1516,23 +1637,21 @@ u32 ui_pause(u16 *game_picture)
       }
     }
 
+    if(ui_woke)
+    {
+      ui_woke = 0;
+      show_toast("Paused while the PSP slept", UI_COL_SKY, UNDO_NONE, 0);
+    }
+
     if(opened && !p.closing)
     {
       int resume = ui_pressed(PSP_CTRL_TRIANGLE | PSP_CTRL_HOME) || ui_pressed(ui_key_back);
 
-      if(p.exit_holding)
-      {
-        ui_hold_step(&p.exit_hold, ui_key_confirm);
-        if(p.exit_hold.done)
-          leave = LEAVE_QUIT;
-        else if(ui_pressed(ui_key_back) || ui_pressed(PSP_CTRL_UP | PSP_CTRL_LEFT | PSP_CTRL_RIGHT))
-          p.exit_holding = 0;
-      }
-      else if(resume)
+      if(resume)
         p.closing = 1;
       else if(p.row == 0)
       {
-        move_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
+        step_slot(ui_step(p.cur, SLOTS, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
         if(ui_pressed(PSP_CTRL_LTRIGGER)) move_slot(strip_position(LAST_SLOT));
         if(ui_pressed(PSP_CTRL_RTRIGGER)) move_slot(strip_position(0));
         if(ui_pressed(PSP_CTRL_DOWN))
@@ -1620,7 +1739,12 @@ u32 ui_pause(u16 *game_picture)
         if(ui_released(PSP_CTRL_SELECT) && undo_offered())
           action_undo();
 
-        if(ui_pressed(ui_key_confirm))
+        /* with the save off, Exit, Restart and Library are a hold */
+        if(tile_needs_hold(p.tile))
+          ui_hold_step(&p.exit_hold, ui_key_confirm);
+        else
+          memset(&p.exit_hold, 0, sizeof(p.exit_hold));
+        if(tile_needs_hold(p.tile) ? p.exit_hold.done : ui_pressed(ui_key_confirm))
         {
           switch(p.tile)
           {
@@ -1639,8 +1763,11 @@ u32 ui_pause(u16 *game_picture)
               ui_input_init();
               break;
             case TILE_CHEATS:
-            case TILE_LIBRARY:
               leave = LEAVE_OLD_MENU;
+              break;
+            case TILE_LIBRARY:
+              action_library();
+              leave = LEAVE_OLD_MENU;  /* the old menu until the library lands */
               break;
             case TILE_SHOT:
               shot_wait();
@@ -1648,10 +1775,7 @@ u32 ui_pause(u16 *game_picture)
               show_toast("Screenshot saved", UI_COL_SKY, UNDO_NONE, 0);
               break;
             case TILE_RESTART:
-              reset_gba();
-              reg[CHANGED_PC_STATUS] = 1;
-              p.changed = 1;
-              p.closing = 1;
+              action_restart_game();
               break;
             case TILE_EXIT:
               if(action_exit())
