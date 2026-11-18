@@ -33,12 +33,31 @@ void ui_frame_end_now(void)
   flip_screen();
 }
 
+/* Drawing stays inside this rectangle (the whole screen unless a screen
+ * narrows it, e.g. to a list's area or a moving cursor frame). */
+int ui_clip_x0 = 0, ui_clip_y0 = 0, ui_clip_x1 = UI_SCREEN_W, ui_clip_y1 = UI_SCREEN_H;
+
+void ui_clip_set(int x, int y, int w, int h)
+{
+  ui_clip_x0 = (x > 0) ? x : 0;
+  ui_clip_y0 = (y > 0) ? y : 0;
+  ui_clip_x1 = (x + w < UI_SCREEN_W) ? x + w : UI_SCREEN_W;
+  ui_clip_y1 = (y + h < UI_SCREEN_H) ? y + h : UI_SCREEN_H;
+}
+
+void ui_clip_reset(void)
+{
+  ui_clip_x0 = ui_clip_y0 = 0;
+  ui_clip_x1 = UI_SCREEN_W;
+  ui_clip_y1 = UI_SCREEN_H;
+}
+
 static int clip(int *x, int *y, int *w, int *h)
 {
-  if(*x < 0) { *w += *x; *x = 0; }
-  if(*y < 0) { *h += *y; *y = 0; }
-  if(*x + *w > UI_SCREEN_W) *w = UI_SCREEN_W - *x;
-  if(*y + *h > UI_SCREEN_H) *h = UI_SCREEN_H - *y;
+  if(*x < ui_clip_x0) { *w -= ui_clip_x0 - *x; *x = ui_clip_x0; }
+  if(*y < ui_clip_y0) { *h -= ui_clip_y0 - *y; *y = ui_clip_y0; }
+  if(*x + *w > ui_clip_x1) *w = ui_clip_x1 - *x;
+  if(*y + *h > ui_clip_y1) *h = ui_clip_y1 - *y;
   return (*w > 0) && (*h > 0);
 }
 
@@ -63,6 +82,29 @@ void ui_fill(int x, int y, int w, int h, u16 color)
  * almost nothing on it. Static parts of a screen can be drawn into the
  * layer once. Without pool memory it is drawn by the CPU from two rows. */
 static u16 *ground_layer = NULL;
+
+/* The bare ground check over one rectangle, e.g. to redraw part of a
+ * screen in another state on top of its ground layer. */
+void ui_ground_rect(int x, int y, int w, int h)
+{
+  int x0 = x, y0 = y, j;
+
+  if(!clip(&x0, &y0, &w, &h))
+    return;
+  for(j = y0; j < y0 + h; j = (j / UI_CHECK + 1) * UI_CHECK)
+  {
+    int jh = (j / UI_CHECK + 1) * UI_CHECK - j, i;
+    if(j + jh > y0 + h)
+      jh = y0 + h - j;
+    for(i = x0; i < x0 + w; i = (i / UI_CHECK + 1) * UI_CHECK)
+    {
+      int iw = (i / UI_CHECK + 1) * UI_CHECK - i;
+      if(i + iw > x0 + w)
+        iw = x0 + w - i;
+      ui_fill(i, j, iw, jh, (((i / UI_CHECK) ^ (j / UI_CHECK)) & 1) ? UI_COL_PLUM_2 : UI_COL_PLUM);
+    }
+  }
+}
 
 static void build_ground(u16 *dest, u32 pitch)
 {

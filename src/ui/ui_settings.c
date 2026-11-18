@@ -67,20 +67,20 @@ static row_t rows[TABS][MAX_ROWS] =
   { /* Display */
     { "Screen size", "Original keeps the GBA's pixels exact; Fit fills the height; Full fills the screen.",
       K_SCREEN, 0, 3, { "Original", "Fit", "Full" }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
-    { "Smoothing", "Sharp keeps pixels crisp at any size; Smooth blurs them; Off shows them as they fall.",
+    { "Smoothing", "Sharp keeps pixels crisp when the picture is scaled; Smooth softens them.",
       K_SEG, 0, 3, { "Off", "Smooth", "Sharp" }, &g_gpsp_config.screen_filter, NULL, filter_sharp_bilinear },
-    { "Side bars", "What fills the screen beside the picture: black, the menu's pattern, or the game's own edge colours.",
+    { "Side bars", "What fills the space beside the picture in 3:2 sizes.",
       K_SEG, 0, 3, { "Black", "Pattern", "Game colours" }, &g_gpsp_config.side_bars, NULL, SIDE_BARS_BLACK },
-    { "Frameskip", "Auto skips drawing only when the game can't keep up.",
+    { "Frameskip", "Auto skips frames only when the game would slow down.",
       K_SEG, 1, 3, { "Off", "Auto", "Fixed" }, &g_game_config.frameskip_type, map_frameskip, auto_frameskip },
-    { "Skip up to", "The most frames in a row that may go undrawn.",
+    { "Skip up to", "The most frames Auto skips in a row; Fixed skips this many.",
       K_CYCLE, 1, 0, { NULL }, &g_game_config.frameskip_value, NULL, 9, 0, 99, "%d frames" },
-    { "Picture scale", "Shrinks or grows the picture around its centre.",
+    { "Picture scale", "Below 100 % the picture shrinks inside its screen size.",
       K_CYCLE, 0, 0, { NULL }, &g_gpsp_config.screen_scale, NULL, 100, 50, 200, "%d%%" },
     { "TV output", NULL, K_OFF, 0, 0, { "Comes later" } },
   },
   { /* Sound */
-    { "Sound", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
+    { "Sound", "Off mutes the game and runs a little faster.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
     { "Sound delay", "Less delay feels faster; more delay stops crackles in busy games.",
       K_BLOCKS, 1, 11, { NULL }, &g_game_config.audio_buffer_size_number, NULL, 2 },
   },
@@ -93,30 +93,30 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
   { /* Play */
-    { "Save when leaving a game", "Exit and Library save to Last first; Continue picks up there.",
+    { "Save when leaving a game", "Continue on the Home screen picks up exactly here.",
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.save_on_leave, NULL, YES },
     { "Fast forward", "Hold: fast while the button is down. Toggle: one press on, one press off.",
       K_SEG, 0, 2, { "Hold", "Toggle" }, &g_gpsp_config.fast_forward_mode, map_ff, FF_TOGGLE },
     { "Fast forward speed", "Max runs as fast as the PSP can, so its speed changes with each game.",
       K_SEG, 0, 3, { "2\xC3\x97", "3\xC3\x97", "Max" }, &g_gpsp_config.ff_speed, NULL, FF_SPEED_3X },
-    { "Sound while fast", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
-    { "Rapid-fire speed", NULL, K_SEG, 1, 3, { "Slow", "Medium", "Fast" },
+    { "Sound while fast", "Off keeps fast forward quiet.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
+    { "Rapid-fire speed", "How fast a rapid-fire button presses while you hold it.", K_SEG, 1, 3, { "Slow", "Medium", "Fast" },
       &g_game_config.rapidfire_speed, NULL, RAPIDFIRE_FAST },
-    { "Show FPS", NULL, K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_fps, NULL, NO },
+    { "Show FPS", "Shows the frames per second in the top-left corner.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_fps, NULL, NO },
   },
   { /* System */
-    { "Language", "The menu language; it applies the next time kai starts.",
+    { "Language", "The language comes from your PSP until you pick one.",
       K_CYCLE, 0, 12, { NULL }, &g_gpsp_config.language, NULL, 1, 0, 0, NULL, language_names },
-    { "CPU speed", "Faster runs heavy games smoothly; slower saves battery.",
+    { "CPU speed", "333 MHz runs every game at full speed; lower saves battery.",
       K_SEG, 1, 3, { "222", "266", "333 MHz" }, &g_game_config.clock_speed_number, map_clock, 9 },
-    { "Write game saves", "Right away writes the game's own save as soon as it changes.",
+    { "Write game saves", "Right away writes the game's save at once; On exit waits until you leave.",
       K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
-    { "Start games with", NULL, K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
+    { "Start games with", "GBA BIOS shows the GBA's start-up logo first; Game Cart skips it.", K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
     { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models.",
       K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
-    { "Reset all settings (hold)", "Every setting on every tab goes back to its default.",
+    { "Reset all settings", "Puts every setting back to its default, for every game.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESET_ALL },
   },
 };
@@ -137,9 +137,12 @@ static int row_height(const row_t *r)
   return (r->kind == K_SCREEN) ? SCREEN_ROW_H : UI_ROW_H;
 }
 
-static int row_pitch(const row_t *r)
+/* Settings rows sit on a 26 px pitch (6 px between cards keeps the
+ * selected card's cursor frame clear of the row above); the Stick page's
+ * rows beside the stick use the compact 22 px one. */
+static int row_pitch(int tab, const row_t *r)
 {
-  return row_height(r) + (UI_ROW_PITCH - UI_ROW_H);
+  return row_height(r) + ((tab == PAD_TAB) ? UI_ROW_PITCH_COMPACT : UI_ROW_PITCH) - UI_ROW_H;
 }
 
 /* The choice shown for a stored value; -1 when it is none of them. */
@@ -176,7 +179,9 @@ static struct
 {
   int tab, tab_prev, tab_f;
   int cur, cursor_from, cursor_f, rest;
-  int top;                        /* scroll: content y at VIEW_T */
+  int cursor_h_from;              /* the frame's height as it left the last row */
+  int top;                        /* scroll: where the list rests */
+  int top_from, top_f;            /* and where it slides from (scroll token) */
   int value_f, value_from;        /* the selected row's value motion */
   int dirty;                      /* the ground needs drawing again */
   ui_hold_t reset_hold;           /* START: reset this tab */
@@ -185,6 +190,7 @@ static struct
   int undo_all;                   /* the undo covers every tab */
   char toast[48];
   int toast_f, toast_undo;
+  u16 toast_edge;
   int restart;                    /* leave Settings and restart kai */
   /* Controls */
   int page;                       /* 0 Buttons, 1 Stick */
@@ -231,7 +237,7 @@ static int row_y(int tab, int i)
   int y = rows_y0(tab), j;
 
   for(j = 0; j < i; j++)
-    y += row_pitch(&rows[tab][j]);
+    y += row_pitch(tab, &rows[tab][j]);
   return y;
 }
 
@@ -240,29 +246,43 @@ static int rows_bottom(int tab)
   return row_y(tab, row_count(tab));
 }
 
-/* Scroll by whole rows, so the first row in view always sits at ROWS_Y and
- * no row is ever cut at the top. Keep the row after the cursor in view when
- * there is one, and the row before it when moving up. */
+/* Where the list is now: sliding to s.top with the scroll token. */
+static int top_now(void)
+{
+  return ui_ease_out_back(s.top_from, s.top, s.top_f, UI_F_SCROLL);
+}
+
+/* Scroll by whole rows, so the first row in view always sits at the top of
+ * the list and no row is ever cut there; the cursor stays a row from the
+ * bottom edge (spec: Settings; the r4 mockups' settings_top). */
 static void scroll_to_cursor(void)
 {
-  int n = row_count(s.tab), first = 0, top;
+  int n = row_count(s.tab), bottom = rows_bottom(s.tab), top = 0, i;
 
-  if(rows_bottom(s.tab) > VIEW_B)
+  if(bottom > VIEW_B)
   {
-    int want = (s.cur + 1 < n) ? s.cur + 1 : s.cur;
+    int y0 = rows_y0(s.tab), cy = row_y(s.tab, s.cur);
+    int want = cy + row_height(&rows[s.tab][s.cur]) + ((s.tab == PAD_TAB) ? UI_ROW_PITCH_COMPACT : UI_ROW_PITCH) - VIEW_B;
 
-    while((first < n - 1) && (row_y(s.tab, first + 1) - rows_y0(s.tab) <= s.top))
-      first++;  /* the first row in view now */
-    if((s.cur <= first) && (first > 0))
-      first = (s.cur > 0) ? s.cur - 1 : 0;
-    while((first < s.cur) && (row_y(s.tab, want) + row_height(&rows[s.tab][want])
-                              - (row_y(s.tab, first) - rows_y0(s.tab)) > VIEW_B))
-      first++;
+    if(want > bottom - VIEW_B)
+      want = bottom - VIEW_B;
+    if(want > 0)
+    {
+      /* the first row start at or past it, else the last one */
+      top = row_y(s.tab, n - 1) - y0;
+      for(i = 0; i < n; i++)
+        if(row_y(s.tab, i) - y0 >= want)
+        {
+          top = row_y(s.tab, i) - y0;
+          break;
+        }
+    }
   }
-  top = row_y(s.tab, first) - rows_y0(s.tab);
   if(top != s.top)
   {
+    s.top_from = top_now();
     s.top = top;
+    s.top_f = 0;
     s.dirty = 1;
   }
 }
@@ -364,15 +384,12 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       ui_row_cycle(vx, vy, text, selected, g, selected ? f : UI_F_VALUE);
       break;
     case K_ACTION:
-      if(selected && (s.action_hold.p > 0))
-        ui_hold_bar(vx - 120, vy + 7, 112, s.action_hold.p, UI_COL_PINK);
-      else
-        ui_row_action(vx, vy, selected);
+      ui_row_action(vx, vy, selected);  /* its hold bar is in the tip line */
       break;
   }
 }
 
-static void show_toast(const char *text, int undo);
+static void show_toast(const char *text, int undo, u16 edge);
 
 /* ---- Controls: the Buttons page ------------------------------------------ */
 
@@ -463,12 +480,12 @@ static void draw_chip(int i, int selected)
   ui_line(ex, ey, c->ax, c->ay, line);
   if(selected)
     ui_round_fill(c->x + 1, c->y + 1, CHIP_W, CHIP_H, 2, UI_COL_SHADE);
-  ui_round_fill(x, y, CHIP_W, CHIP_H, 2, selected ? UI_COL_LIME : UI_COL_PLUM_2);
+  ui_round_fill(x, y, CHIP_W, CHIP_H, 2, selected ? UI_COL_LIME : UI_COL_CARD);
   gx = ui_glyph(x + 4, y + 3, c->key) + 4;
   ui_print_fit(gx, y + 2, action_name(gamepad_config_map[c->map]),
-   selected ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, x + CHIP_W - 4 - gx);
-  if(chip_remapped(i))  /* remapped: a dot beside the chip */
-    ui_fill((i >= 5) && (i < 10) ? c->x + CHIP_W + 3 : c->x - 7, c->y + 7, 4, 4, UI_COL_TANGERINE);
+   selected ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, x + 100 - gx);  /* clear of the dot */
+  if(chip_remapped(i))  /* remapped: a dot inside the chip's right end */
+    ui_fill(x + 102, y + 7, 4, 4, selected ? UI_COL_PLUM : UI_COL_TANGERINE);
   draw_pad_button(i, selected ? UI_COL_LIME :
    (((c->map >= 6) && (c->map <= 9)) || (c->map <= 3) ? UI_COL_CREAM : UI_COL_MUTE));
 }
@@ -578,7 +595,7 @@ static void picker_input(void)
     int m = s.pick_map;
     if(!menu_reachable_without(m, s.pcur))
     {
-      show_toast("One button has to open the menu", 0);
+      show_toast("One button has to open the menu", 0, UI_COL_PINK);
       return;
     }
     if(gamepad_config_map[m] != (u32)s.pcur)
@@ -668,9 +685,9 @@ static int draw_picker(void)
 
 /* ---- Controls: the Stick page ---------------------------------------------- */
 
-#define STICK_CX 118
+#define STICK_CX 122
 #define STICK_CY 140
-#define STICK_R  54
+#define STICK_R  46
 
 static void draw_page_switch(void)
 {
@@ -702,43 +719,50 @@ static void draw_stick(void)
 {
   static const s8 dirs[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
   int sens = g_gpsp_config.analog_sensitivity_level + 1;
-  int dz = STICK_R * (75 - sens * 6) / 100, i;
+  int dz = STICK_R * (75 - sens * 6) / 100, use = stick_pickable(), i;
+  u16 nub = COLOR16(25, 22, 23);  /* cream and mute, half each */
 
   draw_page_switch();
   /* the travel, the ring where a push starts to count (smaller = more
-     sensitive) and the nub */
+     sensitive; mute while the stick is off) and the nub */
   ui_disc(STICK_CX, STICK_CY, STICK_R + 3, UI_COL_SHADE);
   ui_disc(STICK_CX, STICK_CY, STICK_R, UI_COL_CARD);
-  ui_ring(STICK_CX, STICK_CY, dz, 2, UI_COL_LIME);
+  ui_ring(STICK_CX, STICK_CY, dz, 2, use ? UI_COL_LIME : UI_COL_MUTE);
   ui_disc(STICK_CX, STICK_CY, 12, UI_COL_CREAM);
-  ui_disc(STICK_CX, STICK_CY, 8, UI_COL_MUTE);
-  /* what each push does: map entries 12-15; the selected chip is lime and
-     lifted, like on the Buttons page */
+  ui_disc(STICK_CX, STICK_CY, 8, nub);
+  /* what each push does (map entries 12-15): card chips 6 px off the disc,
+     the glyph at +4 and the name 4 px after it. The ← chip stays 20 px in
+     and the → chip ends by x 226, 10 px clear of the rows; a long name
+     slides over the disc's edge but never over the ring (2 px clear), cut
+     to fit. The selected chip is lime and lifted, as on the Buttons page. */
   for(i = 0; i < 4; i++)
   {
     const char *name = action_name(gamepad_config_map[12 + i]);
-    int w = ui_print_width(name, UI_FONT_SMALL, 0) + ui_glyph_width(stick_keys[i]) + 14, px, py, gx;
-    int sel = (i == s.dir);
-    px = STICK_CX + dirs[i][0] * (STICK_R + 10) - ((dirs[i][0] == 0) ? w / 2 : ((dirs[i][0] < 0) ? w : 0));
-    py = STICK_CY + dirs[i][1] * (STICK_R + 10) - ((dirs[i][1] == 0) ? 9 : ((dirs[i][1] < 0) ? 18 : 0));
-    /* a long name slides the side chips over the disc's edge rather than
-       off the screen or into the rows */
-    if(w > 100)
-      w = 100;
-    if(px < 4)
-      px = 4;
-    if(px + w > 230)
-      px = 230 - w;
+    int gw = ui_glyph_width(stick_keys[i]), sel = (i == s.dir), px, py, gx, w, room, tw;
+    room = (dirs[i][0] == 0) ? 100 : ((dirs[i][0] < 0) ? STICK_CX - dz - 2 - 20 : 226 - (STICK_CX + dz + 2));
+    if(room > 100)
+      room = 100;
+    tw = ui_print_width(name, UI_FONT_SMALL, 0);
+    if(tw > room - (gw + 13))
+      tw = room - (gw + 13);
+    w = 4 + gw + 4 + tw + 5;
+    if(dirs[i][0] < 0)
+      px = (STICK_CX - (STICK_R + 6) - w > 20) ? STICK_CX - (STICK_R + 6) - w : 20;
+    else if(dirs[i][0] > 0)
+      px = (STICK_CX + STICK_R + 6 < 226 - w) ? STICK_CX + STICK_R + 6 : 226 - w;
+    else
+      px = STICK_CX - w / 2;
+    py = STICK_CY + dirs[i][1] * (STICK_R + 6) - ((dirs[i][1] == 0) ? 9 : ((dirs[i][1] < 0) ? 18 : 0));
     if(sel)
     {
       ui_round_fill(px + 1, py + 1, w, 18, 2, UI_COL_SHADE);
       px -= UI_LIFT;
       py -= UI_LIFT;
     }
-    ui_round_fill(px, py, w, 18, 2, sel ? UI_COL_LIME : UI_COL_PLUM_2);
+    ui_round_fill(px, py, w, 18, 2, sel ? UI_COL_LIME : UI_COL_CARD);
     gx = ui_glyph(px + 4, py + 3, stick_keys[i]) + 4;
-    ui_print_fit(gx, py + 2, name, sel ? UI_COL_PLUM : (stick_pickable() ? UI_COL_CREAM : UI_COL_MUTE),
-     UI_FONT_SMALL, 0, px + w - 4 - gx);
+    ui_print_fit(gx, py + 2, name, sel ? UI_COL_PLUM : (use ? UI_COL_CREAM : UI_COL_MUTE),
+     UI_FONT_SMALL, 0, tw);
   }
 }
 
@@ -807,9 +831,24 @@ static void draw_hints(void)
 
 /* The ground: the check, the legend, every row but the selected one, the
  * scroll bar and the hint strip. */
+/* The bottom of the list as drawn with the list at top: under the last
+ * row that fits whole above the tip line, its shadow included. */
+static int list_bottom(int top)
+{
+  int i, n = row_count(s.tab), vb = VIEW_T;
+
+  for(i = 0; i < n; i++)
+  {
+    int y = row_y(s.tab, i) - top, h = row_height(&rows[s.tab][i]);
+    if((y >= VIEW_T - 1) && (y + h + 1 <= VIEW_B) && (y + h + 1 > vb))
+      vb = y + h + 1;
+  }
+  return vb;
+}
+
 static void build_ground(void)
 {
-  int i, n = row_count(s.tab), per_game = 0, bottom = rows_bottom(s.tab);
+  int i, n = row_count(s.tab), per_game = 0, bottom = rows_bottom(s.tab), top;
 
   s.dirty = 0;
   if(!ui_layer_begin())
@@ -830,30 +869,132 @@ static void build_ground(void)
     ui_per_game_mark(UI_MARGIN, 40, UI_COL_TANGERINE);
     ui_text(UI_MARGIN + 16, 39, "Saved for this game only", UI_COL_MUTE);
   }
+  /* every row as it looks unselected; the selected look is drawn over it
+     each frame inside the cursor frame. While the list slides, rows are cut
+     at the top of the list and at the bottom of the last whole row. */
+  top = top_now();
+  ui_clip_set(0, VIEW_T, UI_SCREEN_W, list_bottom(top) - VIEW_T);
   for(i = 0; i < n; i++)
   {
-    int y = row_y(s.tab, i) - s.top, h = row_height(&rows[s.tab][i]);
-    if(((i == s.cur) && (s.dir < 0)) || (y < VIEW_T) || (y + h > VIEW_B))
+    int y = row_y(s.tab, i) - top, h = row_height(&rows[s.tab][i]);
+    if((y + h < VIEW_T) || (y > VIEW_B))
       continue;
     draw_row(s.tab, i, y, 0, UI_F_VALUE);
   }
+  ui_clip_reset();
   if(bottom > VIEW_B)
   {
     int track = VIEW_B - VIEW_T - 4, th = track * (VIEW_B - VIEW_T) / (bottom - VIEW_T);
-    int ty = VIEW_T + 2 + (track - th) * ((s.top < bottom - VIEW_B) ? s.top : bottom - VIEW_B) / (bottom - VIEW_B);
+    int ty = VIEW_T + 2 + (track - th) * ((top < bottom - VIEW_B) ? top : bottom - VIEW_B) / (bottom - VIEW_B);
     ui_round_fill(468, VIEW_T + 2, 4, track, 1, UI_COL_CARD);
     ui_round_fill(468, ty, 4, th, 1, UI_COL_MUTE);
   }
-  if(s.tab == PAD_TAB)
-  {
-    /* the Stick page's tip sits under its rows, up to three lines */
-    const char *tip = (s.dir >= 0) ? STICK_DIR_TIP : rows[s.tab][s.cur].tip;
-    char line[128];
-    for(i = 0; tip && (i < 3) && ui_wrap_line(tip, i, 220, UI_FONT_SMALL, line, sizeof(line)); i++)
-      ui_print(236, 150 + i * 14, line, UI_COL_MUTE, UI_FONT_SMALL, 0);
-  }
   draw_hints();
   ui_layer_end();
+}
+
+/* ---- the selection and the tip line ---------------------------------------- */
+
+/* The cursor frame flies between rows with the cursor token; inside it the
+ * rows show their selected look (the lime fill moves with the frame), and
+ * outside it they stay as the ground drew them. */
+static void draw_selection(void)
+{
+  int top = top_now(), n = row_count(s.tab), i;
+  int rx = row_x(s.tab), rw = row_w(s.tab);
+  int hh = ui_ease_out_back(s.cursor_h_from, row_height(&rows[s.tab][s.cur]), s.cursor_f, UI_F_CURSOR);
+  int cy = ui_ease_out_back(s.cursor_from, row_y(s.tab, s.cur), s.cursor_f, UI_F_CURSOR) - top;
+  int bx = rx - 4, by = cy - 2, bw = rw + 6, bh = hh + 3, lb = list_bottom(top);
+
+  /* the box, cut to the list area */
+  if(by < VIEW_T) { bh -= VIEW_T - by; by = VIEW_T; }
+  if(by + bh > lb) bh = lb - by;
+  if(bh > 0)
+  {
+    ui_clip_set(bx, by, bw, bh);
+    ui_ground_rect(bx, by, bw, bh);
+    for(i = 0; i < n; i++)
+    {
+      int y = row_y(s.tab, i) - top, h = row_height(&rows[s.tab][i]);
+      if((y + h + 1 < by) || (y - 2 > by + bh))
+        continue;
+      if(i != s.cur)
+        draw_row(s.tab, i, y, row_selectable(&rows[s.tab][i]), UI_F_VALUE);
+    }
+    /* the selected row last, so its value motion is on top */
+    draw_row(s.tab, s.cur, row_y(s.tab, s.cur) - top, 1, s.value_f);
+    ui_clip_reset();
+  }
+  ui_cursor_frame(rx - UI_LIFT, cy - UI_LIFT, rw, hh);
+}
+
+/* A hold's bar in the tip line's place: 440 x 6 at (20, 235) on a card
+ * track, from 12 f like every hold. Returns 1 while it shows. */
+static int tip_hold_bar(const ui_hold_t *h, u16 color)
+{
+  if(!h->shown || (h->p <= 0))
+    return 0;
+  ui_fill(UI_MARGIN, 235, ROW_W, 6, UI_COL_CARD);
+  ui_fill(UI_MARGIN, 235, ROW_W * ((h->p < 256) ? h->p : 256) / 256, 6, color);
+  return 1;
+}
+
+/* The tip line: "▸ " and one line at (20, 231), cut at 440 px. It waits
+ * for the cursor to rest, then fades in rising 6 px. A hold's bar takes its
+ * place: START's tangerine, Restart kai's and Language's sky, Reset all's
+ * pink (it loses data). */
+static void draw_tip_line(void)
+{
+  const char *tip = NULL;
+  char text[160];
+  int k;
+
+  if(tip_hold_bar(&s.reset_hold, UI_COL_TANGERINE))
+    return;
+  if(tip_hold_bar(&s.action_hold, (action_of(s.tab, s.cur) == ACT_RESET_ALL) ? UI_COL_PINK : UI_COL_SKY))
+    return;
+  if(s.reset_hold.fired || s.action_hold.fired)
+    return;  /* done, key still down: the tip stays away */
+
+  if(s.rest < UI_F_TIP_DELAY + 8)
+    s.rest++;
+  if(s.rest <= UI_F_TIP_DELAY)
+    return;
+  k = s.rest - UI_F_TIP_DELAY;  /* 1..8 */
+  if(k > 8)
+    k = 8;
+
+  if(s.tab == PAD_TAB)
+    tip = (s.page == 0) ? PAD_TIP : ((s.dir >= 0) ? STICK_DIR_TIP : rows[s.tab][s.cur].tip);
+  else if(is_lang_row(s.tab, s.cur) && lang_pending())
+  {
+    /* the glyph is whichever key confirms */
+    snprintf(text, sizeof(text), "Applies after a restart: hold %s to restart now, or it waits for the next start.",
+     (ui_key_confirm == PSP_CTRL_CIRCLE) ? "\xE2\x97\x8B" : "\xC3\x97");
+    tip = text;
+  }
+  else
+    tip = rows[s.tab][s.cur].tip;
+  if(!tip)
+    return;
+  if(tip != text)
+  {
+    snprintf(text, sizeof(text), "%s", tip);
+    tip = text;
+  }
+  {
+    char line[168];
+    int c, col = UI_COL_MUTE & 0x8000;
+    snprintf(line, sizeof(line), "\xE2\x96\xB8 %s", text);
+    /* plum to mute as it rises */
+    for(c = 0; c < 15; c += 5)
+    {
+      int a = (UI_COL_PLUM >> c) & 31, b = (UI_COL_MUTE >> c) & 31;
+      col |= ((a + (b - a) * k / 8) & 31) << c;
+    }
+    ui_print_fit(UI_MARGIN, 231 + 6 - 6 * UI_EASE_OUT_CUBIC_8[k - 1] / 256, line, (u16)col,
+     UI_FONT_SMALL, 0, ROW_W);
+  }
 }
 
 /* ---- actions ---------------------------------------------------------------- */
@@ -880,10 +1021,13 @@ static void reset_tab(int tab)
       *rows[tab][i].value = rows[tab][i].def;
 }
 
-static void show_toast(const char *text, int undo)
+/* edge: the group colour of what happened (a tab reset lime; a refused
+ * pick pink, with no button as nothing changed) */
+static void show_toast(const char *text, int undo, u16 edge)
 {
   snprintf(s.toast, sizeof(s.toast), "%s", text);
   s.toast_undo = undo;
+  s.toast_edge = edge;
   s.toast_f = 0;
 }
 
@@ -901,7 +1045,7 @@ static void undo_reset(void)
       if(rows[t][i].value)
         *rows[t][i].value = s.undo[t][i];
   }
-  show_toast("Settings are back as they were", 0);
+  show_toast("Settings are back as they were", 0, UI_COL_LIME);
   s.dirty = 1;
 }
 
@@ -909,7 +1053,8 @@ static void move_cursor(int to)
 {
   if(to == s.cur)
     return;
-  s.cursor_from = ui_ease_out_back(s.cursor_from, row_y(s.tab, s.cur) - s.top, s.cursor_f, UI_F_CURSOR);
+  s.cursor_from = ui_ease_out_back(s.cursor_from, row_y(s.tab, s.cur), s.cursor_f, UI_F_CURSOR);
+  s.cursor_h_from = ui_ease_out_back(s.cursor_h_from, row_height(&rows[s.tab][s.cur]), s.cursor_f, UI_F_CURSOR);
   s.cur = to;
   s.cursor_f = 0;
   s.rest = 0;
@@ -952,9 +1097,13 @@ static void first_row(void)
       s.cur = i;
       break;
     }
-  s.top = 0;
+  s.top = s.top_from = 0;
+  s.top_f = UI_F_SCROLL;
   scroll_to_cursor();
-  s.cursor_from = row_y(s.tab, s.cur) - s.top;
+  s.top_from = s.top;   /* a new tab or page opens in place */
+  s.top_f = UI_F_SCROLL;
+  s.cursor_from = row_y(s.tab, s.cur);
+  s.cursor_h_from = row_height(&rows[s.tab][s.cur]);
   s.cursor_f = UI_F_CURSOR;
   s.rest = 0;
 }
@@ -1027,6 +1176,10 @@ int ui_settings(int tab, int row)
   {
     s.cur = row;
     scroll_to_cursor();
+    s.top_from = s.top;  /* back where it was, without a slide */
+    s.top_f = UI_F_SCROLL;
+    s.cursor_from = row_y(s.tab, s.cur);
+    s.cursor_h_from = row_height(&rows[s.tab][s.cur]);
   }
   ui_input_init();
   ui_status_read();
@@ -1156,7 +1309,7 @@ int ui_settings(int tab, int row)
       s.undo_all = 0;
       reset_tab(s.tab);
       snprintf(text, sizeof(text), "%s reset", tab_labels[s.tab]);
-      show_toast(text, 1);
+      show_toast(text, 1, UI_COL_LIME);
       s.reset_hold.p = 0;
       s.reset_hold.shown = 0;
       s.dirty = 1;
@@ -1192,13 +1345,18 @@ int ui_settings(int tab, int row)
         s.undo_all = 1;
         for(t = 0; t < TABS; t++)
           reset_tab(t);
-        show_toast("Every setting reset", 1);
+        show_toast("Every setting reset", 1, UI_COL_PINK);
         s.action_hold.p = 0;
         s.dirty = 1;
       }
     }
 
   draw:
+    if(s.top_f < UI_F_SCROLL)
+    {
+      s.top_f++;
+      s.dirty = 1;  /* the list slides: its ground follows */
+    }
     if(s.dirty)
       build_ground();
 
@@ -1208,49 +1366,18 @@ int ui_settings(int tab, int row)
     if(s.tab_f < UI_F_TAB) s.tab_f++;
     ui_tabs(UI_MARGIN, tab_labels, TABS, s.tab, s.tab_prev, s.tab_f);
     ui_status_chip();
-    if(s.reset_hold.p > 0)  /* the reset bar, under the tabs */
-    {
-      ui_fill(UI_MARGIN, 32, ROW_W, 2, UI_COL_CARD);
-      ui_fill(UI_MARGIN, 32, ROW_W * s.reset_hold.p / 256, 2, UI_COL_TANGERINE);
-    }
     if(s.value_f < UI_F_VALUE) s.value_f++;
     if(s.cursor_f < UI_F_CURSOR) s.cursor_f++;
     if((s.tab == PAD_TAB) && (s.page == 0))
       draw_chip(s.btn, 1);
-    else
-    {
-      int y = row_y(s.tab, s.cur) - s.top, h = row_height(&rows[s.tab][s.cur]);
-      int cy = ui_ease_out_back(s.cursor_from, y, s.cursor_f, UI_F_CURSOR);
-      if(row_selectable(&rows[s.tab][s.cur]) && (s.dir < 0))
-      {
-        draw_row(s.tab, s.cur, y, 1, s.value_f);
-        ui_cursor_frame(row_x(s.tab) - UI_LIFT, cy - UI_LIFT, row_w(s.tab), h);
-      }
-    }
-    /* the tip line waits for the cursor to rest */
-    if(s.rest < UI_F_TIP_DELAY)
-      s.rest++;
-    else if(s.tab == PAD_TAB)
-    {
-      if(s.page == 0)
-        ui_print_fit(UI_MARGIN, 231, PAD_TIP,
-         UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
-    }
-    else
-    {
-      const char *tip = rows[s.tab][s.cur].tip;
-      if(is_lang_row(s.tab, s.cur) && lang_pending())
-        tip = "Applies after a restart: hold \xC3\x97 to restart now, or it waits for the next start.";
-      if(is_lang_row(s.tab, s.cur) && (s.action_hold.p > 0))
-        ui_hold_bar(UI_MARGIN, 233, 184, s.action_hold.p, UI_COL_SKY);  /* in the tip's place */
-      else if(tip)
-        ui_print_fit(UI_MARGIN, 231, tip, UI_COL_MUTE, UI_FONT_SMALL, 0, ROW_W);
-    }
+    else if(row_selectable(&rows[s.tab][s.cur]) && (s.dir < 0))
+      draw_selection();
+    draw_tip_line();
     if(s.pick && !draw_picker())
       s.dirty = 1;  /* closed: the chip shows its new job */
     if(s.toast_f >= 0)
     {
-      if(!ui_toast(s.toast, UI_COL_LIME, s.toast_undo ? "Undo" : NULL, s.toast_f))
+      if(!ui_toast(s.toast, s.toast_edge, s.toast_undo ? "Undo" : NULL, s.toast_f))
         s.toast_f = -1;
       else
         s.toast_f++;

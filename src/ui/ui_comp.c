@@ -113,8 +113,11 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
 
   if(flags & UI_ROW_DISABLED)
   {
+    /* greyed out: a plum-2 card, the label and its per-game mark mute */
     ui_round_fill(x, y, w, UI_ROW_H, 2, UI_COL_PLUM_2);
-    body_text(x + 8, y + 2, label, UI_COL_MUTE, 0);
+    end = body_text(x + 8, y + 2, label, UI_COL_MUTE, 0);
+    if(flags & UI_ROW_PER_GAME)
+      draw_icon(end + 5, y + 2 + 4, icon_rom, UI_COL_MUTE);
     *vx = x + w - 8;
     *vy = y;
     return;
@@ -326,12 +329,22 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f)
  * once it is gone. */
 int ui_toast(const char *text, u16 edge, const char *undo, int f)
 {
-  int w, x, y = undo ? 214 : 212, right = undo ? 466 : 460, out;
+  return ui_toast_at(text, edge, undo, f, 214);
+}
+
+/* At y: 214 bottom right in menus, 6 top right on the pause screen and over
+ * a running game. The right edge is 466 either way. */
+int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y)
+{
+  int w, x, right = 466, out;
 
   if(f < 0)
     return 0;
-  /* text, SELECT pill and the undo word, with 12 px either side */
-  w = body_width(text, 0) + (undo ? small_width(undo) + ui_glyph_width(PSP_CTRL_SELECT) + 40 : 28);
+  /* 12 px in, the text, then 10 px, the SELECT pill, 4 px and the bold
+     undo word; 12 px clear at the end */
+  w = 12 + body_width(text, 0) + 12;
+  if(undo)
+    w += 10 + ui_glyph_width(PSP_CTRL_SELECT) + 4 + small_width(undo) + 1;
   out = w + 24;
   if(f < UI_F_TOAST_IN)
     x = right - w + ui_ease_out_back(out, 0, f + 1, UI_F_TOAST_IN);
@@ -352,12 +365,12 @@ int ui_toast(const char *text, u16 edge, const char *undo, int f)
     int ex = body_text(x + 12, y + 5, text, UI_COL_PLUM, 0);
     int gx = ui_glyph_inverted(ex + 10, y + 7, PSP_CTRL_SELECT) + 4;
     if(ui_font_loaded())
-      ui_print(gx, y + 5, undo, UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+      ui_print(gx, y + 6, undo, UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
     else
       small_text(gx, y + 6, undo, UI_COL_PLUM);
   }
   else
-    body_text(x + 14, y + 5, text, UI_COL_PLUM, 0);
+    body_text(x + 12, y + 5, text, UI_COL_PLUM, 0);
   return 1;
 }
 
