@@ -427,6 +427,7 @@ int main(int argc, char *argv[])
 #ifdef UI4
   // Before the game buffer, which takes all the RAM left on a PSP-1000
   ui_pool_init();
+  ui_layer_init();
   ui_font_init(g_gpsp_config.language);
 #endif
   init_gamepak_buffer();

@@ -77,6 +77,7 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h);
 void ui_shrink_box(const u16 *src, int sw, int sh, u16 *dst, int w, int h);
 void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h);
 void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, int w, int h);
+void ui_layer_init(void);  /* once, after ui_pool_init() */
 int ui_layer_begin(void);
 void ui_layer_end(void);
 void ui_layer_reset(void);

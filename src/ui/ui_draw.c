@@ -134,6 +134,14 @@ static int alloc_ground_layer(void)
   return 1;
 }
 
+/* The layer is reserved once, right after the pool, for the whole run:
+ * taken lazily, it landed after a screen's pool mark and the screen's
+ * release left it pointing at memory the next screen allocated again. */
+void ui_layer_init(void)
+{
+  alloc_ground_layer();
+}
+
 /* Draw the static parts of a screen into the ground layer once: between
  * ui_layer_begin() and ui_layer_end() every ui_* drawing goes to the layer.
  * ui_layer_begin() starts from the plain ground and returns 0 without
