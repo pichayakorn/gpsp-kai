@@ -4,7 +4,7 @@
  * as a grid of covers or a list. A game without box art gets its preset
  * cover (ui_cover.c). The name is the file name, cleaned up (display_name).
  *
- * This part: the All tab (grid and list), View & sort, the empty library
+ * This part: the All tab (the list), Sort, the empty library
  * and starting a game. Recent with its Continue card, the game card,
  * Favourites, Folders and the letter jump come in the next parts.
  */
@@ -41,7 +41,12 @@
 #define POP_X  20
 #define POP_Y  128
 #define POP_W  300
-#define POP_H  98
+/* The first release ships the list view only (maintainer, 2026-11-19):
+   the grid is postponed and will be reworked. Its code stays behind this
+   switch; with it on, SELECT opens View & sort with a View row. */
+#define LIBRARY_GRID 0
+#define POP_FIRST_ROW (LIBRARY_GRID ? 0 : 1)
+#define POP_H  (LIBRARY_GRID ? 98 : 64)
 
 enum { VIEW_GRID, VIEW_LIST };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
@@ -800,10 +805,11 @@ static void draw_popup(void)
   ui_round_fill(x + 3, y + 3, POP_W, POP_H, 3, UI_COL_SHADE);
   ui_round_fill(x, y, POP_W, POP_H, 3, UI_COL_CREAM);
   ui_fill(x, y + 4, 6, POP_H - 8, UI_COL_SKY);
-  ui_print(x + 16, y + 6, "View & sort", UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
-  for(j = 0; j < 2; j++)
+  ui_print(x + 16, y + 6, LIBRARY_GRID ? "View & sort" : "Sort", UI_COL_PLUM,
+   UI_FONT_BODY, UI_TEXT_BOLD);
+  for(j = POP_FIRST_ROW; j < 2; j++)
   {
-    int ry = y + 32 + j * 34, sx = x + 16 + 64, i, n = j ? SORTS : 2;
+    int ry = y + 32 + (j - POP_FIRST_ROW) * 34, sx = x + 16 + 64, i, n = j ? SORTS : 2;
     int k = j ? L.sort : L.view;
     const char **labels = j ? sort_labels : view_labels;
     if(j == L.pop_row)
@@ -837,7 +843,10 @@ static void draw_hints(void)
 
   if(L.pop && !L.pop_out)
   {
-    h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;    h[n++].verb = "Move";
+    if(LIBRARY_GRID)
+    {
+      h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;  h[n++].verb = "Move";
+    }
     h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Change";
     h[n].keys = ui_key_back;                    h[n++].verb = "Close";
   }
@@ -848,7 +857,7 @@ static void draw_hints(void)
   }
   else
   {
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = "View";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
   }
@@ -1017,11 +1026,12 @@ static void popup_input(void)
     L.pop_out = 1;
     L.pop_f = 0;
     /* written when the popup closes (spec section 7) */
-    g_gpsp_config.library_view = (L.view & 1) | ((L.sort & 3) << 1);
+    g_gpsp_config.library_view = (LIBRARY_GRID ? (L.view & 1) :
+     (g_gpsp_config.library_view & 1)) | ((L.sort & 3) << 1);
     save_config_file();
     return;
   }
-  if(ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  if(LIBRARY_GRID && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     L.pop_row ^= 1;
   if(ui_repeat(PSP_CTRL_LEFT) || ui_repeat(PSP_CTRL_RIGHT))
   {
@@ -1094,7 +1104,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
 
   memset(&L, 0, sizeof(L));
   L.played_game = -1;
-  L.view = g_gpsp_config.library_view & 1;
+  L.view = LIBRARY_GRID ? (g_gpsp_config.library_view & 1) : VIEW_LIST;
   L.sort = (g_gpsp_config.library_view >> 1) & 3;
   if(L.sort >= SORTS)
     L.sort = SORT_NAME;
@@ -1142,7 +1152,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
         L.pop = 1;
         L.pop_f = 0;
         L.pop_out = 0;
-        L.pop_row = 0;
+        L.pop_row = POP_FIRST_ROW;
         L.pop_flash = UI_F_VALUE;
         L.dirty = 1;
       }
