@@ -1010,32 +1010,42 @@ void set_cpu_mode(CPU_MODE_TYPE new_mode)
   u32 i;
   CPU_MODE_TYPE cpu_mode = reg[CPU_MODE];
 
+  // FIQ banks r8-r14; every other mode banks only r13-r14 and shares r8-r12,
+  // which wait in reg_mode[MODE_USR][0-4] while FIQ runs (where
+  // user_reg_ptr() finds them). Leaving FIQ saves its own r8-r14 and brings
+  // the shared r8-r12 back, whichever mode comes next.
   if(cpu_mode != new_mode)
   {
-    if(new_mode == MODE_FIQ)
+    if(cpu_mode == MODE_FIQ)
     {
       for(i = 8; i < 15; i++)
-      {
-        reg_mode[cpu_mode][i - 8] = reg[i];
-      }
+        reg_mode[MODE_FIQ][i - 8] = reg[i];
     }
     else
     {
       reg_mode[cpu_mode][5] = reg[REG_SP];
       reg_mode[cpu_mode][6] = reg[REG_LR];
+      if(new_mode == MODE_FIQ)
+      {
+        for(i = 8; i < 13; i++)
+          reg_mode[MODE_USR][i - 8] = reg[i];
+      }
     }
 
-    if(cpu_mode == MODE_FIQ)
+    if(new_mode == MODE_FIQ)
     {
       for(i = 8; i < 15; i++)
-      {
-        reg[i] = reg_mode[new_mode][i - 8];
-      }
+        reg[i] = reg_mode[MODE_FIQ][i - 8];
     }
     else
     {
       reg[REG_SP] = reg_mode[new_mode][5];
       reg[REG_LR] = reg_mode[new_mode][6];
+      if(cpu_mode == MODE_FIQ)
+      {
+        for(i = 8; i < 13; i++)
+          reg[i] = reg_mode[MODE_USR][i - 8];
+      }
     }
 
     reg[CPU_MODE] = new_mode;

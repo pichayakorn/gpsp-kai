@@ -25,7 +25,9 @@
 // reg[13] and reg[14] into reg_mode[cpu_mode][5] and reg_mode[cpu_mode][6]
 // respectively and load into reg[13] and reg[14] reg_mode[new_mode][5] and
 // reg_mode[new_mode][6]. When swapping to/from FIQ retire/load reg[8]
-// through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6].
+// through reg[14] to/from reg_mode[MODE_FIQ][0] through reg_mode[MODE_FIQ][6];
+// the r8-r12 the other modes share wait in reg_mode[MODE_USR][0-4] meanwhile
+// (set_cpu_mode() in main.c).
 
 u32 reg_mode[7][7];
 
