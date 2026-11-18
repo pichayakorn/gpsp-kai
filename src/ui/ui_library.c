@@ -373,7 +373,7 @@ static void covers_init(void)
 }
 
 /* The name plate (spec section 5, "the name is the cover"): from 32 px up
- * the name sits on a dark plate at the bottom, 12 px bold cream at x 4, on
+ * the name sits on a dark plate at the bottom, 12 px regular cream at x 4, on
  * up to three lines 14 px apart; the plate is 14 per line + 6 high. A name
  * longer than three lines has its third line cut with "…". */
 #define PLATE_LINES 3
@@ -422,9 +422,9 @@ static void cover_plate(int x, int y, int size, const char *title)
   {
     int ty = y + size - h + 2 + PLATE_PITCH * i;
     if(cut && (i == n - 1))  /* the rest of the name, cut with "…" */
-      ui_print_fit(x + 4, ty, rest, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, size - 8);
+      ui_print_fit(x + 4, ty, rest, UI_COL_CREAM, UI_FONT_BODY, 0, size - 8);
     else
-      ui_print(x + 4, ty, lines[i], UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+      ui_print(x + 4, ty, lines[i], UI_COL_CREAM, UI_FONT_BODY, 0);
   }
 }
 
@@ -504,14 +504,14 @@ static void grid_marquee(int x, int y, int game)
 
   if(n >= 0)
     return;  /* three lines or fewer: nothing moves */
-  w = ui_print_width(rest, UI_FONT_BODY, UI_TEXT_BOLD);
+  w = ui_print_width(rest, UI_FONT_BODY, 0);
   if(L.marq_f <= UI_MARQUEE_DELAY)
     return;
   ly = y + COVER - (PLATE_PITCH * PLATE_LINES + 6) + 2 + PLATE_PITCH * 2;
   ui_fill(x, ly, COVER, PLATE_PITCH, ui_cover_plate_color(title));
   ui_clip_set(x + 4, ly, COVER - 8, PLATE_PITCH);
   ui_print(x + 4 - marquee_shift(w - (COVER - 8)), ly, rest, UI_COL_CREAM,
-   UI_FONT_BODY, UI_TEXT_BOLD);
+   UI_FONT_BODY, 0);
   ui_clip_reset();
 }
 
