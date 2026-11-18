@@ -112,6 +112,8 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Write game saves", "Right away writes the game's save at once; On exit waits until you leave.",
       K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
     { "Start games with", "GBA BIOS shows the GBA's start-up logo first; Game Cart skips it.", K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
+    { "No-BIOS notice", "Shows a line in the library each time kai starts without a GBA BIOS.",
+      K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.bios_note, NULL, YES },
     { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models.",
       K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",

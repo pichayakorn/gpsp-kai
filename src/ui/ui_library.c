@@ -657,7 +657,7 @@ static int list_gap(int i)
 #define LIST_LAST  244
 static void list_layout(int pos)
 {
-  int lo = pos >> 8, fr = pos & 0xFF, i, d = 0, bottom;
+  int lo = pos >> 8, fr = pos & 0xFF, i, d = 0, bottom, first;
 
   if(lo >= L.n - 1)
   {
@@ -670,30 +670,16 @@ static void list_layout(int pos)
   for(i = lo - 1; i >= 0; i--)
     L.ys[i] = L.ys[i + 1] - list_h(i) - list_gap(i + 1);
   bottom = L.ys[L.n - 1] + list_h(L.n - 1);
-  if(L.ys[0] > LIST_FIRST)
-    d = LIST_FIRST - L.ys[0];
+  /* before the first game the No BIOS notice is the list's first line,
+     24 px above row 0: the top bound moves down to make room */
+  first = list_banner() ? LIST_FIRST + 22 : LIST_FIRST;
+  if(L.ys[0] > first)
+    d = first - L.ys[0];
   else if(bottom < LIST_LAST)
   {
     d = LIST_LAST - bottom;
-    if(d > LIST_FIRST - L.ys[0])
-      d = LIST_FIRST - L.ys[0];
-  }
-  if(list_banner())
-  {
-    /* No BIOS before the first game: the banner is the list's top item,
-       never selectable, 86 high and 8 px above row 0. On the first game it
-       shows whole at y 40 with the card under it; over the first rows the
-       card glides back to y 88 and the banner slides up under the tabs. */
-    int bt = L.ys[0] + d - 8 - 86, sel = (pos + 128) >> 8, push;
-    if(sel > L.n - 1)
-      sel = L.n - 1;
-    push = 40 - bt;
-    if(LIST_LAST - (L.ys[sel] + d + list_h(sel)) < push)
-      push = LIST_LAST - (L.ys[sel] + d + list_h(sel));
-    if(94 - 26 * pos / 256 < push)
-      push = 94 - 26 * pos / 256;
-    if(push > 0)
-      d += push;
+    if(d > first - L.ys[0])
+      d = first - L.ys[0];
   }
   for(i = 0; i < L.n; i++)
     L.ys[i] += d;
@@ -815,8 +801,8 @@ static void list_ground(void)
     if(y + h > VIEW_B)
       ui_door(20, y, 440, h);
   }
-  if(list_banner() && (L.ys[0] - 94 + 86 > VIEW_T - 2))
-    draw_banner_at(L.ys[0] - 94);
+  if(list_banner() && (L.ys[0] - 24 + 18 > VIEW_T - 2))
+    draw_banner_at(L.ys[0] - 24);
   ui_clip_reset();
   if(L.n > 1)
   {
@@ -876,12 +862,18 @@ static void list_selection(void)
 #define CONT_Y       40
 #define CONT_W       440
 #define CONT_H       104
-#define RECENT_Y     166
+#define RECENT_Y     recent_y()  /* 166; 172 under the No BIOS notice */
 #define PIC_W        144
 #define PIC_H        96
 #define SVS_SHOT     8                       /* the screenshot follows the 8-byte header */
 #define SVS_TIME     (SVS_SHOT + 240 * 160 * 2)
 #define SHOT_ROWS    20
+
+static int banner_up(void);
+static int recent_y(void)
+{
+  return banner_up() ? 172 : 166;
+}
 
 /* a game's savestate file for slot 0-10 */
 static void state_path(int game, int slot, char *out)
@@ -1082,7 +1074,8 @@ static void recent_ground(void)
   int i, n = (L.recent_count < RECENT_ROW) ? L.recent_count : RECENT_ROW;
 
   draw_continue(L.rec_row == 0);
-  ui_print(20, 146, "Recent", UI_COL_MUTE, UI_FONT_SMALL, 0);
+  if(!banner_up())  /* the No BIOS notice takes this line */
+    ui_print(20, 146, "Recent", UI_COL_MUTE, UI_FONT_SMALL, 0);
   for(i = 0; i < n; i++)
   {
     draw_cover(GRID_X + i * GRID_PX, RECENT_Y, L.recent[i]);
@@ -1807,17 +1800,17 @@ static void fold_move(void)
   L.dirty = 1;  /* × reads Open or Play */
 }
 
-/* ---- the No BIOS banner (spec section 4, No BIOS; r4 bios) ----------------------------------
- * Without gba_bios.bin kai runs games on its built-in BIOS. A cream banner
- * says so, once per start, until the first game is launched; the library
- * keeps working under it. */
+/* ---- the No BIOS notice (spec section 4, No BIOS; r4 bios, bios_new) ------------------------
+ * Without gba_bios.bin kai runs games on its built-in BIOS. A one-line
+ * notice says so on every start until the first game is launched (unless
+ * System -> No-BIOS notice is off); the library keeps working around it. */
 
 int ui_no_bios = 0;       /* set at start when the built-in BIOS is in use */
 static int banner_gone = 0;
 
 static int banner_up(void)
 {
-  return ui_no_bios && !banner_gone;
+  return ui_no_bios && !banner_gone && g_gpsp_config.bios_note;
 }
 
 /* before the first game (no Recent tab) it is the top item of the All
@@ -1827,23 +1820,20 @@ static int list_banner(void)
   return banner_up() && (L.recent_count == 0) && (L.tab_ids[L.tab] == TAB_ALL) && (L.n > 0);
 }
 
+/* the notice: one cream line, 440 x 16 at x 20 with a 4 px tangerine edge;
+   the line in plum, □ Help at its right end (□ opens its help with the
+   Help step) */
 static void draw_banner_at(int y)
 {
-  static const char t[] = "No GBA BIOS";
-  static const char b[] = "Games will start in Game Cart mode. Most games run fine.";
-  int w = 440, h = 86, j, bx = 299, by = y + 32;
-  char line[128];
+  static const char t[] = "No GBA BIOS: games start in Game Cart mode.";
+  int hw = ui_print_width("Help", UI_FONT_SMALL, UI_TEXT_BOLD), hx = 460 - 8 - hw - 17;
 
-  ui_round_fill(23, y + 3, w, h, 3, UI_COL_SHADE);
-  ui_round_fill(20, y, w, h, 3, UI_COL_CREAM);
-  ui_fill(20, y + 4, 6, h - 8, UI_COL_TANGERINE);
-  ui_print(36, y + 19, t, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
-  for(j = 0; j < 2; j++)
-    if(ui_wrap_line(b, j, 250, UI_FONT_SMALL, line, sizeof(line)))
-      ui_print(36, y + 38 + j * 14, line, UI_COL_PLUM, UI_FONT_SMALL, 0);
-  ui_round_frame(bx, by, 150, 22, 2, UI_COL_PLUM);
-  ui_glyph_inverted(bx + 6, by + 4, PSP_CTRL_SQUARE);
-  ui_print_fit(bx + 22, by + 3, "How to add one", UI_COL_PLUM, UI_FONT_BODY, 0, 150 - 28);
+  ui_round_fill(22, y + 2, 440, 16, 2, UI_COL_SHADE);
+  ui_round_fill(20, y, 440, 16, 2, UI_COL_CREAM);
+  ui_fill(20, y + 2, 4, 12, UI_COL_TANGERINE);
+  ui_glyph_inverted(hx, y + 1, PSP_CTRL_SQUARE);
+  ui_print(hx + 17, y + 1, "Help", UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+  ui_print_fit(30, y + 1, t, UI_COL_PLUM, UI_FONT_SMALL, 0, hx - 30 - 10);
 }
 
 /* ---- View & sort ------------------------------------------------------------------- */
@@ -2098,9 +2088,9 @@ static void build_ground(void)
     grid_ground();
   else
     list_ground();
-  /* on Recent over the Recent row; before any game, in the All list */
+  /* on Recent in the Recent label's line; before any game, in the All list */
   if((L.count > 0) && banner_up() && tab_is(TAB_RECENT) && !L.card)
-    draw_banner_at(148);
+    draw_banner_at(149);
   /* the game card: the library, its tabs and chip stay behind the screen
      door (they are drawn here, not each frame, while it is up) */
   if(L.card)
