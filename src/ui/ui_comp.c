@@ -1059,7 +1059,7 @@ void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
  * (either key closes). f counts frames since it opened or began closing. */
 void ui_help_card(const char *title, const char *body, u16 edge, int f, int closing)
 {
-  ui_hint_t h[1];
+  ui_hint_t h[2];
   char line[200];
   int lines = 0, w = 440, x = (UI_SCREEN_W - w) / 2, y, hgt, j;
 
@@ -1080,9 +1080,11 @@ void ui_help_card(const char *title, const char *body, u16 edge, int f, int clos
     if(ui_wrap_line(body, j, w - 36, UI_FONT_BODY, line, sizeof(line)))
       ui_print(x + 18, y + 38 + j * 16, line, UI_COL_PLUM, UI_FONT_BODY, 0);
   /* keys that share a verb sit together */
-  h[0].keys = PSP_CTRL_SQUARE | ui_key_back;
-  h[0].verb = "Close";
-  ui_hint_packed(h, 1, 14);
+  h[0].keys = PSP_CTRL_SQUARE;
+  h[0].verb = "";
+  h[1].keys = ui_key_back;
+  h[1].verb = "Close";
+  ui_hint_packed(h, 2, 14);
 }
 
 /* ---- error cards (spec section 4, Errors; motion: dialog in / out) ---------------------
