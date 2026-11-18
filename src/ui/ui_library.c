@@ -1011,6 +1011,59 @@ static int recent_place(void)
  * to two lines 16 px apart, 2 px higher, so the block keeps the 2x
  * title's height. Past two lines the second is cut with "…"; with shift >
  * 0 (the focused card's marquee) it runs sideways instead, over bg. */
+/* Line n of a headline wrapped at w, measured in bold as it is drawn:
+   breaks at spaces; text without spaces (CJK) breaks between characters
+   (ui_wrap_line). Returns 0 past the end. */
+static int bold_line(const char *t, int n, int w, char *out, int size)
+{
+  const char *p = t;
+  int line = 0;
+
+  if(!strchr(t, ' '))
+    return ui_wrap_line(t, n, w, UI_FONT_BODY, out, size);
+  while(*p)
+  {
+    const char *end = p, *q;
+    char buf[256];
+    while(*p == ' ')
+      p++;
+    if(!*p)
+      break;
+    /* take words while the line, in bold, fits w */
+    end = p;
+    for(q = p; ; )
+    {
+      const char *we = q;
+      int len;
+      while(*we && (*we != ' '))
+        we++;
+      len = we - p;
+      if(len >= (int)sizeof(buf))
+        break;
+      memcpy(buf, p, len);
+      buf[len] = 0;
+      if((end != p) && (ui_print_width(buf, UI_FONT_BODY, UI_TEXT_BOLD) > w))
+        break;
+      end = we;
+      if(!*we)
+        break;
+      q = we + 1;
+    }
+    if(line == n)
+    {
+      int len = end - p;
+      if(len >= size)
+        len = size - 1;
+      memcpy(out, p, len);
+      out[len] = 0;
+      return 1;
+    }
+    line++;
+    p = end;
+  }
+  return 0;
+}
+
 static void big_title(int x, int y, int w, const char *t, u16 ink, u16 bg, int shift)
 {
   char line[128], rest[256];
@@ -1022,7 +1075,7 @@ static void big_title(int x, int y, int w, const char *t, u16 ink, u16 bg, int s
     return;
   }
   rest[0] = 0;
-  for(n = 0; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  for(n = 0; bold_line(t, n, w, line, sizeof(line)); n++)
   {
     char *l = line;
     while(*l == ' ')
@@ -1057,7 +1110,7 @@ static int big_title_over(const char *t, int w)
   if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= w)
     return 0;
   rest[0] = 0;
-  for(n = 1; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  for(n = 1; bold_line(t, n, w, line, sizeof(line)); n++)
   {
     char *l = line;
     while(*l == ' ')
