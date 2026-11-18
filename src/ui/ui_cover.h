@@ -7,12 +7,11 @@
 #include "../common.h"
 #endif
 
-/* Draw the cover art for a title into a size x size square of dst. From
- * 32 px up its bottom ui_cover_band(size) rows are the dark title band;
- * the caller writes the title on it (white, the 10 px font, centred). */
+/* Draw the cover art for a title into a size x size square of dst: the art
+ * alone. From 32 px up the caller puts the name on a plate at the bottom
+ * (spec section 5), in ui_cover_plate_color(). */
 void ui_cover_art(u16 *dst, int pitch, int size, const char *title);
-int ui_cover_band(int size);
-u16 ui_cover_band_color(const char *title);
+u16 ui_cover_plate_color(const char *title);
 u32 ui_cover_seed(const char *title);
 
 #endif

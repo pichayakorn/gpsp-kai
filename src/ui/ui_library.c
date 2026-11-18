@@ -76,7 +76,11 @@ static struct
   int view, sort;
   int cur, cur_from, cur_f;   /* selection (in view order) and its move */
   int top, off_from, top_f;   /* grid: first row in view, sliding from off_from px */
-  int pos, pos_from, pos_f;   /* list: selection in 1/256, eased */
+  int pos, pos_from, pos_f;   /* list: selection in 1/256, eased (list_scroll) */
+  int open_row, open_f;       /* list: the card opening or open (-1: none) */
+  int close_row, close_from, close_f;  /* list: the card closing, from how open */
+  int *ys;                    /* list: every row's top this frame */
+  int marq_f;                 /* frames the selection has rested (marquee) */
   int dirty;
   u32 frame;
 
@@ -295,7 +299,8 @@ static int load_games(void)
   L.order = ui_pool_alloc(MAX_GAMES * sizeof(int));
   L.dirs = ui_pool_alloc(MAX_DIRS * sizeof(char *));
   L.arena = ui_pool_alloc(ARENA_SIZE);
-  if(!L.games || !L.order || !L.dirs || !L.arena)
+  L.ys = ui_pool_alloc(MAX_GAMES * sizeof(int));
+  if(!L.games || !L.order || !L.dirs || !L.arena || !L.ys)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0);
@@ -327,26 +332,65 @@ static void covers_init(void)
   }
 }
 
-/* Draw the title on a cover's band, as the cover's own (white, centred,
-   cut with "…"). x, y: the cover's top left on the current target. */
-static void cover_title(int x, int y, int size, const char *title)
-{
-  int band = ui_cover_band(size), w, tx;
+/* The name plate (spec section 5, "the name is the cover"): from 32 px up
+ * the name sits on a dark plate at the bottom, 12 px bold cream at x 4, on
+ * up to three lines 14 px apart; the plate is 14 per line + 6 high. A name
+ * longer than three lines has its third line cut with "…". */
+#define PLATE_LINES 3
+#define PLATE_PITCH 14
 
-  if(band == 0)
-    return;
-  w = ui_print_width(title, UI_FONT_SMALL, 0);
-  if(w > size - 4)
-    w = size - 4;
-  tx = (size - w) / 2;
-  if(tx < 2)
-    tx = 2;
-  ui_print_fit(x + tx, y + size - band + (band - 14) / 2 + 1, title,
-   COLOR16(31, 31, 31), UI_FONT_SMALL, 0, size - 4);
+/* the plate's lines for a cover of this size; returns how many (0-3).
+   rest: the name from the third line on (for the marquee), may be NULL */
+static int plate_lines(const char *title, int size, char lines[PLATE_LINES][128],
+ char *rest, int rest_size)
+{
+  int n, k;
+  char line[128];
+
+  if(size < 32)
+    return 0;
+  if(rest)
+    rest[0] = 0;
+  for(n = 0; ui_wrap_line(title, n, size - 8, UI_FONT_BODY, line, sizeof(line)); n++)
+  {
+    char *s = line;
+    while(*s == ' ')
+      s++;
+    if(n < PLATE_LINES)
+      snprintf(lines[n], 128, "%s", s);
+    if(rest && (n >= PLATE_LINES - 1))
+    {
+      k = strlen(rest);
+      snprintf(rest + k, rest_size - k, "%s%s", k ? " " : "", s);
+    }
+  }
+  return (n > PLATE_LINES) ? -PLATE_LINES : n;  /* negative: cut */
 }
 
-/* A cover of any size, drawn at x, y on the current target (clipped). */
-static void draw_cover_any(int x, int y, int size, const char *title)
+static void cover_plate(int x, int y, int size, const char *title)
+{
+  char lines[PLATE_LINES][128], rest[256];
+  int n = plate_lines(title, size, lines, rest, sizeof(rest)), cut = n < 0, h, i;
+
+  if(n == 0)
+    return;
+  if(cut)
+    n = -n;
+  h = PLATE_PITCH * n + 6;
+  ui_fill(x, y + size - h, size, h, ui_cover_plate_color(title));
+  for(i = 0; i < n; i++)
+  {
+    int ty = y + size - h + 2 + PLATE_PITCH * i;
+    if(cut && (i == n - 1))  /* the rest of the name, cut with "…" */
+      ui_print_fit(x + 4, ty, rest, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, size - 8);
+    else
+      ui_print(x + 4, ty, lines[i], UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+  }
+}
+
+/* A cover of any size at x, y on the current target (clipped); plate 0:
+   the art alone (the list card, a grid row cut by the hint strip). */
+static void draw_cover_any(int x, int y, int size, const char *title, int plate)
 {
   static u16 buf[96 * 96];
 
@@ -354,10 +398,11 @@ static void draw_cover_any(int x, int y, int size, const char *title)
     size = 96;
   ui_cover_art(buf, size, size, title);
   ui_blit(buf, size, x, y, size, size);
-  cover_title(x, y, size, title);
+  if(plate)
+    cover_plate(x, y, size, title);
 }
 
-/* A 64 px grid cover, from the cache when it has room. */
+/* A 64 px grid cover with its plate, from the cache when it has room. */
 static void draw_cover(int x, int y, int game)
 {
   int i, free_i = -1, old_i = 0;
@@ -378,20 +423,56 @@ static void draw_cover(int x, int y, int game)
   }
   if(L.cover_count == 0)
   {
-    draw_cover_any(x, y, COVER, L.games[game].title);
+    draw_cover_any(x, y, COVER, L.games[game].title, 1);
     return;
   }
   c = &L.covers[(free_i >= 0) ? free_i : old_i];
   c->game = game;
   c->used = L.frame;
   ui_cover_art(c->px, COVER, COVER, L.games[game].title);
-  /* the title goes into the cached picture too */
+  /* the plate goes into the cached picture too */
   if(ui_target_begin(c->px, COVER, COVER, COVER))
   {
-    cover_title(0, 0, COVER, L.games[game].title);
+    cover_plate(0, 0, COVER, L.games[game].title);
     ui_target_end();
   }
   ui_blit(c->px, COVER, x, y, COVER, COVER);
+}
+
+/* ---- the marquee ---------------------------------------------------------------------
+ * A long name on the selected item runs sideways once the cursor has rested
+ * UI_MARQUEE_DELAY frames, 1 px a frame; it waits at the end as long, then
+ * starts again. Only the selected item, clipped to its own line. */
+
+static int marquee_shift(int over)
+{
+  int t = L.marq_f - UI_MARQUEE_DELAY, cycle = over + 2 * UI_MARQUEE_DELAY;
+
+  if((over <= 0) || (t <= 0))
+    return 0;
+  t %= cycle;
+  return (t < over) ? t : (t < over + UI_MARQUEE_DELAY) ? over : 0;
+}
+
+/* the grid's selected cover at x, y: a cut third line runs the rest of the
+   name (clipped to x 4-60 of the cover) */
+static void grid_marquee(int x, int y, int game)
+{
+  char lines[PLATE_LINES][128], rest[256];
+  const char *title = L.games[game].title;
+  int n = plate_lines(title, COVER, lines, rest, sizeof(rest)), w, ly;
+
+  if(n >= 0)
+    return;  /* three lines or fewer: nothing moves */
+  w = ui_print_width(rest, UI_FONT_BODY, UI_TEXT_BOLD);
+  if(L.marq_f <= UI_MARQUEE_DELAY)
+    return;
+  ly = y + COVER - (PLATE_PITCH * PLATE_LINES + 6) + 2 + PLATE_PITCH * 2;
+  ui_fill(x, ly, COVER, PLATE_PITCH, ui_cover_plate_color(title));
+  ui_clip_set(x + 4, ly, COVER - 8, PLATE_PITCH);
+  ui_print(x + 4 - marquee_shift(w - (COVER - 8)), ly, rest, UI_COL_CREAM,
+   UI_FONT_BODY, UI_TEXT_BOLD);
+  ui_clip_reset();
 }
 
 /* ---- the grid --------------------------------------------------------------------- */
@@ -413,17 +494,16 @@ static void grid_item_xy(int i, int off, int *x, int *y)
 }
 
 /* A grid cover, cut to the list area; a row cut by the hint strip shows
-   its art only, never half a title. */
+   its art only, never half a name plate. */
 static void grid_cover(int i, int x, int y)
 {
-  int bottom = y + COVER;
+  int bottom = (y + COVER < VIEW_B) ? y + COVER : VIEW_B;
 
-  if(bottom > VIEW_B)
-    bottom = y + COVER - ui_cover_band(COVER);
-  if(bottom > VIEW_B)
-    bottom = VIEW_B;
   ui_clip_set(0, VIEW_T, UI_SCREEN_W, bottom - VIEW_T);
-  draw_cover(x, y, L.order[i]);
+  if(y + COVER > VIEW_B)
+    draw_cover_any(x, y, COVER, L.games[L.order[i]].title, 0);
+  else
+    draw_cover(x, y, L.order[i]);
   ui_clip_reset();
 }
 
@@ -435,7 +515,7 @@ static void grid_ground(void)
   {
     int x, y;
     grid_item_xy(i, off, &x, &y);
-    if((y + COVER <= VIEW_T) || (y >= VIEW_B - 8))
+    if((y + COVER <= VIEW_T) || (y >= VIEW_B))
       continue;
     grid_cover(i, x, y);
   }
@@ -464,6 +544,8 @@ static void grid_selection(void)
     ui_fill(x + 1, y + 1, COVER, COVER, UI_COL_SHADE);
     draw_cover(x - UI_LIFT, y - UI_LIFT, L.order[L.cur]);
     ui_clip_reset();
+    if(L.top_f >= UI_F_SCROLL)
+      grid_marquee(x - UI_LIFT, y - UI_LIFT, L.order[L.cur]);
   }
   grid_item_xy(L.cur_from, off, &x0, &y0);
   grid_item_xy(L.cur, off, &x1, &y1);
@@ -472,55 +554,71 @@ static void grid_selection(void)
   ui_cursor_frame(fx - UI_LIFT, fy - UI_LIFT, COVER, COVER);
 }
 
-/* ---- the list --------------------------------------------------------------------- */
+/* ---- the list ----------------------------------------------------------------------
+ * Motion "A+" (spec section 6: list_scroll, list_close, list_open): the list
+ * slides with every row slim and no overshoot; the open card closes as a
+ * move starts and the new one opens only once the d-pad is up and the slide
+ * has stopped. A card between sizes shows only its slim row's contents. */
 
 /* the selection's place in 1/256 rows, eased */
 static int list_pos(void)
 {
-  return ui_ease_out_back(L.pos_from, L.pos, L.pos_f, UI_F_SCROLL);
+  return ui_ease_out_cubic(L.pos_from, L.pos, L.pos_f, UI_F_LIST_SCROLL);
 }
 
-/* height of row i with the selection at pos (1/256) */
-static int list_h(int i, int pos)
+/* how open row i is, 0-256 */
+static int list_open_p(int i)
 {
-  int d = i * 256 - pos;
-
-  if(d < 0)
-    d = -d;
-  if(d >= 256)
-    return LIST_SM;
-  return LIST_SM + (LIST_BIG - LIST_SM) * (256 - d) / 256;
+  if(i == L.open_row)
+    return ui_ease_out_cubic(0, 256, L.open_f, UI_F_LIST_OPEN);
+  if(i == L.close_row)
+    return ui_ease_out_cubic(L.close_from, 0, L.close_f, UI_F_LIST_CLOSE);
+  return 0;
 }
 
-static int list_gap(int i, int pos)
+static int list_h(int i)
 {
-  int d = i * 256 - pos;
-
-  if(d < 0)
-    d = -d;
-  if(d >= 256)
-    return LIST_GAP;
-  return LIST_GAP + 4 * (256 - d) / 256;
+  return LIST_SM + (LIST_BIG - LIST_SM) * list_open_p(i) / 256;
 }
 
-/* top of row i: the row under the selection sits at LIST_FY at rest and
-   moves up by its own pitch as the selection passes it */
-static int list_y(int i, int pos)
+/* 4 px more ground above an open card: it lifts 2 px, so its frame keeps
+   3 px of ground above and below */
+static int list_gap(int i)
 {
-  int lo = pos >> 8, fr = pos & 0xFF, y, k;
+  return LIST_GAP + 4 * list_open_p(i) / 256;
+}
 
-  if(lo >= L.count)
+/* Every row's top for this frame, into L.ys: the row under the selection
+ * sits at LIST_FY and moves up by its own pitch as the selection passes it;
+ * then the whole list shifts so no ground shows above the first row (top
+ * at y 42 or above) or below the last (bottom at y 244 or below). */
+#define LIST_FIRST 42
+#define LIST_LAST  244
+static void list_layout(int pos)
+{
+  int lo = pos >> 8, fr = pos & 0xFF, i, d = 0, bottom;
+
+  if(lo >= L.count - 1)
+  {
     lo = L.count - 1;
-  if(lo < 0)
-    lo = 0;
-  y = LIST_FY - fr * (list_h(lo, pos) + list_gap(lo + 1, pos)) / 256;
-  if(i >= lo)
-    for(k = lo; k < i; k++)
-      y += list_h(k, pos) + list_gap(k + 1, pos);
-  else
-    for(k = lo - 1; k >= i; k--)
-      y -= list_h(k, pos) + list_gap(k + 1, pos);
-  return y;
+    fr = 0;
+  }
+  L.ys[lo] = LIST_FY - fr * (list_h(lo) + list_gap(lo + 1)) / 256;
+  for(i = lo + 1; i < L.count; i++)
+    L.ys[i] = L.ys[i - 1] + list_h(i - 1) + list_gap(i);
+  for(i = lo - 1; i >= 0; i--)
+    L.ys[i] = L.ys[i + 1] - list_h(i) - list_gap(i + 1);
+  bottom = L.ys[L.count - 1] + list_h(L.count - 1);
+  if(L.ys[0] > LIST_FIRST)
+    d = LIST_FIRST - L.ys[0];
+  else if(bottom < LIST_LAST)
+  {
+    d = LIST_LAST - bottom;
+    if(d > LIST_FIRST - L.ys[0])
+      d = LIST_FIRST - L.ys[0];
+  }
+  for(i = 0; i < L.count; i++)
+    L.ys[i] += d;
 }
 
 static void size_text(u32 bytes, char *out, int n)
@@ -572,19 +670,39 @@ static void played_text(u32 seconds, char *out, int n)
     snprintf(out, n, "Played %u h", (unsigned)(seconds / 3600));
 }
 
-/* the open card of row i at y, h px tall (its contents cut at its edge) */
-static void list_open(int i, int y, int h)
+/* a slim row's icon, name and size; on a card between sizes they are plum
+   and bold, moved with its lift */
+static void list_slim_contents(const game_t *g, int y, int lift, int on_card)
+{
+  char size[16];
+
+  draw_cover_any(23 - lift, y + 3 - lift, 16, g->title, 0);
+  ui_print_fit(46 - lift, y + 3 - lift, g->title, on_card ? UI_COL_PLUM : UI_COL_CREAM,
+   UI_FONT_BODY, on_card ? UI_TEXT_BOLD : 0, 330);
+  size_text(g->size, size, sizeof(size));
+  ui_print(452 - lift - ui_print_width(size, UI_FONT_SMALL, 0), y + 4 - lift, size,
+   on_card ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+}
+
+/* row i at y as a card (open or between sizes, o of 256) */
+static void list_card(int i, int y, int o)
 {
   const game_t *g = &L.games[L.order[i]];
+  int h = list_h(i), lift = (2 * o + 128) / 256;
   char chip[32], size[16], played[32];
   int cw;
 
   ui_round_fill(21, y + 1, 440, h, 2, UI_COL_SHADE);
-  ui_round_fill(20 - UI_LIFT, y - UI_LIFT, 440, h, 2, UI_COL_TANGERINE);
-  ui_clip_set(18, (y - 2 > VIEW_T) ? y - 2 : VIEW_T, 440,
-   ((y + h - 2 < VIEW_B) ? y + h - 2 : VIEW_B) - ((y - 2 > VIEW_T) ? y - 2 : VIEW_T));
+  ui_round_fill(20 - lift, y - lift, 440, h, 2, UI_COL_TANGERINE);
+  if(o < 256)
+  {
+    list_slim_contents(g, y, lift, 1);
+    return;
+  }
+  /* open: the full art (no plate, the name is beside it), 76 px in the
+     80 px plum box, 2 px of tangerine round the box */
   ui_fill(20, y, 80, 80, UI_COL_PLUM);
-  draw_cover_any(22, y + 2, 76, g->title);
+  draw_cover_any(22, y + 2, 76, g->title, 0);
   ui_print_fit(110, y + 6, g->title, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD, 330);
   played_text(game_played(L.order[i]), played, sizeof(played));
   ui_print(110, y + 26, played, UI_COL_PLUM, UI_FONT_SMALL, 0);
@@ -593,37 +711,31 @@ static void list_open(int i, int y, int h)
   cw = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
   ui_round_fill(110, y + 48, cw, 16, 2, UI_COL_PLUM);
   ui_print(116, y + 49, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
-  ui_clip_reset();
 }
 
 static void list_ground(void)
 {
   int i, pos = list_pos();
 
+  list_layout(pos);
+  ui_clip_set(0, VIEW_T - 2, UI_SCREEN_W, VIEW_B - VIEW_T + 2);
   for(i = 0; i < L.count; i++)
   {
-    const game_t *g = &L.games[L.order[i]];
-    int y = list_y(i, pos), h = list_h(i, pos);
-    char size[16];
+    int y = L.ys[i], h = list_h(i), o = list_open_p(i);
     if((y + h < VIEW_T - 2) || (y > VIEW_B))
       continue;
-    if(h > LIST_SM)
+    if(o > 0)
     {
-      list_open(i, y, h);
+      list_card(i, y, o);
       continue;
     }
-    ui_clip_set(0, VIEW_T - 2, UI_SCREEN_W, VIEW_B - VIEW_T + 2);
     ui_round_fill(20, y, 440, h, 2, UI_COL_CARD);
-    draw_cover_any(23, y + 3, 16, g->title);
-    ui_print_fit(46, y + 3, g->title, UI_COL_CREAM, UI_FONT_BODY, 0, 330);
-    size_text(g->size, size, sizeof(size));
-    ui_print(452 - ui_print_width(size, UI_FONT_SMALL, 0), y + 4, size,
-     UI_COL_MUTE, UI_FONT_SMALL, 0);
+    list_slim_contents(&L.games[L.order[i]], y, 0, 0);
     /* the row past the last whole one: dimmed, a "more below" peek */
     if(y + h > VIEW_B)
       ui_door(20, y, 440, h);
-    ui_clip_reset();
   }
+  ui_clip_reset();
   if(L.count > 1)
   {
     int ty = 176 * pos / ((L.count - 1) * 256);
@@ -632,25 +744,41 @@ static void list_ground(void)
   }
 }
 
+/* the cursor frame between rows lo and lo + 1, with their current heights;
+   on the open card at rest, a long name runs sideways */
 static void list_selection(void)
 {
   int pos = list_pos(), lo = pos >> 8, hi, fr = pos & 0xFF, y0, y1, h0, h1;
 
   if(L.count == 0)
     return;
+  list_layout(pos);
   if(lo >= L.count - 1)
   {
     lo = L.count - 1;
     fr = 0;
   }
   hi = (lo + 1 < L.count) ? lo + 1 : lo;
-  y0 = list_y(lo, pos) - 2;
-  y1 = list_y(hi, pos) - 2;
-  h0 = list_h(lo, pos);
-  h1 = list_h(hi, pos);
+  y0 = L.ys[lo] - 2;
+  y1 = L.ys[hi] - 2;
+  h0 = list_h(lo);
+  h1 = list_h(hi);
   ui_clip_set(0, VIEW_T - 4, UI_SCREEN_W, VIEW_B - VIEW_T + 4);
   ui_cursor_frame(18, y0 + (y1 - y0) * fr / 256, 440, h0 + (h1 - h0) * fr / 256);
   ui_clip_reset();
+  if((L.open_row == L.cur) && (list_open_p(L.cur) == 256))
+  {
+    const char *t = L.games[L.order[L.cur]].title;
+    int w = ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD), y = L.ys[L.cur];
+    int shift = marquee_shift(w - 330);
+    if(shift > 0)
+    {
+      ui_fill(110, y + 6, 330, 16, UI_COL_TANGERINE);
+      ui_clip_set(110, y + 6, 330, 16);
+      ui_print(110 - shift, y + 6, t, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
+      ui_clip_reset();
+    }
+  }
 }
 
 /* ---- View & sort ------------------------------------------------------------------- */
@@ -794,11 +922,49 @@ static void select_game(int i)
   }
   else
   {
+    /* the open card closes as the move starts (from however open it is);
+       the list slides with every row slim; the new card opens later */
+    if(L.open_row >= 0)
+    {
+      L.close_from = list_open_p(L.open_row);
+      L.close_row = L.open_row;
+      L.close_f = 0;
+      L.open_row = -1;
+    }
     L.pos_from = list_pos();
     L.pos = i * 256;
     L.pos_f = 0;
   }
+  L.marq_f = 0;
   L.dirty = 1;
+}
+
+/* list_open: once the d-pad is up and the slide has stopped, the selected
+   row grows into the card */
+static void list_step(void)
+{
+  if(L.pos_f < UI_F_LIST_SCROLL)
+  {
+    L.pos_f++;
+    L.dirty = 1;
+  }
+  if((L.close_row >= 0) && (L.close_f < UI_F_LIST_CLOSE))
+  {
+    if(++L.close_f >= UI_F_LIST_CLOSE)
+      L.close_row = -1;
+    L.dirty = 1;
+  }
+  if((L.open_row < 0) && (L.pos_f >= UI_F_LIST_SCROLL) &&
+   !ui_down(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  {
+    L.open_row = L.cur;
+    L.open_f = 0;
+  }
+  if((L.open_row >= 0) && (L.open_f < UI_F_LIST_OPEN))
+  {
+    L.open_f++;
+    L.dirty = 1;
+  }
 }
 
 /* the view changed (View & sort): the grid rests with the cursor in view */
@@ -810,7 +976,11 @@ static void view_reset(void)
   L.off_from = L.top * GRID_PY;
   L.top_f = UI_F_SCROLL;
   L.pos = L.pos_from = L.cur * 256;
-  L.pos_f = UI_F_SCROLL;
+  L.pos_f = UI_F_LIST_SCROLL;
+  L.open_row = L.cur;  /* the list opens at rest, its card open */
+  L.open_f = UI_F_LIST_OPEN;
+  L.close_row = -1;
+  L.marq_f = 0;
   L.cur_from = L.cur;
   L.cur_f = UI_F_CURSOR;
   L.dirty = 1;
@@ -979,8 +1149,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size)
     }
 
     if(L.top_f < UI_F_SCROLL) { L.top_f++; L.dirty = 1; }
-    if(L.pos_f < UI_F_SCROLL) { L.pos_f++; L.dirty = 1; }
+    if(L.view == VIEW_LIST)
+      list_step();
     if(L.cur_f < UI_F_CURSOR) L.cur_f++;
+    L.marq_f++;
     if(L.dirty)
       build_ground();
 

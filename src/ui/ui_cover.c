@@ -5,8 +5,8 @@
  *   seed   = crc32 of the lower-cased UTF-8 title
  *   colour = pair (seed >> 8) % 12, swapped when bit 28 is set
  *   motif  = (seed >> 16) % 12, mirrored when bit 29 is set
- * From 32 px up the title sits on a dark band at the bottom; the caller
- * draws the title text (ui_cover_band tells it where).
+ * The name goes on a dark plate at the bottom ("the name is the cover");
+ * the caller draws it with the UI font, in ui_cover_plate_color().
  *
  * Plain C over a 16-bit buffer and zlib's crc32, nothing else, so the same
  * file builds on a PC to compare its pictures with the design's.
@@ -16,34 +16,34 @@
 #include <zlib.h>
 #include "ui_cover.h"
 
-/* bg, figure, the figure at 45 % over bg, bg darkened 45 %, the title band
-   (bg darkened 55 %); the second twelve are the first swapped */
+/* bg, figure, the figure at 45 % over bg, bg darkened 45 %, the name plate
+   (bg darkened 60 %); the second twelve are the first swapped */
 static const u16 duos[24][5] =
 {
-  { COLOR16(6, 10, 20), COLOR16(28, 20, 8), COLOR16(16, 14, 15), COLOR16(3, 6, 11), COLOR16(3, 4, 9) },
-  { COLOR16(20, 6, 8), COLOR16(31, 27, 18), COLOR16(25, 15, 12), COLOR16(11, 3, 4), COLOR16(9, 3, 4) },
-  { COLOR16(4, 16, 12), COLOR16(26, 30, 12), COLOR16(14, 22, 12), COLOR16(2, 9, 7), COLOR16(2, 7, 5) },
-  { COLOR16(14, 6, 20), COLOR16(31, 16, 22), COLOR16(22, 10, 21), COLOR16(8, 3, 11), COLOR16(6, 3, 9) },
-  { COLOR16(24, 14, 4), COLOR16(8, 4, 2), COLOR16(17, 10, 3), COLOR16(13, 8, 2), COLOR16(11, 6, 2) },
-  { COLOR16(8, 18, 26), COLOR16(30, 30, 28), COLOR16(18, 23, 27), COLOR16(4, 10, 14), COLOR16(4, 8, 12) },
-  { COLOR16(26, 24, 18), COLOR16(6, 8, 14), COLOR16(17, 17, 16), COLOR16(14, 13, 10), COLOR16(12, 11, 8) },
-  { COLOR16(4, 6, 8), COLOR16(12, 28, 30), COLOR16(8, 16, 18), COLOR16(2, 3, 4), COLOR16(2, 3, 4) },
-  { COLOR16(28, 10, 6), COLOR16(30, 26, 12), COLOR16(29, 17, 9), COLOR16(15, 6, 3), COLOR16(13, 4, 3) },
-  { COLOR16(3, 12, 18), COLOR16(31, 13, 16), COLOR16(16, 12, 17), COLOR16(2, 7, 10), COLOR16(1, 5, 8) },
-  { COLOR16(22, 26, 10), COLOR16(5, 10, 8), COLOR16(14, 19, 9), COLOR16(12, 14, 6), COLOR16(10, 12, 4) },
+  { COLOR16(6, 10, 20), COLOR16(28, 20, 8), COLOR16(16, 14, 15), COLOR16(3, 6, 11), COLOR16(2, 4, 8) },
+  { COLOR16(20, 6, 8), COLOR16(31, 27, 18), COLOR16(25, 15, 12), COLOR16(11, 3, 4), COLOR16(8, 2, 3) },
+  { COLOR16(4, 16, 12), COLOR16(26, 30, 12), COLOR16(14, 22, 12), COLOR16(2, 9, 7), COLOR16(2, 6, 5) },
+  { COLOR16(14, 6, 20), COLOR16(31, 16, 22), COLOR16(22, 10, 21), COLOR16(8, 3, 11), COLOR16(6, 2, 8) },
+  { COLOR16(24, 14, 4), COLOR16(8, 4, 2), COLOR16(17, 10, 3), COLOR16(13, 8, 2), COLOR16(10, 6, 2) },
+  { COLOR16(8, 18, 26), COLOR16(30, 30, 28), COLOR16(18, 23, 27), COLOR16(4, 10, 14), COLOR16(3, 7, 10) },
+  { COLOR16(26, 24, 18), COLOR16(6, 8, 14), COLOR16(17, 17, 16), COLOR16(14, 13, 10), COLOR16(10, 10, 7) },
+  { COLOR16(4, 6, 8), COLOR16(12, 28, 30), COLOR16(8, 16, 18), COLOR16(2, 3, 4), COLOR16(2, 2, 3) },
+  { COLOR16(28, 10, 6), COLOR16(30, 26, 12), COLOR16(29, 17, 9), COLOR16(15, 6, 3), COLOR16(11, 4, 2) },
+  { COLOR16(3, 12, 18), COLOR16(31, 13, 16), COLOR16(16, 12, 17), COLOR16(2, 7, 10), COLOR16(1, 5, 7) },
+  { COLOR16(22, 26, 10), COLOR16(5, 10, 8), COLOR16(14, 19, 9), COLOR16(12, 14, 6), COLOR16(9, 10, 4) },
   { COLOR16(12, 4, 10), COLOR16(12, 26, 20), COLOR16(12, 14, 14), COLOR16(7, 2, 6), COLOR16(5, 2, 4) },
-  { COLOR16(28, 20, 8), COLOR16(6, 10, 20), COLOR16(18, 16, 13), COLOR16(15, 11, 4), COLOR16(13, 9, 4) },
-  { COLOR16(31, 27, 18), COLOR16(20, 6, 8), COLOR16(26, 18, 14), COLOR16(17, 15, 10), COLOR16(14, 12, 8) },
-  { COLOR16(26, 30, 12), COLOR16(4, 16, 12), COLOR16(16, 24, 12), COLOR16(14, 16, 7), COLOR16(12, 14, 5) },
-  { COLOR16(31, 16, 22), COLOR16(14, 6, 20), COLOR16(23, 12, 21), COLOR16(17, 9, 12), COLOR16(14, 7, 10) },
-  { COLOR16(8, 4, 2), COLOR16(24, 14, 4), COLOR16(15, 8, 3), COLOR16(4, 2, 1), COLOR16(4, 2, 1) },
-  { COLOR16(30, 30, 28), COLOR16(8, 18, 26), COLOR16(20, 25, 27), COLOR16(16, 16, 15), COLOR16(14, 14, 13) },
-  { COLOR16(6, 8, 14), COLOR16(26, 24, 18), COLOR16(15, 15, 16), COLOR16(3, 4, 8), COLOR16(3, 4, 6) },
-  { COLOR16(12, 28, 30), COLOR16(4, 6, 8), COLOR16(8, 18, 20), COLOR16(7, 15, 16), COLOR16(5, 13, 14) },
-  { COLOR16(30, 26, 12), COLOR16(28, 10, 6), COLOR16(29, 19, 9), COLOR16(16, 14, 7), COLOR16(14, 12, 5) },
-  { COLOR16(31, 13, 16), COLOR16(3, 12, 18), COLOR16(18, 13, 17), COLOR16(17, 7, 9), COLOR16(14, 6, 7) },
-  { COLOR16(5, 10, 8), COLOR16(22, 26, 10), COLOR16(13, 17, 9), COLOR16(3, 6, 4), COLOR16(2, 4, 4) },
-  { COLOR16(12, 26, 20), COLOR16(12, 4, 10), COLOR16(12, 16, 16), COLOR16(7, 14, 11), COLOR16(5, 12, 9) },
+  { COLOR16(28, 20, 8), COLOR16(6, 10, 20), COLOR16(18, 16, 13), COLOR16(15, 11, 4), COLOR16(11, 8, 3) },
+  { COLOR16(31, 27, 18), COLOR16(20, 6, 8), COLOR16(26, 18, 14), COLOR16(17, 15, 10), COLOR16(12, 11, 7) },
+  { COLOR16(26, 30, 12), COLOR16(4, 16, 12), COLOR16(16, 24, 12), COLOR16(14, 16, 7), COLOR16(10, 12, 5) },
+  { COLOR16(31, 16, 22), COLOR16(14, 6, 20), COLOR16(23, 12, 21), COLOR16(17, 9, 12), COLOR16(12, 6, 9) },
+  { COLOR16(8, 4, 2), COLOR16(24, 14, 4), COLOR16(15, 8, 3), COLOR16(4, 2, 1), COLOR16(3, 2, 1) },
+  { COLOR16(30, 30, 28), COLOR16(8, 18, 26), COLOR16(20, 25, 27), COLOR16(16, 16, 15), COLOR16(12, 12, 11) },
+  { COLOR16(6, 8, 14), COLOR16(26, 24, 18), COLOR16(15, 15, 16), COLOR16(3, 4, 8), COLOR16(2, 3, 6) },
+  { COLOR16(12, 28, 30), COLOR16(4, 6, 8), COLOR16(8, 18, 20), COLOR16(7, 15, 16), COLOR16(5, 11, 12) },
+  { COLOR16(30, 26, 12), COLOR16(28, 10, 6), COLOR16(29, 19, 9), COLOR16(16, 14, 7), COLOR16(12, 10, 5) },
+  { COLOR16(31, 13, 16), COLOR16(3, 12, 18), COLOR16(18, 13, 17), COLOR16(17, 7, 9), COLOR16(12, 5, 6) },
+  { COLOR16(5, 10, 8), COLOR16(22, 26, 10), COLOR16(13, 17, 9), COLOR16(3, 6, 4), COLOR16(2, 4, 3) },
+  { COLOR16(12, 26, 20), COLOR16(12, 4, 10), COLOR16(12, 16, 16), COLOR16(7, 14, 11), COLOR16(5, 10, 8) },
 };
 
 enum { HORIZON, SLASH, PEAKS, TARGET, SPLIT, DOTS, ARCS, SUNSET, ORBIT,
@@ -422,16 +422,7 @@ u32 ui_cover_seed(const char *title)
   return crc32(0, (const unsigned char *)low, i);
 }
 
-int ui_cover_band(int size)
-{
-  int band = 16 * size / 64;
-
-  if(size < 32)
-    return 0;
-  return (band < 10) ? 10 : band;
-}
-
-u16 ui_cover_band_color(const char *title)
+u16 ui_cover_plate_color(const char *title)
 {
   u32 s = ui_cover_seed(title);
   return duos[((s >> 8) % 12) + (((s >> 28) & 1) ? 12 : 0)][4];
@@ -441,7 +432,7 @@ void ui_cover_art(u16 *dst, int pitch, int size, const char *title)
 {
   u32 s = ui_cover_seed(title);
   const u16 *col = duos[((s >> 8) % 12) + (((s >> 28) & 1) ? 12 : 0)];
-  int band = ui_cover_band(size), x, y;
+  int x, y;
 
   cv = dst;
   cv_pitch = pitch;
@@ -459,6 +450,4 @@ void ui_cover_art(u16 *dst, int pitch, int size, const char *title)
         row[size - 1 - x] = t;
       }
     }
-  if(band)
-    rect(0, size - band, size - 1, size - 1, col[4]);
 }

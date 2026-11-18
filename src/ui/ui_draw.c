@@ -589,6 +589,23 @@ int ui_ease_out_back(int a, int b, int f, int n)
   return ease(out_back_table(n), a, b, f, n);
 }
 
+/* out-cubic, no overshoot: from the token table, or 1 - (1 - t)^3 */
+int ui_ease_out_cubic(int a, int b, int f, int n)
+{
+  int u;
+
+  if(n == 8)
+    return ease(UI_EASE_OUT_CUBIC_8, a, b, f, n);
+  if(n == 10)
+    return ease(UI_EASE_OUT_CUBIC_10, a, b, f, n);
+  if(f >= n)
+    return b;
+  if(f <= 0)
+    return a;
+  u = n - f;
+  return a + (int)((s64)(b - a) * (256 - 256 * u * u * u / (n * n * n)) >> 8);
+}
+
 int ui_ease_in_cubic(int a, int b, int f, int n)
 {
   return ease((n == 8) ? UI_EASE_IN_CUBIC_8 : (n == 10) ? UI_EASE_IN_CUBIC_10 : NULL,

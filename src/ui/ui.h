@@ -107,6 +107,7 @@ void ui_hint_packed(const ui_hint_t *hints, int count, int gap);
  * from a to b. */
 int ui_ease_out_back(int a, int b, int f, int n);
 int ui_ease_in_cubic(int a, int b, int f, int n);
+int ui_ease_out_cubic(int a, int b, int f, int n);
 
 /* Components (ui_comp.c, spec section 2). Each draws one frame from the
  * state it is given; f arguments are frames since the change started. */

@@ -64,6 +64,9 @@
 #define UI_F_RAIL_OUT       8  /* in-cubic */
 #define UI_F_HELP_IN       12  /* out-back */
 #define UI_F_HELP_OUT       8  /* in-cubic */
+#define UI_F_LIST_SCROLL   12  /* out-cubic */
+#define UI_F_LIST_OPEN      8  /* out-cubic */
+#define UI_F_LIST_CLOSE     8  /* out-cubic */
 #define UI_F_FIRST_RUN     12  /* out-back */
 #define UI_MARQUEE_DELAY 40
 #define UI_MARQUEE_SPEED  1  /* px per frame */
