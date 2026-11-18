@@ -1038,6 +1038,69 @@ static int recent_place(void)
   return L.rec_row ? 1 + L.rec_cur : 0;
 }
 
+/* A headline title (spec section 4, Long game names; the Continue card and
+ * the game card): 12 px bold at 2x when it fits w; else 12 px bold on up
+ * to two lines 16 px apart, 2 px higher, so the block keeps the 2x
+ * title's height. Past two lines the second is cut with "…"; with shift >
+ * 0 (the focused card's marquee) it runs sideways instead, over bg. */
+static void big_title(int x, int y, int w, const char *t, u16 ink, u16 bg, int shift)
+{
+  char line[128], rest[256];
+  int n, k;
+
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= w)
+  {
+    ui_print(x, y, t, ink, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+    return;
+  }
+  rest[0] = 0;
+  for(n = 0; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  {
+    char *l = line;
+    while(*l == ' ')
+      l++;
+    if(n == 0)
+      ui_print(x, y - 2, l, ink, UI_FONT_BODY, UI_TEXT_BOLD);
+    else
+    {
+      k = strlen(rest);
+      snprintf(rest + k, sizeof(rest) - k, "%s%s", k ? " " : "", l);
+    }
+  }
+  if(rest[0] == 0)
+    return;
+  if(shift <= 0)
+  {
+    ui_print_fit(x, y + 14, rest, ink, UI_FONT_BODY, UI_TEXT_BOLD, w);
+    return;
+  }
+  ui_fill(x, y + 14, w, 16, bg);
+  ui_clip_set(x, y + 14, w, 16);
+  ui_print(x - shift, y + 14, rest, ink, UI_FONT_BODY, UI_TEXT_BOLD);
+  ui_clip_reset();
+}
+
+/* how far a headline's second line runs past w (0: it fits, or one line) */
+static int big_title_over(const char *t, int w)
+{
+  char line[128], rest[256];
+  int n, k;
+
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= w)
+    return 0;
+  rest[0] = 0;
+  for(n = 1; ui_wrap_line(t, n, w, UI_FONT_BODY, line, sizeof(line)); n++)
+  {
+    char *l = line;
+    while(*l == ' ')
+      l++;
+    k = strlen(rest);
+    snprintf(rest + k, sizeof(rest) - k, "%s%s", k ? " " : "", l);
+  }
+  k = ui_print_width(rest, UI_FONT_BODY, UI_TEXT_BOLD) - w;
+  return (k > 0) ? k : 0;
+}
+
 static void draw_continue(int hero)
 {
   int game = L.recent[0], lift = hero ? UI_LIFT : 0, x, y, w;
@@ -1058,8 +1121,7 @@ static void draw_continue(int hero)
   w = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
   ui_round_fill(x + 160, y + 10, w, 16, 2, hero ? UI_COL_PLUM : UI_COL_TANGERINE);
   ui_print(x + 166, y + 11, chip, hero ? UI_COL_TANGERINE : UI_COL_PLUM, UI_FONT_SMALL, 0);
-  ui_print_fit(x + 160, y + 30, L.games[game].title, ink, UI_FONT_BODY,
-   UI_TEXT_BOLD | UI_TEXT_2X, 270);
+  big_title(x + 160, y + 30, 270, L.games[game].title, ink, 0, 0);
   when_text(L.cont_time, when, sizeof(when));
   played_text(game_played(game), played, sizeof(played));
   if(L.cont_slot == 10)
@@ -1099,6 +1161,15 @@ static void recent_selection(void)
     draw_cover(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
     grid_marquee(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
     cover_heart(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
+  }
+  /* the focused Continue card: a long name's second line runs sideways */
+  if((L.rec_row == 0) && (L.rec_f >= UI_F_CURSOR))
+  {
+    const char *t = L.games[L.recent[0]].title;
+    int shift = marquee_shift(big_title_over(t, 270));
+    if(shift > 0)
+      big_title(CONT_X - UI_LIFT + 160, CONT_Y - UI_LIFT + 30, 270, t, UI_COL_PLUM,
+       UI_COL_TANGERINE, shift);
   }
   /* the frame flies straight to the new place, also between the card and
      the row */
@@ -1311,12 +1382,8 @@ static int card_open(int game)
   }
   L.card_game = game;
   card_read_tiles();
+  /* the art alone: the name is beside it */
   ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
-  if(ui_target_begin(L.card_cover, CARD_COVER, CARD_COVER, CARD_COVER))
-  {
-    cover_plate(0, 0, CARD_COVER, L.games[game].title);
-    ui_target_end();
-  }
   L.card = 1;
   L.card_f = 0;
   L.card_out = 0;
@@ -1327,6 +1394,7 @@ static int card_open(int game)
   L.card_first_f = UI_F_SCROLL;
   L.fav_flash = UI_F_FLASH;
   L.card_changed = 0;
+  L.marq_f = 0;  /* a long name waits again before it runs */
   memset(&L.hold, 0, sizeof(L.hold));
   L.toast_f = -1;
   L.dirty = 1;
@@ -1390,8 +1458,10 @@ static void draw_card(void)
   ui_fill(x + 4, y, CARD_W - 8, 4, UI_COL_TANGERINE);
   ui_fill(x + 12, y + 14, 100, 100, UI_COL_PLUM);
   ui_blit(L.card_cover, CARD_COVER, x + 14, y + 16, CARD_COVER, CARD_COVER);
-  ui_print_fit(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY,
-   UI_TEXT_BOLD | UI_TEXT_2X, CARD_W - 136);
+  /* 316 px: 2x when it fits, else two lines; the card is focused, so a
+     longer name's second line runs sideways */
+  big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
+   (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
 
   /* chips: size, play time, the heart (△ flashes it) */
   cx = x + 124;
