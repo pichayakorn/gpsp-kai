@@ -2,8 +2,7 @@
  *
  * Every game under the ROM folder and its subfolders (.gba and .zip), shown
  * as a grid of covers or a list. A game without box art gets its preset
- * cover (ui_cover.c). The name is the display name from rom_names.txt when
- * it has one, else the file name without its extension.
+ * cover (ui_cover.c). The name is the file name, cleaned up (display_name).
  *
  * This part: the All tab (grid and list), View & sort, the empty library
  * and starting a game. Recent with its Continue card, the game card,
@@ -104,6 +103,8 @@ static char *arena_str(const char *s, int n)
   return p;
 }
 
+static const char *display_name(const char *name, int n);
+
 static int is_game_file(const char *name)
 {
   const char *dot = strrchr(name, '.');
@@ -160,7 +161,7 @@ static void scan_dir(const char *path, int depth)
       game_t *g = &L.games[L.count];
       const char *dot = strrchr(e.d_name, '.');
       g->name = arena_str(e.d_name, strlen(e.d_name));
-      g->title = g->name ? arena_str(e.d_name, dot - e.d_name) : NULL;
+      g->title = g->name ? display_name(e.d_name, dot - e.d_name) : NULL;
       if(g->title == NULL)
         break;  /* out of room: the list ends here */
       g->size = (u32)e.d_stat.st_size;
@@ -173,38 +174,58 @@ static void scan_dir(const char *path, int depth)
   sceIoDclose(d);
 }
 
-/* rom_names.txt in the CFG folder (#14): one "file name=display name" per
-   line, UTF-8; lines starting with # are notes */
-static void read_display_names(void)
+/* The name shown for a file: its name without the extension, cleaned up
+ * so a downloaded library reads well (#14): bracketed tags such as
+ * "(USA, Europe)", "[!]" or "(Rev 1)" go, so does a leading release number
+ * ("1986 - Golden Sun"), and underscores become spaces. The cover is drawn
+ * from this name, so these rules must not change once released. */
+static const char *display_name(const char *name, int n)
 {
-  char path[MAX_PATH], line[512];
-  FILE *f;
+  char out[256];
+  int i = 0, o = 0, depth = 0;
 
-  path_printf(path, sizeof(path), "%s/rom_names.txt", g_default_cfg_dir);
-  f = fopen(path, "r");
-  if(f == NULL)
-    return;
-  while(fgets(line, sizeof(line), f))
+  if(n > 255)
+    n = 255;
+  /* a leading release number: digits, then " - " */
+  while((i < n) && (name[i] >= '0') && (name[i] <= '9'))
+    i++;
+  if(i > 0)
   {
-    char *eq = strchr(line, '='), *end;
-    int i;
-    if((line[0] == '#') || (eq == NULL))
-      continue;
-    *eq++ = 0;
-    end = eq + strlen(eq);
-    while((end > eq) && ((end[-1] == '\n') || (end[-1] == '\r') || (end[-1] == ' ')))
-      *--end = 0;
-    if(*eq == 0)
-      continue;
-    for(i = 0; i < L.count; i++)
-      if(!strcasecmp(L.games[i].name, line))
-      {
-        const char *t = arena_str(eq, end - eq);
-        if(t)
-          L.games[i].title = t;
-      }
+    int j = i;
+    while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
+      j++;
+    if((j < n) && (name[j] == '-'))
+    {
+      j++;
+      while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
+        j++;
+      i = j;
+    }
+    else
+      i = 0;
   }
-  fclose(f);
+  for(; i < n; i++)
+  {
+    char c = name[i];
+    if((c == '(') || (c == '['))
+      depth++;
+    else if(((c == ')') || (c == ']')) && depth)
+      depth--;
+    else if(depth == 0)
+    {
+      if(c == '_')
+        c = ' ';
+      /* one space between words, none at the start */
+      if((c == ' ') && ((o == 0) || (out[o - 1] == ' ')))
+        continue;
+      out[o++] = c;
+    }
+  }
+  while((o > 0) && ((out[o - 1] == ' ') || (out[o - 1] == '-')))
+    o--;
+  if(o == 0)
+    return arena_str(name, n);  /* nothing left: the plain name */
+  return arena_str(out, o);
 }
 
 /* recent.txt (written on leaving a game): full paths, newest first */
@@ -278,7 +299,6 @@ static int load_games(void)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0);
-  read_display_names();
   read_recent();
   for(i = 0; i < L.count; i++)
     L.order[i] = i;
