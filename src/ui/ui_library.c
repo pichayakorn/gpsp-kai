@@ -1349,12 +1349,8 @@ static int card_open(int game)
   }
   L.card_game = game;
   card_read_tiles();
+  /* the art alone: the name is beside it */
   ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
-  if(ui_target_begin(L.card_cover, CARD_COVER, CARD_COVER, CARD_COVER))
-  {
-    cover_plate(0, 0, CARD_COVER, L.games[game].title);
-    ui_target_end();
-  }
   L.card = 1;
   L.card_f = 0;
   L.card_out = 0;
@@ -1365,6 +1361,7 @@ static int card_open(int game)
   L.card_first_f = UI_F_SCROLL;
   L.fav_flash = UI_F_FLASH;
   L.card_changed = 0;
+  L.marq_f = 0;  /* a long name waits again before it runs */
   memset(&L.hold, 0, sizeof(L.hold));
   L.toast_f = -1;
   L.dirty = 1;
@@ -1428,8 +1425,10 @@ static void draw_card(void)
   ui_fill(x + 4, y, CARD_W - 8, 4, UI_COL_TANGERINE);
   ui_fill(x + 12, y + 14, 100, 100, UI_COL_PLUM);
   ui_blit(L.card_cover, CARD_COVER, x + 14, y + 16, CARD_COVER, CARD_COVER);
-  ui_print_fit(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY,
-   UI_TEXT_BOLD | UI_TEXT_2X, CARD_W - 136);
+  /* 316 px: 2x when it fits, else two lines; the card is focused, so a
+     longer name's second line runs sideways */
+  big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
+   (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
 
   /* chips: size, play time, the heart (△ flashes it) */
   cx = x + 124;
