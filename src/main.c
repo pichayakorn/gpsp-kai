@@ -573,6 +573,7 @@ u32 update_gba()
 {
   // TODO: may need logging here
   IRQ_TYPE irq_raised = IRQ_NONE;
+  u32 dma_alert = 0;
 
   do
     {
@@ -611,13 +612,13 @@ u32 update_gba()
 
           // If in visible area also fire HDMA
           if(dma[0].start_type == DMA_START_HBLANK)
-            dma_transfer(dma);
+            dma_alert |= dma_transfer(dma);
           if(dma[1].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 1);
+            dma_alert |= dma_transfer(dma + 1);
           if(dma[2].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 2);
+            dma_alert |= dma_transfer(dma + 2);
           if(dma[3].start_type == DMA_START_HBLANK)
-            dma_transfer(dma + 3);
+            dma_alert |= dma_transfer(dma + 3);
         }
 
         // The HBlank IRQ is raised on every line, including the V-blank
@@ -648,13 +649,13 @@ u32 update_gba()
           affine_reference_y[1] = ((s32)(ADDRESS32(io_registers, 0x3C) << 4) >> 4);
 
           if(dma[0].start_type == DMA_START_VBLANK)
-            dma_transfer(dma);
+            dma_alert |= dma_transfer(dma);
           if(dma[1].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 1);
+            dma_alert |= dma_transfer(dma + 1);
           if(dma[2].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 2);
+            dma_alert |= dma_transfer(dma + 2);
           if(dma[3].start_type == DMA_START_VBLANK)
-            dma_transfer(dma + 3);
+            dma_alert |= dma_transfer(dma + 3);
 
        }
         else
@@ -719,6 +720,16 @@ u32 update_gba()
 
     if(irq_raised)
       raise_interrupt(irq_raised);
+
+    // An H-blank or V-blank DMA that wrote over translated code: drop the
+    // old translations, as a CPU write there does, and have the caller look
+    // the PC up again instead of returning into a flushed block.
+    if(dma_alert & CPU_ALERT_SMC)
+    {
+      dma_alert = 0;
+      flush_translation_cache_ram();
+      reg[CHANGED_PC_STATUS] = 1;
+    }
 
     CHECK_TIMER(0);
     CHECK_TIMER(1);
