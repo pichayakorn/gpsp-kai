@@ -270,7 +270,9 @@ typedef struct
     }                                                                         \
   }                                                                           \
                                                                               \
-  switch((opcode >> 20) & 0xFF) /* bits 20-27 */                             \
+  /* condition NV (0xF) never runs (the scan made it an AL no-op);            \
+     0xC0 emits nothing */                                                    \
+  switch(((opcode >> 28) == 0xF) ? 0xC0 : ((opcode >> 20) & 0xFF))            \
   {                                                                           \
     case 0x00:                                                                \
       if((opcode & 0x90) == 0x90)                                             \
@@ -2950,6 +2952,15 @@ block_lookup_address_body(dual);
   condition = opcode >> 28;                                                   \
                                                                               \
   opcode &= 0xFFFFFFF;                                                        \
+  /* condition NV (0xF) is "never" on the ARM7TDMI: make the word an AL       \
+     no-op, so it is no exit and closes any conditional run (with no          \
+     case for 0xF, generate_condition emitted no skip and the run             \
+     kept a stale or unset backpatch address) */                              \
+  if(condition == 0x0F)                                                       \
+  {                                                                           \
+    condition = 0x0E;                                                         \
+    opcode = 0;                                                               \
+  }                                                                           \
                                                                               \
   block_end_pc += 4                                                           \
 
