@@ -212,6 +212,9 @@ static int glyph(int x, int y, u32 c, u16 color, int size, int flags, int draw)
   const u8 *g = find_glyph(c, size, &font);
   int scale = (flags & UI_TEXT_2X) ? 2 : 1;
   int bold = (flags & UI_TEXT_BOLD) && boldable(c);
+  /* bold advances 1 px per glyph; the "…" is not struck (its dots would
+     run into a bar) but advances the same (spec section 1, Type) */
+  int wider = bold || ((flags & UI_TEXT_BOLD) && (c == 0x2026));
   int advance;
 
   if(g == NULL)
@@ -230,7 +233,7 @@ static int glyph(int x, int y, u32 c, u16 color, int size, int flags, int draw)
     if(bold)
       blit(font, g + 1, x + scale, y, color, scale);
   }
-  return (advance + bold) * scale;
+  return (advance + wider) * scale;
 }
 
 int ui_print(int x, int y, const char *s, u16 color, int font, int flags)
