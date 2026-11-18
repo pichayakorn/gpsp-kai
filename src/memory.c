@@ -4107,6 +4107,64 @@ static void write_state_thumbnail(const char *savestate_path)
    savestate_write_buffer + SVS_TIME_OFFSET);
 }
 
+/* The 60x40 picture of the savestate at savestate_path, for a game that
+ * is not running (the 4.0 library's game card): from its .thm when that
+ * belongs to this save, else made from the savestate's screenshot, and
+ * the .thm written for next time. *time gets its save time (0 for an old
+ * savestate without one). Returns 0 without a savestate, 1 with one but no
+ * picture, 2 with the picture. */
+u32 read_thumbnail_for(const char *savestate_path, u16 *pixels, u64 *time)
+{
+  static u16 rows[240 * 20];
+  char thumbnail_path[MAX_PATH];
+  u8 head[THM_HEADER], t[8];
+  SceUID fd;
+  u32 y, ok = 0;
+
+  *time = 0;
+  fd = sceIoOpen(savestate_path, PSP_O_RDONLY, 0777);
+  if(fd < 0)
+    return 0;
+  if((sceIoRead(fd, head, 4) != 4) || memcmp(head, g_state_str, 4) ||
+   (sceIoLseek32(fd, SVS_TIME_OFFSET, PSP_SEEK_SET) != SVS_TIME_OFFSET) ||
+   (sceIoRead(fd, t, 8) != 8))
+  {
+    sceIoClose(fd);
+    return 1;  /* an old savestate: no time, no picture */
+  }
+  memcpy(time, t, 8);
+
+  get_thumbnail_path(savestate_path, thumbnail_path);
+  {
+    SceUID th = sceIoOpen(thumbnail_path, PSP_O_RDONLY, 0777);
+    if(th >= 0)
+    {
+      if((sceIoRead(th, head, THM_HEADER) == THM_HEADER) &&
+       !memcmp(head, "KTHM", 4) && (head[4] == 1) && (head[5] == THM_W) &&
+       (head[6] == THM_H) && !memcmp(head + 8, t, 8) &&
+       (sceIoRead(th, pixels, THM_W * THM_H * 2) == THM_W * THM_H * 2))
+        ok = 1;
+      sceIoClose(th);
+    }
+  }
+  if(!ok)
+  {
+    /* made from the screenshot, 20 rows at a time */
+    sceIoLseek32(fd, SVS_SHOT_OFFSET, PSP_SEEK_SET);
+    for(y = 0; y < 160; y += 20)
+    {
+      if(sceIoRead(fd, rows, sizeof(rows)) != (int)sizeof(rows))
+        break;
+      make_thumbnail_rows(rows, 20, pixels + (y / 4) * THM_W, THM_W);
+    }
+    ok = (y == 160);
+    if(ok)
+      write_thumbnail_pixels(savestate_path, pixels, THM_W, t);
+  }
+  sceIoClose(fd);
+  return ok ? 2 : 1;
+}
+
 /*--------------------------------------------------------
   Reading savestates for the 4.0 pause screen
   Slots 0-9 are <game>_N.svs, Last (10) is <game>_10.svs.
