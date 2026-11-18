@@ -332,11 +332,13 @@ u8 read_backup(u32 address)
 #define read_backup8()                                                        \
   value = read_backup(address & 0xFFFF)                                       \
 
+/* SRAM and flash sit on an 8-bit bus: a 16 or 32-bit read returns the
+   byte in every lane */
 #define read_backup16()                                                       \
-  value = 0                                                                   \
+  value = read_backup(address & 0xFFFF) * 0x0101                              \
 
 #define read_backup32()                                                       \
-  value = 0                                                                   \
+  value = read_backup(address & 0xFFFF) * 0x01010101                          \
 
 
 // EEPROM is 512 bytes by default; it is autodetecte as 8KB if
