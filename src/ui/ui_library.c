@@ -1927,9 +1927,10 @@ static void popup_input(void)
 /* ---- starting a game ------------------------------------------------------------------ */
 
 /* the tangerine progress card, "Loading" and its three dots (spec section 2) */
-static void draw_loading(int t)
+static void draw_loading(int t, int fill_256)
 {
   int x = (UI_SCREEN_W - 332) / 2, y = 98, w = 332, h = 54, ex, i;
+  int k = (30 * fill_256 + 128) / 256 - 1;
 
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CARD);
@@ -1939,7 +1940,56 @@ static void draw_loading(int t)
     ui_fill(ex + 4 + i * 8, y + 19 - ((i == (t / UI_F_LOADING) % 3) ? 3 : 0), 4, 4,
      UI_COL_TANGERINE);
   for(i = 0; i < 30; i++)
-    ui_fill(x + 16 + i * 10, y + 32, 8, 12, UI_COL_PLUM_2);
+    ui_fill(x + 16 + i * 10, y + 32, 8, 12, (i <= k) ? UI_COL_TANGERINE : UI_COL_PLUM_2);
+}
+
+/* While the game loads, its progress fills the Loading card (instead of
+   the old menu's dialog), and the dots hop with each step. The card is
+   drawn over the library's last frame. */
+static void load_hook(int current, int total)
+{
+  ui_frame_begin();
+  draw_loading(current * UI_F_LOADING, total ? current * 256 / total : 0);
+  ui_frame_end_now();
+}
+
+/* Load the game picked in the library, with the Loading card. */
+s32 ui_library_load(const char *dir, char *name)
+{
+  s32 loaded;
+
+  chdir(dir);
+  snprintf(rom_path, sizeof(rom_path), "%s", dir);
+  progress_hook = load_hook;
+  loaded = load_gamepak(name);
+  progress_hook = NULL;
+  if(loaded == -1)
+  {
+    /* spec err_rom: one button, OK; × OK and ○ both go back to the
+       library. Drawn into both buffers over the library, then held until a
+       key (the error step adds its motion). */
+    static const char *ok[1] = { "OK" };
+    ui_hint_t h[2];
+    int i;
+    h[0].keys = ui_key_confirm; h[0].verb = "OK";
+    h[1].keys = ui_key_back;    h[1].verb = "Close";
+    for(i = 0; i < 2; i++)
+    {
+      ui_frame_begin();
+      ui_dialog("This game won't open", "The file is damaged, or it is not a GBA game.",
+       ok, 1, 0, UI_COL_PINK, UI_F_DIALOG_IN, 0);
+      ui_hint_packed(h, 2, 14);
+      ui_frame_end();
+    }
+    ui_input_init();
+    do
+    {
+      sceDisplayWaitVblankStart();
+      ui_input_update();
+    }
+    while(!ui_pressed(ui_key_confirm) && !ui_pressed(ui_key_back));
+  }
+  return loaded;
 }
 
 /* ---- the screen ----------------------------------------------------------------------- */
@@ -2139,7 +2189,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         L.dirty = 1;  /* the hints change with it */
     }
     if(chosen)
-      draw_loading(0);
+      draw_loading(0, 0);
     ui_frame_end();
   }
 
@@ -2200,9 +2250,7 @@ u32 ui_library_switch(void)
 
   while(ui_library(dir, sizeof(dir), name, sizeof(name), &slot))
   {
-    chdir(dir);
-    snprintf(rom_path, sizeof(rom_path), "%s", dir);
-    if(load_gamepak(name) != -1)
+    if(ui_library_load(dir, name) != -1)
     {
       reset_gba();
       ui_library_resume(slot);
