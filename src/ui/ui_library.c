@@ -702,7 +702,7 @@ static void find_art(void)
       g->art = ART_BY_FILE;
     else
     {
-      ui_clean_name(g->name, clean);
+      game_name_of_file(g->name, clean);
       if(hash_has(tab, name_hash(clean, strlen(clean))))
         g->art = ART_BY_NAME;
     }
@@ -731,7 +731,7 @@ static int art_read(int game, int size, u16 *out)
       *dot = 0;
   }
   else
-    ui_clean_name(g->name, name);
+    game_name_of_file(g->name, name);
   art_dir(path, sizeof(path));
   snprintf(path + strlen(path), sizeof(path) - strlen(path), "/%s.art", name);
   f = fopen(path, "rb");
