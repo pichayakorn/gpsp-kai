@@ -162,6 +162,28 @@ void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int
   body_text(ex - vw - 4 - body_width("\xE2\x97\x80", 0), y + 2, "\xE2\x97\x80", ac, 0);
 }
 
+/* A cycle value drawn from a 1-bit mask (16 rows of 13 bytes, w px wide)
+ * instead of text, in the text's ink: the Language row's names, each in
+ * its own script whatever font is loaded. */
+void ui_row_cycle_mask(int xr, int y, const u8 (*bits)[13], int w, int selected, u16 group,
+ int f)
+{
+  u16 tc = selected ? UI_COL_PLUM : UI_COL_CREAM;
+  u16 ac = selected ? UI_COL_PLUM : group;
+  int ex, off = 0, r, c;
+
+  ex = xr - body_width("\xE2\x96\xB6", 0);
+  body_text(ex, y + 2, "\xE2\x96\xB6", ac, 0);
+  ex -= 4;
+  if(f < UI_F_VALUE)
+    off = ui_ease_out_back(10, 0, f, UI_F_VALUE);
+  for(r = 0; r < 16; r++)
+    for(c = 0; c < w; c++)
+      if(bits[r][c >> 3] & (0x80 >> (c & 7)))
+        ui_fill(ex - w + off + c, y + 2 + r, 1, 1, tc);
+  body_text(ex - w - 4 - body_width("\xE2\x97\x80", 0), y + 2, "\xE2\x97\x80", ac, 0);
+}
+
 /* Segments: the chosen one filled; on a change the fill springs from the
  * old segment to the new one. */
 /* A segment label of UI_SEG_CROSS or UI_SEG_CIRCLE is drawn as the

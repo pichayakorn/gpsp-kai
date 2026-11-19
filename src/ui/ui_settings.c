@@ -19,6 +19,7 @@
 #include "../common.h"
 #include "ui.h"
 #include "ui_help_pics.h"
+#include "ui_lang_masks.h"
 
 enum { K_SEG, K_SWITCH, K_BLOCKS, K_CYCLE, K_SCREEN, K_ACTION, K_OFF };
 
@@ -388,6 +389,13 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       ui_row_blocks(vx, vy, r->count, k, text, selected ? f : UI_F_VALUE, selected, g);
       break;
     case K_CYCLE:
+      if(r->names == language_names)
+      {
+        /* each language in its own script, from its pre-drawn mask */
+        const ui_lang_mask_t *m = &ui_lang_masks[(k >= 0) && (k < 12) ? k : 1];
+        ui_row_cycle_mask(vx, vy, m->bits, m->w, selected, g, selected ? f : UI_F_VALUE);
+        break;
+      }
       if(r->names)
         snprintf(text, sizeof(text), "%s", r->names[(k >= 0) && (k < r->count) ? k : 0]);
       else

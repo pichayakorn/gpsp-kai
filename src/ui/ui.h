@@ -127,6 +127,8 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
  int flags, int *vx, int *vy);
 void ui_row_note(int xr, int y, const char *note);
 void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int f);
+void ui_row_cycle_mask(int xr, int y, const u8 (*bits)[13], int w, int selected, u16 group,
+ int f);
 /* Segment labels drawn as button discs (Confirm button row) */
 #define UI_SEG_CROSS  "\x01x"
 #define UI_SEG_CIRCLE "\x01o"
