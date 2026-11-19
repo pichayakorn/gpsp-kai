@@ -61,7 +61,7 @@ enum { VIEW_GRID, VIEW_LIST, VIEW_PANEL };
 #define PANEL_LW   276
 #define PANEL_PX   20
 #define PANEL_PW   152
-#define PANEL_ART  124
+#define PANEL_ART  116
 enum { TAB_RECENT, TAB_ALL, TAB_FAV, TAB_FOLDERS };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
@@ -146,6 +146,7 @@ static struct
   int pop, pop_f, pop_out, pop_row, pop_flash;  /* View & sort */
   int played_game;            /* the game whose play time is read */
   u32 played;                 /* its seconds */
+  u32 last_played;            /* when it was last left, Unix time (0: never) */
 
   cover_t covers[MAX_COVERS];
   int cover_count;
@@ -856,6 +857,7 @@ static u32 game_played(int game)
     return L.played;
   L.played_game = game;
   L.played = 0;
+  L.last_played = 0;
   snprintf(name, sizeof(name), "%s", L.games[game].name);
   dot = strrchr(name, '.');
   if(dot)
@@ -871,6 +873,8 @@ static u32 game_played(int game)
     n = fread(&cfg, 1, sizeof(cfg), f);
     if(n >= offsetof(game_config_t, play_seconds) + sizeof(u32))
       L.played = cfg.play_seconds;
+    if(n >= offsetof(game_config_t, last_played) + sizeof(u32))
+      L.last_played = cfg.last_played;
   }
   fclose(f);
   return L.played;
@@ -1009,6 +1013,41 @@ static void list_selection(void)
 
 static int bold_line(const char *t, int n, int w, char *out, int size);
 
+/* days since 0001-01-01 of a date */
+static int day_number(int y, int m, int d)
+{
+  if(m < 3)
+  {
+    y--;
+    m += 12;
+  }
+  return 365 * y + y / 4 - y / 100 + y / 400 + (153 * (m - 3) + 2) / 5 + d;
+}
+
+/* "Today 21:46", "Yesterday 19:02" or "3 days ago", from Unix time; ""
+   for never */
+static void last_text(u32 unix_time, char *out, int n)
+{
+  u64 utc, local;
+  ScePspDateTime t, now;
+  int days;
+
+  out[0] = 0;
+  if(unix_time == 0)
+    return;
+  utc = (u64)unix_time * 1000000ULL + 62135596800000000ULL;  /* ticks from year 1 */
+  if((sceRtcConvertUtcToLocalTime(&utc, &local) < 0) || (sceRtcSetTick(&t, &local) < 0))
+    return;
+  sceRtcGetCurrentClockLocalTime(&now);
+  days = day_number(now.year, now.month, now.day) - day_number(t.year, t.month, t.day);
+  if(days <= 0)
+    snprintf(out, n, "Today %02d:%02d", t.hour, t.minute);
+  else if(days == 1)
+    snprintf(out, n, "Yesterday %02d:%02d", t.hour, t.minute);
+  else
+    snprintf(out, n, "%d days ago", days);
+}
+
 static int panel_y0(void)
 {
   return list_banner() ? 66 : 42;  /* the No BIOS notice spans both columns at y 40 */
@@ -1065,8 +1104,9 @@ static void panel_row(int i, int y, int sel)
 static void panel_card(void)
 {
   const game_t *g = &L.games[L.order[L.cur]];
-  int py = panel_y0(), ph = 244 - py, art = ph - 80, ax, ny, w = PANEL_PW - 16, cw;
-  char l1[256], l2[256], chip[32], size[16];
+  int py = panel_y0(), ph = 244 - py, art = ph - 86, ax, ny, w = PANEL_PW - 16;
+  char l1[256], l2[256], when[32], played[32];
+  u32 seconds;
 
   if(art > PANEL_ART)
     art = PANEL_ART;
@@ -1104,11 +1144,19 @@ static void panel_card(void)
       ui_print_fit(PANEL_PX + 8, ny + 16, l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, w);
     }
   }
-  size_text(g->size, size, sizeof(size));
-  snprintf(chip, sizeof(chip), "GBA \xC2\xB7 %s", size);
-  cw = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
-  ui_round_fill(PANEL_PX + 8, py + ph - 24, cw, 16, 2, UI_COL_PLUM);
-  ui_print(PANEL_PX + 14, py + ph - 23, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
+  /* the foot: when it was last played (cream), its play time (mute); the
+     size stays on the rows and the game card (maintainer, 2026-11-20) */
+  seconds = game_played(L.order[L.cur]);
+  last_text(L.last_played, when, sizeof(when));
+  if(!when[0] && !seconds)
+    ui_print(PANEL_PX + 8, py + ph - 34, "Not played yet", UI_COL_CREAM, UI_FONT_SMALL, 0);
+  else
+  {
+    if(when[0])
+      ui_print(PANEL_PX + 8, py + ph - 34, when, UI_COL_CREAM, UI_FONT_SMALL, 0);
+    played_text(seconds, played, sizeof(played));
+    ui_print(PANEL_PX + 8, py + ph - 20, played, UI_COL_MUTE, UI_FONT_SMALL, 0);
+  }
 }
 
 static void panel_ground(void)
