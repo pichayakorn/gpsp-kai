@@ -765,7 +765,6 @@ void init_game_config()
   g_game_config.last_played = 0;
   g_game_config.last_slot = 0;
   g_game_config.cheat_locks = 0;
-  g_game_config.cheat_locks_set = NO;
 }
 
 void init_gpsp_config()
