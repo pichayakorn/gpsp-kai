@@ -65,6 +65,7 @@
 
 #include "common.h"
 #include "cheat_engine.h"
+#include "game_name.h"
 
 extern u32 gamepak_size;
 
@@ -99,6 +100,7 @@ typedef struct
   u32 work;                       /* worst-case accesses a frame */
   u16 group;
   u8 family, status, on, locked;
+  u8 detail;                      /* ce_error: the engine's own reason */
   u8 started;                     /* on when the game last started */
 } cheat_entry;
 
@@ -211,11 +213,6 @@ static int ce_in_ram(u32 address)
 
 /* ---- CodeBreaker ------------------------------------------------------------- */
 
-typedef enum
-{
-  CE_E_NONE = 0, CE_E_SYNTAX, CE_E_GAMESHARK, CE_E_REGION, CE_E_ALIGN, CE_E_MIXED,
-  CE_E_UNSUPPORTED, CE_E_ENCRYPTED, CE_E_TOOBIG, CE_E_WORK
-} ce_error;
 
 /* records one CodeBreaker code takes: a slide (4) and a super code (5)
    carry payload records */
@@ -1079,12 +1076,16 @@ static u32 hash_text(u32 h, const char *s, int code)
 
 static char code_text[CE_CODE_TEXT];
 static u32 code_len;
+static u32 code_cut;  /* some of the code didn't fit: it can't run */
 
 static void code_add(const char *s)
 {
   u32 n = strlen(s);
   if(code_len + n + 2 >= CE_CODE_TEXT)
+  {
+    code_cut = 1;  /* never run a code cut short */
     return;
+  }
   if(code_len)
     code_text[code_len++] = ' ';
   memcpy(code_text + code_len, s, n);
@@ -1103,14 +1104,16 @@ static void finish_cheat(const char *name, int kind)
 
   if(ce_counting)
   {
-    ce_counted += (kind != K_NONE) && (code_len != 0);
+    ce_counted += (kind != K_NONE) && (code_len || code_cut);
     code_len = 0;
+    code_cut = 0;
     return;
   }
-  if((kind == K_NONE) || (code_len == 0) || (ce_count >= CE_MAX_CHEATS) ||
+  if((kind == K_NONE) || (!code_len && !code_cut) || (ce_count >= CE_MAX_CHEATS) ||
    (ce_group_count == 0))
   {
     code_len = 0;
+    code_cut = 0;
     return;
   }
   c = &ce[ce_count];
@@ -1118,7 +1121,9 @@ static void finish_cheat(const char *name, int kind)
   snprintf(c->name, sizeof(c->name), "%s", name[0] ? name : "Unnamed cheat");
   c->first = ce_rec_used;
   ce_bad_region = 0;
-  if(kind == K_NEW)
+  if(code_cut)
+    err = CE_E_TOOBIG;
+  else if(kind == K_NEW)
     err = compile_new(c, code_text);
   else
     err = compile_kai(c, code_text, (kind == K_KAI3) || (kind == K_KAI3_ENC),
@@ -1139,11 +1144,13 @@ static void finish_cheat(const char *name, int kind)
     ce_rec_used = save_rec;
     ce_patch_used = save_patch;
   }
+  c->detail = err;
   c->hash = hash_text(hash_text(2166136261u, c->name, 0), code_text, 1);
   c->group = ce_group_count - 1;
   ce_groups[c->group].count++;
   ce_count++;
   code_len = 0;
+  code_cut = 0;
 }
 
 /* A new group from here on; an empty one before it takes its place. */
@@ -1249,10 +1256,10 @@ static void trim(char *s)
    in N order */
 static char db_text[CE_DB_TEXT];
 static u32 db_used;
-static struct { u32 desc, code; } db[CE_MAX_CHEATS];
+static struct { u32 desc, code; u8 cut; } db[CE_MAX_CHEATS];
 static u32 db_top;
 
-static int db_line(char *line)
+static int db_line(char *line, int cut)
 {
   unsigned int n;
   char key[8], *eq, *v;
@@ -1275,7 +1282,19 @@ static int db_line(char *line)
   if(strcmp(key, "desc") && strcmp(key, "code"))
     return 1;  /* cheatN_enable and the rest: not read */
   if(db_used + strlen(v) + 1 > CE_DB_TEXT)
+  {
+    if(!strcmp(key, "code"))
+    {
+      /* no room for the code: the cheat is kept, too big to run */
+      if(n + 1 > db_top)
+        db_top = n + 1;
+      db[n].code = 0;
+      db[n].cut = 1;
+    }
     return 1;
+  }
+  if(!strcmp(key, "code"))
+    db[n].cut = cut;
   if(n + 1 > db_top)
     db_top = n + 1;
   if(!strcmp(key, "desc"))
@@ -1289,12 +1308,13 @@ static int db_line(char *line)
 
 static void read_file(FILE *f)
 {
-  static char line[512], name[CE_NAME_LENGTH];
-  int kind = K_NONE, closed = 0, is_db = 0;
+  static char line[CE_CODE_TEXT + 64], name[CE_NAME_LENGTH];
+  int kind = K_NONE, closed = 0, is_db = 0, cut;
   u32 i;
 
   name[0] = 0;
   code_len = 0;
+  code_cut = 0;
   db_used = db_top = 0;
   memset(db, 0, sizeof(db));
   while(fgets(line, sizeof(line), f))
@@ -1302,10 +1322,25 @@ static void read_file(FILE *f)
     const char *after;
     int k;
     char *s = line;
+    /* a line longer than the buffer: the rest is skipped, and a code on
+       it can't run (never a code cut short) */
+    cut = (strlen(line) == sizeof(line) - 1) && (line[sizeof(line) - 2] != '\n');
+    if(cut)
+    {
+      int ch;
+      char *end = strrchr(line, ' '), *plus = strrchr(line, '+');
+      while(((ch = fgetc(f)) != EOF) && (ch != '\n'))
+        ;
+      /* back to the last whole code, so the line still reads as codes */
+      if(plus > end)
+        end = plus;
+      if(end && (end > line))
+        *end = 0;
+    }
     trim(line);
     if(((u8)s[0] == 0xEF) && ((u8)s[1] == 0xBB) && ((u8)s[2] == 0xBF))
       s += 3;  /* a UTF-8 byte order mark */
-    if(db_line(s))
+    if(db_line(s, cut))
     {
       is_db = 1;
       continue;
@@ -1346,6 +1381,7 @@ static void read_file(FILE *f)
       continue;
     if(code_line(s))
     {
+      code_cut |= cut;
       if(kind >= K_KAI1)
       {
         if(!closed)
@@ -1377,10 +1413,14 @@ static void read_file(FILE *f)
   finish_cheat(name, kind);
   if(is_db)
     for(i = 0; i < db_top; i++)
-      if(db[i].code)
+      if(db[i].code || db[i].cut)
       {
         code_len = 0;
-        code_add(db_text + db[i].code - 1);
+        if(db[i].code)
+          code_add(db_text + db[i].code - 1);
+        else
+          code_add("!");  /* kept so it shows, with its reason */
+        code_cut |= db[i].cut;
         finish_cheat(db[i].desc ? db_text + db[i].desc - 1 : "", K_NEW);
       }
 }
@@ -1470,7 +1510,6 @@ void cheat_engine_clear(void)
   ce_rom[0] = 0;
 }
 
-extern void ui_clean_name(const char *file, char *out);
 
 /* What a file's reading added, to take back for another reading */
 typedef struct
@@ -1647,7 +1686,7 @@ static void read_cheats_for(const char *rom_name)
   dot = strrchr(names[0], '.');
   if(dot)
     *dot = 0;
-  ui_clean_name(rom_name, names[1]);
+  game_name_of_file(rom_name, names[1]);
   for(k = 0; (k < 2) && !found; k++)
   {
     if((k == 1) && !strcmp(names[0], names[1]))
@@ -1853,7 +1892,7 @@ void cheat_engine_folder(char *out, u32 size)
 {
   char name[MAX_FILE];
 
-  ui_clean_name(ce_rom, name);
+  game_name_of_file(ce_rom, name);
   path_printf(out, size, "%s/%s/", g_default_cheat_dir, name);
 }
 
@@ -1890,4 +1929,9 @@ u32 cheat_engine_peek(const char *rom_name, u32 *on)
     fclose(f);
   }
   return n;
+}
+
+u32 cheat_detail(u32 i)
+{
+  return (i < ce_count) ? ce[i].detail : CE_E_NONE;
 }

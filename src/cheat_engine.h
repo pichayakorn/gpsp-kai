@@ -22,6 +22,22 @@ enum
   CE_ASK            /* only while a file is read: bare codes, kind not known yet */
 };
 
+/* The engine's own reason a cheat can't run (cheat_detail), finer than
+   CE_*: for tools that explain it; kai's screen says CE_* in plain words */
+typedef enum
+{
+  CE_E_NONE = 0,
+  CE_E_SYNTAX,       /* not a code kai reads */
+  CE_E_GAMESHARK,    /* bare 16-digit codes that make sense no way */
+  CE_E_REGION,       /* writes outside the work RAM (save, I/O, ROM...) */
+  CE_E_ALIGN,        /* a 16- or 32-bit write to an odd address */
+  CE_E_MIXED,        /* kinds of code mixed in one cheat */
+  CE_E_UNSUPPORTED,  /* a code type kai doesn't run */
+  CE_E_ENCRYPTED,    /* an encrypted CodeBreaker code */
+  CE_E_TOOBIG,       /* more code than kai keeps for one cheat, or a line cut */
+  CE_E_WORK          /* more reads and writes a frame than kai allows */
+} ce_error;
+
 /* A group's rule (a "#kai: ..." line in its file) */
 enum
 {
@@ -69,6 +85,7 @@ u32 cheat_engine_applied(char *name, u32 size);
 /* Any game's cheats without loading them (the library's game card): how
    many, and how many it remembers on */
 u32 cheat_engine_peek(const char *rom_name, u32 *on);
+u32 cheat_detail(u32 i);           /* ce_error */
 /* Where the game's cheat files go: GBA/CHT/<game>/ */
 void cheat_engine_folder(char *out, u32 size);
 
