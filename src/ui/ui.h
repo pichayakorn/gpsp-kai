@@ -76,6 +76,7 @@ void ui_checker(int x, int y, int w, int h, u16 color);
 void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h);
 void ui_shrink_box(const u16 *src, int sw, int sh, u16 *dst, int w, int h);
 void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst);  /* 240 wide to 144, 5:3 */
+void ui_shrink_43_rows(const u16 *src, int rows, u16 *dst);  /* 240 wide to 180, 4:3 */
 void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h);
 void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, int w, int h);
 void ui_layer_init(void);  /* once, after ui_pool_init() */
