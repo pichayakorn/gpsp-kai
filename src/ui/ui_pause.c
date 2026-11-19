@@ -1250,8 +1250,20 @@ static int action_load(int slot)
       snprintf(play, sizeof(play), "Play %s", who);
       if(ui_error_card("Made by another game", body, play, "Cancel", UI_COL_SKY))
       {
-        p.switch_slot = slot;
-        return -1;  /* the caller leaves for that game */
+        if(ui_library_has_rom(state_error_game))
+        {
+          p.switch_slot = slot;
+          return -1;  /* the caller leaves for that game */
+        }
+        /* that game is not there: the player stays in this one */
+        build_layer(1);
+        ui_input_init();
+        {
+          char t[64];  /* a toast's text: a long name is cut */
+          snprintf(t, sizeof(t), "%.36s isn't in your games folder", who);
+          show_toast(t, UI_COL_PINK, UNDO_NONE, 0);
+        }
+        return 0;
       }
       build_layer(1);
       ui_input_init();
@@ -1351,6 +1363,15 @@ static void action_library(void)
   end_bar();
 }
 
+/* Quit kai (System, a pink hold): save like Exit, then close kai and go
+ * back to the PSP's home menu. Does not return. */
+static void quit_kai(void)
+{
+  build_layer(1);  /* the pause screen behind the card */
+  action_exit();
+  quit(0);
+}
+
 /* Restart kai (spec "Restart kai"): save like Exit, show the sky card and
  * start kai again; the note brings the player back to this Settings row.
  * Does not return. */
@@ -1395,8 +1416,11 @@ static void restart_return(void)
   }
   end_bar();
   ui_settings_game = p.game;
-  if(ui_settings(tab, row))
-    restart_kai();
+  switch(ui_settings(tab, row))
+  {
+    case 1: restart_kai(); break;  /* do not return */
+    case 2: quit_kai(); break;
+  }
   build_layer(0);  /* Settings used the layer */
   ui_status_read();
   ui_input_init();
@@ -1752,8 +1776,11 @@ u32 ui_pause(u16 *game_picture)
                  back after it */
               shot_wait();
               ui_settings_game = p.game;
-              if(ui_settings(0, 0))
-                restart_kai();  /* does not return */
+              switch(ui_settings(0, 0))
+              {
+                case 1: restart_kai(); break;  /* do not return */
+                case 2: quit_kai(); break;
+              }
               build_layer(1);
               ui_status_read();
               ui_input_init();

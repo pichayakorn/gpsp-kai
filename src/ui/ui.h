@@ -193,6 +193,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot);
 void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start */
 u32 ui_library_switch(void);
 u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot);
+int ui_library_has_rom(const char *rom_name);
 /* Cheats (ui_cheats.c), from the pause screen's Cheats tile. */
 void ui_cheats(void);
 extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
@@ -202,8 +203,8 @@ void ui_startup_hook(int current, int total);  /* kai's start-up steps */
 void ui_first_run(void);  /* the first-run cards, once (ui_first.c) */
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
- * (0, 0: the first). Returns 1 when the player asked to restart kai, 0 on
- * back. The caller draws its own ground again. */
+ * (0, 0: the first). Returns 1 when the player asked to restart kai, 2 to
+ * quit kai, 0 on back. The caller draws its own ground again. */
 int ui_settings(int tab, int row);
 void ui_settings_where(int *tab, int *row);
 int ui_settings_saved_for_game(const game_config_t *cfg);

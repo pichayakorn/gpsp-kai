@@ -44,12 +44,18 @@ static void glyph26(int x, int y, u32 key)
     }
 }
 
+/* the language in its own script (maintainer, 2026-11-20); the menu
+   language's own font is loaded, so it never draws as boxes here */
 static const char *language_name(u32 lang)
 {
   static const char *names[12] =
   {
-    "Japanese", "English", "French", "Spanish", "German", "Italian", "Dutch",
-    "Portuguese", "Russian", "Korean", "Chinese", "Chinese"
+    "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E", "English", "Fran\xC3\xA7" "ais",
+    "Espa\xC3\xB1ol", "Deutsch", "Italiano", "Nederlands", "Portugu\xC3\xAAs",
+    "\xD0\xA0\xD1\x83\xD1\x81\xD1\x81\xD0\xBA\xD0\xB8\xD0\xB9",
+    "\xED\x95\x9C\xEA\xB5\xAD\xEC\x96\xB4",
+    "\xE4\xB8\xAD\xE6\x96\x87\xEF\xBC\x88\xE7\xB9\x81\xE9\xAB\x94\xEF\xBC\x89",
+    "\xE4\xB8\xAD\xE6\x96\x87\xEF\xBC\x88\xE7\xAE\x80\xE4\xBD\x93\xEF\xBC\x89"
   };
   return names[(lang < 12) ? lang : 1];
 }

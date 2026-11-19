@@ -2565,12 +2565,16 @@ s32 ui_library_load(const char *dir, char *name)
    again on the library */
 static void open_settings(void)
 {
-  if(ui_settings(0, 0))
+  int r = ui_settings(0, 0);
+
+  if(r == 1)
   {
     int tab, row;
     ui_settings_where(&tab, &row);
     ui_restart_now(tab, row, NULL);
   }
+  else if(r == 2)
+    quit(0);  /* Quit kai: no game runs here, nothing to save but kai's own */
   ui_status_read();
   ui_input_init();
   L.dirty = 1;
@@ -2900,6 +2904,13 @@ static int find_rom(const char *path, const char *name, int depth, char *dir, in
   }
   sceIoDclose(d);
   return found;
+}
+
+/* Is a ROM file of that name under the ROM folder? */
+int ui_library_has_rom(const char *rom_name)
+{
+  char dir[MAX_PATH];
+  return find_rom(g_default_rom_dir, rom_name, 0, dir, sizeof(dir));
 }
 
 /* The err_state card's way on: leave the running game (as the Library tile
