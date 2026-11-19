@@ -19,7 +19,7 @@ enum
   CE_OK = 0,
   CE_CANT_KIND,     /* a kind of code kai doesn't run */
   CE_CANT_SAVE,     /* it would write to the game's save or outside the RAM */
-  CE_ASK            /* bare 16-digit codes: GameShark or Action Replay? */
+  CE_ASK            /* only while a file is read: bare codes, kind not known yet */
 };
 
 /* A group's rule (a "#kai: ..." line in its file) */
@@ -31,8 +31,6 @@ enum
   CE_RULE_RESTART   /* works from the game's start */
 };
 
-/* The answer for bare 16-digit codes */
-enum { CE_KIND_GS = 1, CE_KIND_AR };
 
 /* Load the cheats for the game just loaded (its file name, as in
  * gamepak_filename) and apply the ROM patches of those remembered on. */
@@ -62,10 +60,6 @@ u32 cheat_group_rule(u32 g);       /* CE_RULE_* */
 u32 cheat_group_first(u32 g);      /* its cheats: first .. first + size - 1 */
 u32 cheat_group_size(u32 g);
 u32 cheat_group_of(u32 i);
-u32 cheat_group_asks(u32 g);       /* bare codes wait for cheat_group_answer() */
-/* GameShark or Action Replay (CE_KIND_*) for the group's file: remembered,
-   and every cheat is read again (indexes stay as they were). */
-void cheat_group_answer(u32 g, u32 kind);
 /* On since the game started, in a group that needs a restart */
 u32 cheat_waits_restart(u32 i);
 /* The game was just restarted (the pause screen's Restart) */

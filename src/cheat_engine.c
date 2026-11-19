@@ -51,15 +51,16 @@
  * writes, and GameShark v1/v2 or Action Replay v3 marked "GS1:", "AR3:",
  * "GS1RAW:" or "AR3RAW:". They may only read and write the work RAM; a
  * code that would touch the save, I/O, video or ROM can't be switched on,
- * and bare 8 + 8 digit codes wait for the player to say which kind they
- * are (asked once per file; the answer compiles them as GameShark v1/v2
- * or Action Replay v3). Ported from another GPL-2.0 PSP GBA emulator; the
+ * and bare 8 + 8 digit codes are read the four ways they can be meant
+ * (GameShark v1/v2 or Action Replay v3, each encrypted or already
+ * decrypted): the file is read with the one under which the most of its
+ * cheats can run (maintainer, 2026-11-19: kai tells the kind itself).
+ * Ported from another GPL-2.0 PSP GBA emulator; the
  * cipher tables in cheats_gs_cipher.h keep their own MPL-2.0 notice.
  *
  * What is on. GBA/CFG/<rom name>.on lists the cheats that are on, one
  * "HHHHHHHH O|L name" line each: a hash of the cheat's name and code, so
- * reordering or rewrapping the file keeps the choice. L: locked on. Lines
- * "K HHHHHHHH G|A" keep the answer for a file (a hash of its name).
+ * reordering or rewrapping the file keeps the choice. L: locked on.
  */
 
 #include "common.h"
@@ -105,18 +106,12 @@ typedef struct
 {
   char name[CE_NAME_LENGTH];
   u32 first, count;               /* cheats */
-  u32 file;                       /* a hash of its file's name */
-  u8 rule, asks;                  /* CE_RULE_*; bare codes wait for an answer */
+  u8 rule;                        /* CE_RULE_* */
 } cheat_group;
-
-#define CE_ANSWERS 64
 
 static cheat_group ce_groups[CE_MAX_GROUPS];
 static u32 ce_group_count;
-static struct { u32 file; u8 kind; } ce_answers[CE_ANSWERS];  /* kind: CE_KIND_* */
-static u32 ce_answer_count;
-static u32 ce_file;     /* the file being read */
-static u32 ce_answer;   /* its answer, CE_KIND_* or 0 */
+static u32 ce_answer;   /* how bare codes are read: a TAG_*, or 0 (they wait) */
 static u32 ce_applied;  /* runs-once cheats that ran, since the last ask */
 static u32 ce_counting, ce_counted;  /* cheat_engine_peek(): only count */
 static char ce_applied_name[CE_NAME_LENGTH];
@@ -707,14 +702,14 @@ static ce_error cb_validate(cheat_entry *c)
 }
 
 /* A new-format cheat's code text to records. */
-/* Bare 8 + 8 digit codes: GameShark or Action Replay, as the player said
-   for this file; until then they wait. */
+/* Bare 8 + 8 digit codes: read the way read_path() found for the file;
+   on the first reading they only wait. */
 static ce_error bare_pair(cheat_entry *c, const char *code)
 {
   if(!ce_answer)
     return CE_E_GAMESHARK;
   c->count = 0;
-  return gs_compile(c, code, (ce_answer == CE_KIND_AR) ? TAG_AR3 : TAG_GS1);
+  return gs_compile(c, code, ce_answer);
 }
 
 static ce_error compile_new(cheat_entry *c, const char *code)
@@ -1147,8 +1142,6 @@ static void finish_cheat(const char *name, int kind)
   c->hash = hash_text(hash_text(2166136261u, c->name, 0), code_text, 1);
   c->group = ce_group_count - 1;
   ce_groups[c->group].count++;
-  if(c->status == CE_ASK)
-    ce_groups[c->group].asks = 1;
   ce_count++;
   code_len = 0;
 }
@@ -1169,7 +1162,6 @@ static void group_begin(const char *name)
   memset(g, 0, sizeof(*g));
   snprintf(g->name, sizeof(g->name), "%s", name);
   g->first = ce_count;
-  g->file = ce_file;
 }
 
 /* "#kai: one-at-a-time" and the others: the group's rule */
@@ -1411,38 +1403,6 @@ static void on_path(char *path)
   on_path_for(ce_rom, path);
 }
 
-static void read_answers(void)
-{
-  char path[MAX_PATH], line[128];
-  FILE *f;
-
-  ce_answer_count = 0;
-  on_path(path);
-  f = fopen(path, "r");
-  if(!f)
-    return;
-  while(fgets(line, sizeof(line), f) && (ce_answer_count < CE_ANSWERS))
-  {
-    unsigned int h;
-    char kind;
-    if((sscanf(line, "K %8x %c", &h, &kind) == 2) && ((kind == 'G') || (kind == 'A')))
-    {
-      ce_answers[ce_answer_count].file = h;
-      ce_answers[ce_answer_count++].kind = (kind == 'A') ? CE_KIND_AR : CE_KIND_GS;
-    }
-  }
-  fclose(f);
-}
-
-static u32 answer_for(u32 file)
-{
-  u32 i;
-  for(i = 0; i < ce_answer_count; i++)
-    if(ce_answers[i].file == file)
-      return ce_answers[i].kind;
-  return 0;
-}
-
 static void read_on(void)
 {
   char path[MAX_PATH], line[128];
@@ -1486,17 +1446,14 @@ void cheat_engine_save(void)
   on_path(path);
   for(i = 0; i < ce_count; i++)
     any |= kept_on(i);
-  if(!any && !ce_answer_count)
+  if(!any)
   {
-    sceIoRemove(path);  /* nothing on, nothing answered: no file */
+    sceIoRemove(path);  /* nothing on: no file */
     return;
   }
   f = fopen(path, "w");
   if(!f)
     return;
-  for(i = 0; i < ce_answer_count; i++)
-    fprintf(f, "K %08X %c\n", (unsigned)ce_answers[i].file,
-     (ce_answers[i].kind == CE_KIND_AR) ? 'A' : 'G');
   for(i = 0; i < ce_count; i++)
     if(kept_on(i))
       fprintf(f, "%08X %c %s\n", (unsigned)ce[i].hash, ce[i].locked ? 'L' : 'O', ce[i].name);
@@ -1515,17 +1472,88 @@ void cheat_engine_clear(void)
 
 extern void ui_clean_name(const char *file, char *out);
 
-/* One file: a group named name (more when it has [[headers]]). */
+/* What a file's reading added, to take back for another reading */
+typedef struct
+{
+  u32 count, rec_used, patch_used, work_used, group_count;
+  cheat_group group;
+} read_mark;
+
+static void mark_set(read_mark *m)
+{
+  m->count = ce_count;
+  m->rec_used = ce_rec_used;
+  m->patch_used = ce_patch_used;
+  m->work_used = ce_work_used;
+  m->group_count = ce_group_count;
+  if(ce_group_count)
+    m->group = ce_groups[ce_group_count - 1];
+}
+
+static void mark_back(const read_mark *m)
+{
+  ce_count = m->count;
+  ce_rec_used = m->rec_used;
+  ce_patch_used = m->patch_used;
+  ce_work_used = m->work_used;
+  ce_group_count = m->group_count;
+  if(ce_group_count)
+    ce_groups[ce_group_count - 1] = m->group;
+}
+
+static u32 runs_since(const read_mark *m, u32 status)
+{
+  u32 i, n = 0;
+  for(i = m->count; i < ce_count; i++)
+    n += ce[i].status == status;
+  return n;
+}
+
+/* One file: a group named name (more when it has [[headers]]). Bare 8 + 8
+   digit codes can be GameShark or Action Replay, encrypted or already
+   decrypted, and files don't say: when the file has some, it is read again
+   each of the four ways, and kept the way most of its cheats run. Codes
+   that make sense no way can't run. */
 static int read_path(const char *path, const char *file, const char *name)
 {
+  static const u32 ways[4] = { TAG_GS1, TAG_GS1_RAW, TAG_AR3, TAG_AR3_RAW };
   FILE *f = fopen(path, "rb");
+  read_mark m;
+  u32 k, best = 0, best_runs;
 
+  (void)file;
   if(!f)
     return 0;
-  ce_file = hash_text(2166136261u, file, 0);
-  ce_answer = answer_for(ce_file);
+  ce_answer = 0;
   group_begin(name);
+  mark_set(&m);
   read_file(f);
+  if(!ce_counting && runs_since(&m, CE_ASK))
+  {
+    best_runs = runs_since(&m, CE_OK);
+    for(k = 0; k < 4; k++)
+    {
+      u32 n;
+      mark_back(&m);
+      rewind(f);
+      ce_answer = ways[k];
+      read_file(f);
+      n = runs_since(&m, CE_OK);
+      if(n > best_runs)
+      {
+        best = ways[k];
+        best_runs = n;
+      }
+    }
+    mark_back(&m);
+    rewind(f);
+    ce_answer = best;
+    read_file(f);
+    for(k = m.count; k < ce_count; k++)
+      if(ce[k].status == CE_ASK)
+        ce[k].status = CE_CANT_KIND;  /* no way made sense */
+  }
+  ce_answer = 0;
   fclose(f);
   return 1;
 }
@@ -1646,7 +1674,6 @@ void cheat_engine_load(const char *rom_name)
   if(!rom_name || !rom_name[0])
     return;
   snprintf(ce_rom, sizeof(ce_rom), "%s", rom_name);
-  read_answers();
   read_cheats_for(rom_name);
   drop_empty_groups();
   read_on();
@@ -1719,7 +1746,6 @@ const char *cheat_why(u32 i)
   {
     case CE_CANT_KIND: return "This kind of code isn't supported.";
     case CE_CANT_SAVE: return "This code would write to the game's save.";
-    case CE_ASK:       return "Answer which kind of codes these are first.";
   }
   return NULL;
 }
@@ -1799,51 +1825,6 @@ u32 cheat_group_size(u32 g)
 u32 cheat_group_of(u32 i)
 {
   return (i < ce_count) ? ce[i].group : 0;
-}
-
-u32 cheat_group_asks(u32 g)
-{
-  return (g < ce_group_count) && ce_groups[g].asks;
-}
-
-void cheat_group_answer(u32 g, u32 kind)
-{
-  char rom[MAX_FILE];
-  u32 i, file;
-
-  if((g >= ce_group_count) || ((kind != CE_KIND_GS) && (kind != CE_KIND_AR)))
-    return;
-  file = ce_groups[g].file;
-  for(i = 0; (i < ce_answer_count) && (ce_answers[i].file != file); i++)
-    ;
-  if(i == ce_answer_count)
-  {
-    if(ce_answer_count >= CE_ANSWERS)
-      return;
-    ce_answer_count++;
-  }
-  ce_answers[i].file = file;
-  ce_answers[i].kind = kind;
-  /* read everything again with the answer: the ROM goes back as it was,
-     what is on is kept by the .on file, then put back */
-  for(i = 0; i < ce_count; i++)
-    if(ce[i].on && ce[i].patches)
-      apply_patches(&ce[i], 0);
-  cheat_engine_save();
-  snprintf(rom, sizeof(rom), "%s", ce_rom);
-  {
-    /* cheats waiting for a restart keep waiting */
-    static u32 waiting[64];
-    u32 n = 0, k;
-    for(i = 0; i < ce_count; i++)
-      if(cheat_waits_restart(i) && (n < 64))
-        waiting[n++] = ce[i].hash;
-    cheat_engine_load(rom);
-    for(i = 0; i < ce_count; i++)
-      for(k = 0; k < n; k++)
-        if(ce[i].hash == waiting[k])
-          ce[i].started = 0;
-  }
 }
 
 u32 cheat_waits_restart(u32 i)

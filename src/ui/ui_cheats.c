@@ -13,8 +13,7 @@
  * one at a time has round marks (choosing one switches the one before
  * off, with Undo), runs once has Apply (it runs when the game goes on,
  * then switches itself off), needs a restart offers to restart the game.
- * □ explains a row. Bare 16-digit codes ask once per file whether they
- * are GameShark or Action Replay codes.
+ * □ explains a row.
  */
 
 #include "../common.h"
@@ -582,7 +581,7 @@ static void draw_page(void)
   ui_frame_end();
 }
 
-/* ---- the two questions -------------------------------------------------------------- */
+/* ---- the restart question ----------------------------------------------------------- */
 
 /* A dialog card with two buttons over the screen as it is: ←→ moves, ×
  * takes the selected button, ○ goes back. ok_verb: the hint for ×, or NULL
@@ -649,19 +648,6 @@ static int ask(const char *title, const char *body, const char *b0, const char *
   ui_input_init();
   c.dirty = 1;
   return result;
-}
-
-/* Bare 16-digit codes in the group's file: which kind are they? Returns 0
-   when the player went back without answering. */
-static int ask_kind(int g)
-{
-  int k = ask("Which kind of code?", "This file's 16-digit codes could be either. Check where you "
-   "got them; kai remembers your answer for this file.", "GameShark", "Action Replay",
-   UI_COL_LIME, "Back", "Choose");
-  if(k < 0)
-    return 0;
-  cheat_group_answer(g, k ? CE_KIND_AR : CE_KIND_GS);
-  return 1;
 }
 
 /* A cheat that works from the game's start was switched on. */
@@ -739,12 +725,9 @@ static void open_page(int page, int cur)
   c.dirty = 1;
 }
 
-/* × on a group row: its page, asking first when its file's bare codes
-   wait for an answer */
+/* × on a group row: its page */
 static void open_group(int g)
 {
-  if(cheat_group_asks(g) && !ask_kind(g))
-    return;  /* back on the list, its codes still waiting */
   c.list_cur = c.cur;
   open_page(g, 0);
 }
@@ -885,11 +868,7 @@ int ui_cheats(void)
   if(!c.single)
     open_page(GROUPS, 1);  /* on the first group, On now above it */
   else
-  {
     open_page(0, 0);  /* no cheats: no rows, and where the files go */
-    if(cheat_group_asks(0))
-      ask_kind(0);  /* back: its codes show as can't run */
-  }
 
   while(!c.restart)
   {
