@@ -253,125 +253,147 @@ static int mt_choice4(void)
 
 /* ---- the motifs -------------------------------------------------------------- */
 
+/* v / 2 at this size, rounded half to even: px() for the half units the
+   design uses (4.5) */
+static int px_half(int v2)
+{
+  int n = v2 * cv_size, q, r;
+
+  q = n / 128;
+  r = n % 128;
+  if((r > 64) || ((r == 64) && (q & 1)))
+    q++;
+  return q;
+}
+
+/* The 12 motifs, composed for the full square (maintainer, 2026-11-20):
+   the art fills and centres in all 64 x 64 units, with no empty band kept
+   at the bottom for a title. */
 static void motif(int name, u32 s, const u16 *col)
 {
-  int size = cv_size, half = size / 2, i;
+  int size = cv_size, c = size / 2, i;
   u16 F = col[1], M2 = col[2], D = col[3], bg = col[0];
+  int thin = (px(1) - 1 > 0) ? px(1) - 1 : 0;  /* a 1-unit line's extra rows */
 
   switch(name)
   {
-    case HORIZON:  /* a sun over a banded sea */
+    case HORIZON:  /* a sun over a banded sea, the horizon just below the middle */
     {
-      int r = px(14);
-      ellipse(half - r, px(18) - r, half + r, px(18) + r, F, 0);
-      rect(0, px(30), size, size, D);
-      for(i = 0; i < 4; i++)
-        rect(0, px(32 + i * 5), size, px(32 + i * 5), M2);
+      int r = px(15);
+      ellipse(c - r, px(22) - r, c + r, px(22) + r, F, 0);
+      rect(0, px(36), size, size, D);
+      for(i = 0; i < 5; i++)
+        rect(0, px(39 + i * 5), size, px(39 + i * 5) + thin, M2);
       break;
     }
-    case SLASH:    /* diagonal stripes behind a disc */
+    case SLASH:    /* diagonal stripes behind a centred disc */
     {
-      int w = px(10) > 4 ? px(10) : 4;
+      int w = px(10) > 4 ? px(10) : 4, r = px(15);
       for(i = -size; i < size; i += w)
       {
         int p[8] = { i, size, i + w / 2, size, i + w / 2 + size, 0, i + size, 0 };
         polygon(p, 4, M2);
       }
-      ellipse(px(20), px(10), px(44), px(34), F, 0);
+      ellipse(c - r, c - r, c + r, c + r, F, 0);
       break;
     }
-    case PEAKS:    /* two ranges of mountains */
+    case PEAKS:    /* two ranges of mountains rising to the middle of the sky */
     {
-      int a[14] = { 0, px(40), px(22), px(12), px(40), px(34), px(52), px(20),
-       size, px(36), size, size, 0, size };
-      int b[10] = { 0, px(48), px(30), px(30), size, px(46), size, size, 0, size };
+      int a[14] = { 0, px(34), px(22), px(10), px(40), px(30), px(52), px(16),
+       size, px(30), size, size, 0, size };
+      int b[10] = { 0, px(46), px(30), px(28), size, px(44), size, size, 0, size };
       polygon(a, 7, F);
       polygon(b, 5, M2);
       break;
     }
-    case TARGET:   /* rings */
+    case TARGET:   /* centred rings */
     {
-      static const int rs[3] = { 26, 18, 10 };
-      for(i = 0; i < 3; i++)
+      static const int rs[4] = { 30, 22, 14, 6 };
+      for(i = 0; i < 4; i++)
       {
         int rr = px(rs[i]);
-        ellipse(half - rr, px(26) - rr, half + rr, px(26) + rr,
-         (i % 2 == 0) ? F : bg, 0);
+        ellipse(c - rr, c - rr, c + rr, c + rr, (i % 2 == 0) ? F : bg, 0);
       }
       break;
     }
-    case SPLIT:    /* a diagonal halves the square, a small disc on the line */
+    case SPLIT:    /* a diagonal halves the square, a disc on its centre */
     {
       int p[6] = { 0, size, size, 0, size, size };
-      int r = px(7);
+      int r = px(10);
       polygon(p, 3, M2);
-      ellipse(half - r, half - r - px(6), half + r, half + r - px(6), F, 0);
+      ellipse(c - r, c - r, c + r, c + r, F, 0);
       break;
     }
-    case DOTS:     /* a halftone grid, the dots growing toward a corner */
+    case DOTS:     /* a halftone grid over the whole square, growing toward a corner */
     {
-      int step = px(8) > 4 ? px(8) : 4, x, y;
-      for(y = step / 2; y < px(50); y += step)
+      int step = px(8) > 4 ? px(8) : 4, x, y, big = px_half(9);
+      for(y = step / 2; y < size; y += step)
         for(x = step / 2; x < size; x += step)
         {
-          int r = (x + y) * px(3) / size;
+          int r = (x + y) * big / (2 * size);
           if(r < 1)
             r = 1;
           ellipse(x - r, y - r, x + r, y + r, F, 0);
         }
       break;
     }
-    case ARCS:     /* quarter circles from two corners */
+    case ARCS:     /* quarter circles from opposite corners */
     {
-      static const int r1[3] = { 44, 32, 20 }, r2[2] = { 30, 18 };
+      static const int r1[3] = { 44, 32, 20 }, r2[3] = { 36, 24, 12 };
       for(i = 0; i < 3; i++)
       {
         int rr = px(r1[i]);
         ellipse(-rr, -rr, rr, rr, (i % 2 == 0) ? F : M2, 0);
       }
-      for(i = 0; i < 2; i++)
+      for(i = 0; i < 3; i++)
       {
         int rr = px(r2[i]);
-        ellipse(size - rr, px(48) - rr, size + rr, px(48) + rr,
-         (i % 2 == 0) ? M2 : F, 0);
+        ellipse(size - rr, size - rr, size + rr, size + rr, (i % 2 == 0) ? M2 : F, 0);
       }
       break;
     }
-    case SUNSET:   /* bands narrowing toward the horizon, half a sun */
+    case SUNSET:   /* sky bands narrowing toward the horizon, half a sun on it, dark water */
     {
-      int r = px(16);
-      for(i = 0; i < 6; i++)
+      int y = 0, hz = px(42), r = px(16);
+      for(i = 0; i < 5; i++)
       {
-        int h = px(4 + i), y = px(4 + i * (8 + i / 2));
-        rect(0, y, size, y + h, (i % 2) ? M2 : F);
+        int h = px(3 + i);
+        rect(0, y + px(2), size, y + px(2) + h, (i % 2) ? M2 : F);
+        y += h + px(3);
       }
-      ellipse(half - r, px(48) - r, half + r, px(48) + r, F, 1);
+      ellipse(c - r, hz - r, c + r, hz + r, F, 1);
+      rect(0, hz, size, size, D);
+      for(i = 0; i < 3; i++)
+      {
+        int w = px(24 - i * 7), yy = hz + px(4 + i * 6);
+        rect(c - w / 2, yy, c + w / 2, yy + thin, M2);
+      }
       break;
     }
-    case ORBIT:    /* a planet with a ring and a moon */
+    case ORBIT:    /* a centred planet with a ring, a moon in the corner */
     {
-      int r = px(13), cx = half, cy = px(26), m = px(4);
+      int r = px(14), m = px(5);
       int w = px(2) > 1 ? px(2) : 1, t = px(1) > 1 ? px(1) : 1;
-      ellipse_ring(cx - px(28), cy - px(6), cx + px(28), cy + px(6), w, M2);
-      ellipse(cx - r, cy - r, cx + r, cy + r, F, 0);
-      rect(cx - px(28), cy, cx + px(28), cy + t, M2);
-      ellipse(px(50) - m, px(10) - m, px(50) + m, px(10) + m, F, 0);
+      ellipse_ring(c - px(30), c - px(7), c + px(30), c + px(7), w, M2);
+      ellipse(c - r, c - r, c + r, c + r, F, 0);
+      rect(c - px(30), c, c + px(30), c + t, M2);
+      ellipse(px(52) - m, px(12) - m, px(52) + m, px(12) + m, F, 0);
       break;
     }
-    case BLOCKS:   /* three overlapping blocks */
+    case BLOCKS:   /* three overlapping blocks, Bauhaus-style, across the square */
     {
-      int r = px(9);
-      rect(px(6), px(8), px(34), px(36), F);
-      rect(px(24), px(20), px(56), px(46), M2);
-      ellipse(px(40) - r, px(14) - r, px(40) + r, px(14) + r, F, 0);
+      int r = px(10);
+      rect(px(6), px(10), px(36), px(42), F);
+      rect(px(24), px(26), px(58), px(56), M2);
+      ellipse(px(44) - r, px(16) - r, px(44) + r, px(16) + r, F, 0);
       break;
     }
-    case ZIGZAG:   /* chevron bands */
+    case ZIGZAG:   /* chevron bands down the whole square */
     {
       int h = px(6) > 3 ? px(6) : 3, p8 = px(8), row;
       if(p8 < 1)
         p8 = 1;
-      for(row = 0; row < px(52); row += h * 2)
+      for(row = -h; row < size; row += h * 2)
       {
         int pts[2 * 64], n = 0, x;
         for(x = 0; (x < size + p8) && (n < 32); x += p8)
@@ -388,7 +410,7 @@ static void motif(int name, u32 s, const u16 *col)
           pts[n * 2 + 1] = row + h + ((q & 1) ? 0 : h);
           n++;
         }
-        polygon(pts, n, ((row / (h * 2)) % 2 == 0) ? F : M2);
+        polygon(pts, n, (((row + h) / (h * 2)) % 2 == 0) ? F : M2);
       }
       break;
     }
@@ -396,7 +418,7 @@ static void motif(int name, u32 s, const u16 *col)
     {
       int q = size / 4, x, y;
       mt_seed(s);
-      for(y = 0; y < 3; y++)
+      for(y = 0; y < 4; y++)
         for(x = 0; x < 4; x++)
         {
           int k = mt_choice4();
