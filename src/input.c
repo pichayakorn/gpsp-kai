@@ -352,6 +352,16 @@ u32 update_input()
         return ret_val;
       }
 
+#ifdef UI4
+      case BUTTON_ID_CHEATS:
+      {
+        u16 *screen_copy = copy_screen();
+        u32 ret_val = ui_pause_cheats(screen_copy);
+        free(screen_copy);
+        return ret_val;
+      }
+#endif
+
       case BUTTON_ID_LOADSTATE:
       {
         char current_savestate_filename[MAX_FILE];

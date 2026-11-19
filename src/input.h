@@ -62,7 +62,8 @@ typedef enum
   BUTTON_ID_VOLDOWN,
   BUTTON_ID_FPS,
   BUTTON_ID_NONE,
-  BUTTON_ID_PAR_SW
+  BUTTON_ID_PAR_SW,
+  BUTTON_ID_CHEATS   /* 4.0: the Cheats page straight from the game (an option) */
 } input_buttons_id_type;
 
 typedef enum

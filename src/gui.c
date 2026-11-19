@@ -897,6 +897,14 @@ static void format_menu_option(MENU_OPTION_TYPE *option, char *buffer)
 
 u32 menu(u16 *original_screen)
 {
+  // The old menu names actions up to None; a newer one (the 4.0 Cheats
+  // button) reads as None here.
+  {
+    int k;
+    for(k = 0; k < MAX_GAMEPAD_CONFIG_MAP; k++)
+      if(gamepad_config_map[k] > BUTTON_ID_NONE)
+        gamepad_config_map[k] = BUTTON_ID_NONE;
+  }
   gui_action_type gui_action;
   u32 i;
   u32 repeat = 1;

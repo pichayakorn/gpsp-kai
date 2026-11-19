@@ -1574,6 +1574,17 @@ enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_SWITCH, LE
 volatile int ui_power_locked;
 volatile int ui_woke;
 
+static int pause_cheats_only;  /* ui_pause_cheats(): the Cheats page, no pause screen */
+
+u32 ui_pause_cheats(u16 *game_picture)
+{
+  u32 r;
+  pause_cheats_only = 1;
+  r = ui_pause(game_picture);
+  pause_cheats_only = 0;
+  return r;
+}
+
 u32 ui_pause(u16 *game_picture)
 {
   u32 mark, i;
@@ -1610,16 +1621,32 @@ u32 ui_pause(u16 *game_picture)
   p.thumbs = ui_pool_alloc(SLOTS * THUMB_PITCH * SMALL_H * 2);
   p.big = ui_pool_alloc(BIG_W * BIG_H * 2);
   p.chunk = ui_pool_alloc(CHUNK_BYTES);
-  for(i = 0; i < SLOTS; i++)
-    read_slot(i);
+  if(pause_cheats_only)
+  {
+    /* straight to Cheats; ○ there goes back to the game, through the
+       same resume fade as the pause screen (maintainer, 2026-11-20) */
+    ui_status_read();
+    ui_input_init();
+    if(ui_cheats())
+      action_restart_game();  /* a cheat that needs it: Restart now */
+    leave = LEAVE_RESUME;
+  }
+  else
+  {
+    for(i = 0; i < SLOTS; i++)
+      read_slot(i);
+  }
   /* the big picture is sharp from the first frame: it loads while the game
      is still on the LCD */
-  load_big_picture_now();
-  ui_status_read();  /* while the game is still on the LCD */
-  build_layer(0);
-  ui_input_init();
-  if(ui_restart_note.pending)
-    restart_return();
+  if(!pause_cheats_only)
+  {
+    load_big_picture_now();
+    ui_status_read();  /* while the game is still on the LCD */
+    build_layer(0);
+    ui_input_init();
+    if(ui_restart_note.pending)
+      restart_return();
+  }
 #ifdef UI_PERF
   /* the script runs on the first pause only; later pauses take the pad,
      so the game can still be left with Exit */
