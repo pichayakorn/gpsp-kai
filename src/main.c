@@ -736,7 +736,11 @@ u32 update_gba()
           if(g_game_config.update_backup_flag == 1)
             update_backup();
 
+#ifdef UI4
+          cheat_engine_frame();
+#else
           process_cheats();
+#endif
 
           vcount = 0; // TODO: decide when vcount should reset to 0
 

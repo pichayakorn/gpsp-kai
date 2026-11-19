@@ -32,10 +32,11 @@ static struct
   int lock_f, lock_row;        /* the padlock that popped */
   int rest;                    /* frames the cursor has rested (the tip) */
   int toast_f;                 /* -1: none */
-  u32 undo_on;                 /* the cheats All off turned off */
   int dirty;
   int view_b;                  /* the bottom of the last whole row in view */
 } c;
+
+static u8 undo_on[CE_MAX_CHEATS];  /* the cheats All off turned off */
 
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
 {
@@ -49,7 +50,7 @@ static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
 
 static int locked(int i)
 {
-  return (g_game_config.cheat_locks >> i) & 1;
+  return cheat_is_locked(i);
 }
 
 /* a ROM fix or a master code, by its name */
@@ -58,15 +59,23 @@ static int fix_or_master(int i)
   char low[CHEAT_NAME_LENGTH];
   int k;
 
-  for(k = 0; g_game_config.cheats_flag[i].cheat_name[k] && (k < (int)sizeof(low) - 1); k++)
-    low[k] = tolower((unsigned char)g_game_config.cheats_flag[i].cheat_name[k]);
+  const char *name = cheat_name(i);
+
+  for(k = 0; name[k] && (k < (int)sizeof(low) - 1); k++)
+    low[k] = tolower((unsigned char)name[k]);
   low[k] = 0;
   return strstr(low, "fix") || strstr(low, "master");
 }
 
 static int is_on(int i)
 {
-  return g_game_config.cheats_flag[i].cheat_active == 1;
+  return cheat_is_on(i);
+}
+
+/* the engine checked it: it can be switched on */
+static int runs(int i)
+{
+  return cheat_status(i) == CE_OK;
 }
 
 static int count_on(void)
@@ -128,10 +137,25 @@ static void draw_header(void)
 static void draw_row(int i, int y, int sel)
 {
   int lift = sel ? UI_LIFT : 0, x = UI_MARGIN - lift, yy = y - lift, lx, maxw;
-  const char *name = g_game_config.cheats_flag[i].cheat_name;
+  const char *name = cheat_name(i);
   char num[16];
   int p;
 
+  if(!runs(i))
+  {
+    /* can't run: a plum-2 card, mute text and a dash for the switch
+       (selected: a mute card with plum text); the tip says why */
+    if(sel)
+      ui_round_fill(UI_MARGIN + 1, y + 1, 440, UI_ROW_H, 2, UI_COL_SHADE);
+    ui_round_fill(x, yy, 440, UI_ROW_H, 2, sel ? UI_COL_MUTE : UI_COL_PLUM_2);
+    snprintf(num, sizeof(num), "%2d", i + 1);
+    ui_print(x + 8, yy + 2, num, sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_BODY, 0);
+    ui_print_fit(x + 8 + 22, yy + 2, name, sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_BODY, 0,
+     394 - lift - (x + 8 + 22));
+    ui_print(x + 440 - 8 - ui_print_width("\xE2\x80\x94", UI_FONT_BODY, 0), yy + 2,
+     "\xE2\x80\x94", sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_BODY, 0);
+    return;
+  }
   if(sel)
     ui_round_fill(UI_MARGIN + 1, y + 1, 440, UI_ROW_H, 2, UI_COL_SHADE);
   ui_round_fill(x, yy, 440, UI_ROW_H, 2, sel ? UI_COL_LIME : UI_COL_CARD);
@@ -160,14 +184,18 @@ static void draw_hints(void)
     ui_hint_packed(h, n, 14);
     return;
   }
-  /* while the All off toast offers Undo, SELECT is Undo */
-  h[n].keys = PSP_CTRL_SELECT;
-  h[n++].verb = (c.toast_f >= 0) ? "Undo" : locked(c.cur) ? "Unlock" : "Lock";
+  /* while the All off toast offers Undo, SELECT is Undo; a cheat that
+     can't run takes neither SELECT nor × */
+  if((c.toast_f >= 0) || runs(c.cur))
+  {
+    h[n].keys = PSP_CTRL_SELECT;
+    h[n++].verb = (c.toast_f >= 0) ? "Undo" : locked(c.cur) ? "Unlock" : "Lock";
+  }
   if(any_off_able())
   {
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "All off";
   }
-  if(!locked(c.cur))  /* a locked cheat ignores confirm */
+  if(!locked(c.cur) && runs(c.cur))  /* a locked cheat ignores confirm */
   {
     h[n].keys = ui_key_confirm; h[n++].verb = "Switch";
   }
@@ -254,11 +282,14 @@ static void draw_selection(void)
   ui_cursor_frame(UI_MARGIN - UI_LIFT, ui_ease_out_back(y0, y1, c.cur_f, UI_F_CURSOR) - UI_LIFT,
    440, UI_ROW_H);
   ui_clip_reset();
-  /* the tip line: what a lock does, on a locked cheat */
-  if(locked(c.cur) && (c.rest > UI_F_TIP_DELAY))
+  /* the tip line: why a cheat can't run, or what a lock does */
+  if(c.rest > UI_F_TIP_DELAY)
   {
     int k = c.rest - UI_F_TIP_DELAY;
-    ui_tip_line("Locked cheats stay on: All off skips them. SELECT unlocks.", (k > 8) ? 8 : k);
+    if(!runs(c.cur))
+      ui_tip_line(cheat_why(c.cur), (k > 8) ? 8 : k);
+    else if(locked(c.cur))
+      ui_tip_line("Locked cheats stay on: All off skips them. SELECT unlocks.", (k > 8) ? 8 : k);
   }
 }
 
@@ -293,7 +324,7 @@ void ui_cheats(void)
   u32 mark = ui_pool_mark();
 
   memset(&c, 0, sizeof(c));
-  c.n = g_cheats_num;
+  c.n = cheat_count();
   c.cur_f = UI_F_CURSOR;
   c.top_f = UI_F_SCROLL;
   c.value_row = c.lock_row = -1;
@@ -319,17 +350,17 @@ void ui_cheats(void)
           /* Undo All off */
           int i;
           for(i = 0; i < c.n; i++)
-            if((c.undo_on >> i) & 1)
-              g_game_config.cheats_flag[i].cheat_active = 1;
+            if(undo_on[i])
+              cheat_set_on(i, 1);
           c.toast_f = -1;
         }
-        else
+        else if(runs(c.cur))
         {
           /* SELECT locks a cheat on; unlocking leaves it as it is */
-          g_game_config.cheat_locks ^= 1u << c.cur;
-          if(locked(c.cur) && !is_on(c.cur))
+          int was_on = is_on(c.cur);
+          cheat_set_locked(c.cur, !locked(c.cur));
+          if(is_on(c.cur) && !was_on)
           {
-            g_game_config.cheats_flag[c.cur].cheat_active = 1;
             c.value_row = c.cur;
             c.value_f = 0;
           }
@@ -342,24 +373,23 @@ void ui_cheats(void)
       else if(ui_pressed(PSP_CTRL_TRIANGLE) && any_off_able())
       {
         int i;
-        c.undo_on = 0;
         for(i = 0; i < c.n; i++)
-          if(is_on(i) && !locked(i))
-          {
-            g_game_config.cheats_flag[i].cheat_active = 0;
-            c.undo_on |= 1u << i;
-          }
+        {
+          undo_on[i] = is_on(i) && !locked(i);
+          if(undo_on[i])
+            cheat_set_on(i, 0);
+        }
         show_toast();
       }
-      else if(ui_pressed(ui_key_confirm) && !locked(c.cur))
+      else if(ui_pressed(ui_key_confirm) && !locked(c.cur) && runs(c.cur))
       {
-        g_game_config.cheats_flag[c.cur].cheat_active = !is_on(c.cur);
+        cheat_set_on(c.cur, !is_on(c.cur));
         /* a ROM fix or master code locks itself as it is switched on: All
            off then leaves it; kai never switches a code on by itself
            (maintainer, 2026-11-20) */
         if(is_on(c.cur) && fix_or_master(c.cur))
         {
-          g_game_config.cheat_locks |= 1u << c.cur;
+          cheat_set_locked(c.cur, 1);
           c.lock_row = c.cur;
           c.lock_f = 0;
         }
@@ -394,7 +424,7 @@ void ui_cheats(void)
     ui_frame_end();
   }
 
-  save_game_config_file();  /* the locks and switches */
+  cheat_engine_save();  /* which cheats are on and locked */
   ui_layer_reset();
   ui_pool_release(mark);
 }
