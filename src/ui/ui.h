@@ -202,6 +202,7 @@ extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
 void ui_display_name(const char *file, char *out);  /* out: 256 bytes */
 s32 ui_library_load(const char *dir, char *name);  /* with the Loading card */
 void ui_startup_hook(int current, int total);  /* kai's start-up steps */
+void ui_startup_end(void);  /* before the library: the name's 20 f */
 void ui_first_run(void);  /* the first-run cards, once (ui_first.c) */
 
 /* Settings (from the pause screen's Settings tile), opened on a tab and row
