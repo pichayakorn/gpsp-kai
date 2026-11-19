@@ -46,10 +46,22 @@
    the grid is postponed and will be reworked. Its code stays behind this
    switch; with it on, SELECT opens View & sort with a View row. */
 #define LIBRARY_GRID 0
-#define POP_FIRST_ROW (LIBRARY_GRID ? 0 : 1)
-#define POP_H  (LIBRARY_GRID ? 98 : 64)
+#define POP_FIRST_ROW (has_view_row() ? 0 : 1)
+#define POP_H  (has_view_row() ? 98 : 64)
 
-enum { VIEW_GRID, VIEW_LIST };
+/* The list in two styles (maintainer, 2026-11-20): Panel, the default, a
+   fixed panel on the left with rows that never change size; Shelf, the
+   list whose selected row opens into a card. */
+enum { VIEW_GRID, VIEW_LIST, VIEW_PANEL };
+#define VIEW_SHELF VIEW_LIST
+
+/* Panel: rows at x 184-460, 20 px on a 26 px pitch from y 42 (66 under the
+   No BIOS notice), eight in view (seven); the panel at x 20, 152 wide */
+#define PANEL_LX   184
+#define PANEL_LW   276
+#define PANEL_PX   20
+#define PANEL_PW   152
+#define PANEL_ART  124
 enum { TAB_RECENT, TAB_ALL, TAB_FAV, TAB_FOLDERS };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
@@ -83,6 +95,11 @@ static struct
   int arena_used;
 
   int view, sort;
+  int views[2];               /* All, Favourites: VIEW_PANEL or VIEW_SHELF */
+  int ptop, ptop_from, ptop_f;  /* Panel: the first row in view, sliding from px */
+  int rest_f;                 /* Shelf: frames the list has rested, d-pad up */
+  int art_game;               /* Panel: the game drawn in art (-1 none) */
+  u16 art[(PANEL_ART - 4) * (PANEL_ART - 4)];
   int cur, cur_from, cur_f;   /* selection (in view order) and its move */
   int top, off_from, top_f;   /* grid: first row in view, sliding from off_from px */
   int pos, pos_from, pos_f;   /* list: selection in 1/256, eased (list_scroll) */
@@ -989,6 +1006,171 @@ static void list_selection(void)
       ui_print(110 - shift, y + 6, t, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
       ui_clip_reset();
     }
+  }
+}
+
+/* ---- the list, Panel style (spec section 4, Panel; maintainer, 2026-11-20) ------------
+ * A fixed panel on the left shows the selected game; the rows on the right
+ * never change size, so only the cursor and the list move (list_scroll),
+ * by whole rows, keeping the cursor two rows from either edge. The panel
+ * swaps at once when the cursor lands. */
+
+static int bold_line(const char *t, int n, int w, char *out, int size);
+
+static int panel_y0(void)
+{
+  return list_banner() ? 66 : 42;  /* the No BIOS notice spans both columns at y 40 */
+}
+
+static int panel_rows(void)
+{
+  return list_banner() ? 7 : 8;
+}
+
+/* the first row in view that keeps row cur two rows from either edge */
+static int panel_top_for(int cur)
+{
+  int view = panel_rows(), top = L.ptop;
+
+  if(cur < top + 2)
+    top = cur - 2;
+  if(cur > top + view - 3)
+    top = cur - view + 3;
+  if(top > L.n - view)
+    top = L.n - view;
+  if(top < 0)
+    top = 0;
+  return top;
+}
+
+/* how far the list has slid, in px */
+static int panel_top_px(void)
+{
+  return ui_ease_out_cubic(L.ptop_from, L.ptop * UI_ROW_PITCH, L.ptop_f, UI_F_LIST_SCROLL);
+}
+
+static void panel_row(int i, int y, int sel)
+{
+  const game_t *g = &L.games[L.order[i]];
+  int l2 = sel ? UI_LIFT : 0, x = PANEL_LX - l2, yy = y - l2;
+  char size[16];
+
+  if(sel)
+    ui_round_fill(PANEL_LX + 1, y + 1, PANEL_LW, UI_ROW_H, 2, UI_COL_SHADE);
+  ui_round_fill(x, yy, PANEL_LW, UI_ROW_H, 2, sel ? UI_COL_TANGERINE : UI_COL_CARD);
+  draw_cover_any(x + 3, yy + 2, 16, g->title, 0);
+  ui_print_fit(x + 26, yy + 2, g->title, sel ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_BODY, 0,
+   PANEL_LW - 82);
+  if(g->fav)
+    draw_icon11(x + PANEL_LW - 58, yy + 4, icon_heart, sel ? UI_COL_PLUM : UI_COL_PINK, 1);
+  size_text(g->size, size, sizeof(size));
+  ui_print(x + PANEL_LW - 8 - ui_print_width(size, UI_FONT_SMALL, 0), yy + 3, size,
+   sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+}
+
+/* the panel: the art (full square, no plate) in a plum box, the name in
+   12 px bold on up to two lines, the size chip at the bottom */
+static void panel_card(void)
+{
+  const game_t *g = &L.games[L.order[L.cur]];
+  int py = panel_y0(), ph = 244 - py, art = ph - 80, ax, ny, w = PANEL_PW - 16, cw;
+  char l1[256], l2[256], chip[32], size[16];
+
+  if(art > PANEL_ART)
+    art = PANEL_ART;
+  ax = PANEL_PX + (PANEL_PW - art) / 2;
+  ui_round_fill(PANEL_PX + 3, py + 3, PANEL_PW, ph, 3, UI_COL_SHADE);
+  ui_round_fill(PANEL_PX, py, PANEL_PW, ph, 3, UI_COL_CARD);
+  ui_fill(PANEL_PX + 4, py, PANEL_PW - 8, 4, UI_COL_TANGERINE);
+  ui_fill(ax, py + 10, art, art, UI_COL_PLUM);
+  if(L.art_game != L.order[L.cur])
+  {
+    /* drawn once per game, not on every frame of a slide */
+    ui_cover_art(L.art, art - 4, art - 4, g->title);
+    L.art_game = L.order[L.cur];
+  }
+  ui_blit(L.art, art - 4, ax + 2, py + 12, art - 4, art - 4);
+  if(g->fav)
+    draw_icon11(ax + art - 16, py + 14, icon_heart, UI_COL_PINK, 1);
+  /* the name: always one size, so it never jumps as the cursor moves; a
+     name longer than two lines cuts the second with "…" */
+  ny = py + 10 + art + 8;
+  if(bold_line(g->title, 0, w, l1, sizeof(l1)))
+  {
+    ui_print(PANEL_PX + 8, ny, l1, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+    if(bold_line(g->title, 1, w, l2, sizeof(l2)))
+    {
+      if(bold_line(g->title, 2, w, l2, sizeof(l2)))
+      {
+        /* the rest of the name after the first line, cut to fit */
+        const char *rest = strstr(g->title, l1);
+        rest = rest ? rest + strlen(l1) : g->title;
+        while(*rest == ' ')
+          rest++;
+        snprintf(l2, sizeof(l2), "%s", rest);
+      }
+      ui_print_fit(PANEL_PX + 8, ny + 16, l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, w);
+    }
+  }
+  size_text(g->size, size, sizeof(size));
+  snprintf(chip, sizeof(chip), "GBA \xC2\xB7 %s", size);
+  cw = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
+  ui_round_fill(PANEL_PX + 8, py + ph - 24, cw, 16, 2, UI_COL_PLUM);
+  ui_print(PANEL_PX + 14, py + ph - 23, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
+}
+
+static void panel_ground(void)
+{
+  int i, y0 = panel_y0(), top = panel_top_px(), view = panel_rows();
+
+  if(list_banner())
+    draw_banner_at(40);
+  ui_clip_set(0, y0 - 4, UI_SCREEN_W, VIEW_B - (y0 - 4));
+  for(i = 0; i < L.n; i++)
+  {
+    int y = y0 + i * UI_ROW_PITCH - top;
+    if((y + UI_ROW_H < y0 - 4) || (y > VIEW_B))
+      continue;
+    panel_row(i, y, 0);
+  }
+  ui_clip_reset();
+  panel_card();
+  if(L.n > view)
+  {
+    int th = 196 * view / L.n, ty;
+    if(th < 12)
+      th = 12;
+    ty = (196 - th) * top / ((L.n - view) * UI_ROW_PITCH);
+    ui_round_fill(468, 42, 4, 196, 1, UI_COL_CARD);
+    ui_round_fill(468, 42 + ty, 4, th, 1, UI_COL_MUTE);
+  }
+}
+
+/* the selected row, lifted, and the cursor frame gliding to it */
+static void panel_selection(void)
+{
+  int y0 = panel_y0(), top = panel_top_px();
+
+  if(L.n == 0)
+    return;
+  ui_clip_set(0, y0 - 4, UI_SCREEN_W, VIEW_B - (y0 - 4));
+  panel_row(L.cur, y0 + L.cur * UI_ROW_PITCH - top, 1);
+  ui_cursor_frame(PANEL_LX - UI_LIFT, y0 + list_pos() * UI_ROW_PITCH / 256 - top - UI_LIFT,
+   PANEL_LW, UI_ROW_H);
+  ui_clip_reset();
+}
+
+static void panel_step(void)
+{
+  if(L.pos_f < UI_F_LIST_SCROLL)
+  {
+    L.pos_f++;
+    L.dirty = 1;
+  }
+  if(L.ptop_f < UI_F_LIST_SCROLL)
+  {
+    L.ptop_f++;
+    L.dirty = 1;
   }
 }
 
@@ -2245,6 +2427,8 @@ static int notice_in_view(void)
     return 0;
   if(L.tab_ids[L.tab] == TAB_RECENT)
     return 1;
+  if(L.view == VIEW_PANEL)
+    return list_banner();  /* it stays at the top */
   return list_banner() && (L.ys[0] - 24 + 16 > VIEW_T);
 }
 
@@ -2273,8 +2457,15 @@ static void draw_banner_at(int y)
 
 /* ---- View & sort ------------------------------------------------------------------- */
 
-static const char *view_labels[2] = { "Grid", "List" };
+static int tab_is(int id);
+static const char *view_labels[2] = { "Panel", "Shelf" };
 static const char *sort_labels[SORTS] = { "Name", "Recently played", "Size" };
+
+/* All and Favourites choose their list style; Folders keeps its own rows */
+static int has_view_row(void)
+{
+  return !tab_is(TAB_FOLDERS);
+}
 
 static int popup_y(void)
 {
@@ -2290,12 +2481,12 @@ static void draw_popup(void)
   ui_round_fill(x + 3, y + 3, POP_W, POP_H, 3, UI_COL_SHADE);
   ui_round_fill(x, y, POP_W, POP_H, 3, UI_COL_CREAM);
   ui_fill(x, y + 4, 6, POP_H - 8, UI_COL_SKY);
-  ui_print(x + 16, y + 6, LIBRARY_GRID ? "View & sort" : "Sort", UI_COL_PLUM,
+  ui_print(x + 16, y + 6, has_view_row() ? "View & sort" : "Sort", UI_COL_PLUM,
    UI_FONT_BODY, UI_TEXT_BOLD);
   for(j = POP_FIRST_ROW; j < 2; j++)
   {
     int ry = y + 32 + (j - POP_FIRST_ROW) * 34, sx = x + 16 + 64, i, n = j ? SORTS : 2;
-    int k = j ? L.sort : L.view;
+    int k = j ? L.sort : (L.view == VIEW_SHELF);
     const char **labels = j ? sort_labels : view_labels;
     if(j == L.pop_row)
       ui_round_fill(x + 10, ry - 4, POP_W - 20, 28, 2, COLOR16(21, 26, 27));
@@ -2337,6 +2528,7 @@ static void fill_order(void)
     if(!fav || L.games[i].fav)
       L.order[L.n++] = i;
   L.sort = L.sorts[fav];
+  L.view = L.views[fav];
   L.cur = 0;
   sort_games();
   L.cur = L.tab_cur[L.tab];
@@ -2413,7 +2605,7 @@ static void draw_hints(void)
   }
   else if(L.pop && !L.pop_out)
   {
-    if(LIBRARY_GRID)
+    if(has_view_row())
     {
       h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;  h[n++].verb = "Move";
     }
@@ -2445,7 +2637,7 @@ static void draw_hints(void)
     }
     if(!empty)
     {
-      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     }
     h[n].keys = PSP_CTRL_START;    h[n++].verb = "Settings";
     if(!empty)
@@ -2456,13 +2648,13 @@ static void draw_hints(void)
   }
   else if(L.n == 0)  /* Favourites, nothing hearted: nothing to play */
   {
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
   }
   else
   {
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
   }
@@ -2521,6 +2713,8 @@ static void build_ground(void)
     draw_no_favourites();
   else if(L.view == VIEW_GRID)
     grid_ground();
+  else if(L.view == VIEW_PANEL)
+    panel_ground();
   else
     list_ground();
   /* on Recent in the Recent label's line; before any game, in the All list */
@@ -2563,25 +2757,41 @@ static void select_game(int i)
   }
   else
   {
-    /* the open card closes as the move starts (from however open it is);
-       the list slides with every row slim; the new card opens later */
+    /* the open card closes as the move starts; one not yet fully open
+       goes at once (maintainer, 2026-11-20); the list slides with every
+       row slim; the new card opens later */
     if(L.open_row >= 0)
     {
-      L.close_from = list_open_p(L.open_row);
-      L.close_row = L.open_row;
-      L.close_f = 0;
+      if(L.open_f >= UI_F_LIST_OPEN)
+      {
+        L.close_from = list_open_p(L.open_row);
+        L.close_row = L.open_row;
+        L.close_f = 0;
+      }
       L.open_row = -1;
     }
     L.pos_from = list_pos();
     L.pos = i * 256;
     L.pos_f = 0;
+    L.rest_f = 0;
+    if(L.view == VIEW_PANEL)
+    {
+      int top = panel_top_for(i);
+      if(top != L.ptop)
+      {
+        L.ptop_from = panel_top_px();  /* re-targeted from where it is now */
+        L.ptop = top;
+        L.ptop_f = 0;
+      }
+    }
   }
   L.marq_f = 0;
   L.dirty = 1;
 }
 
-/* list_open: once the d-pad is up and the slide has stopped, the selected
-   row grows into the card */
+/* list_open: once the slide has stopped and the list has rested list_rest
+   with the d-pad up, the selected row grows into the card (a single tap
+   opens it about 18 f after the press; quick taps never start it) */
 static void list_step(void)
 {
   if(L.pos_f < UI_F_LIST_SCROLL)
@@ -2595,8 +2805,14 @@ static void list_step(void)
       L.close_row = -1;
     L.dirty = 1;
   }
-  if((L.open_row < 0) && (L.pos_f >= UI_F_LIST_SCROLL) &&
-   !ui_down(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  if((L.pos_f >= UI_F_LIST_SCROLL) && !ui_down(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  {
+    if(L.rest_f < UI_F_LIST_REST)
+      L.rest_f++;
+  }
+  else
+    L.rest_f = 0;
+  if((L.open_row < 0) && (L.rest_f >= UI_F_LIST_REST))
   {
     L.open_row = L.cur;
     L.open_f = 0;
@@ -2618,6 +2834,11 @@ static void view_reset(void)
   L.top_f = UI_F_SCROLL;
   L.pos = L.pos_from = L.cur * 256;
   L.pos_f = UI_F_LIST_SCROLL;
+  L.ptop = 0;
+  L.ptop = panel_top_for(L.cur);
+  L.ptop_from = L.ptop * UI_ROW_PITCH;
+  L.ptop_f = UI_F_LIST_SCROLL;
+  L.rest_f = UI_F_LIST_REST;
   L.open_row = L.cur;  /* the list opens at rest, its card open */
   L.open_f = UI_F_LIST_OPEN;
   L.close_row = -1;
@@ -2660,23 +2881,25 @@ static void popup_input(void)
     /* written when the popup closes (spec section 7) */
     /* the sort is kept per tab */
     L.sorts[tab_is(TAB_FOLDERS) ? 2 : tab_is(TAB_FAV) ? 1 : 0] = L.sort;
-    g_gpsp_config.library_view = (LIBRARY_GRID ? (L.view & 1) :
-     (g_gpsp_config.library_view & 1)) | ((L.sorts[0] & 3) << 1) |
-     ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5);
+    /* bits 7 and 8: All and Favourites in Shelf style (0: Panel) */
+    g_gpsp_config.library_view = (g_gpsp_config.library_view & 1) |
+     ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5) |
+     ((L.views[0] == VIEW_SHELF) << 7) | ((L.views[1] == VIEW_SHELF) << 8);
     save_config_file();
     return;
   }
-  if(LIBRARY_GRID && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  if(has_view_row() && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     L.pop_row ^= 1;
   if(ui_repeat(PSP_CTRL_LEFT) || ui_repeat(PSP_CTRL_RIGHT))
   {
     int d = ui_down(PSP_CTRL_LEFT) ? -1 : 1;
     if(L.pop_row == 0)
     {
-      int v = L.view + d;
-      if((v >= 0) && (v < 2))
+      int k = (L.view == VIEW_SHELF) + d;
+      if((k >= 0) && (k < 2))
       {
-        L.view = v;
+        L.view = k ? VIEW_SHELF : VIEW_PANEL;
+        L.views[tab_is(TAB_FAV)] = L.view;
         view_reset();
         L.pop_flash = 0;
       }
@@ -2786,7 +3009,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
   memset(&L, 0, sizeof(L));
   L.played_game = -1;
-  L.view = LIBRARY_GRID ? (g_gpsp_config.library_view & 1) : VIEW_LIST;
+  L.views[0] = ((g_gpsp_config.library_view >> 7) & 1) ? VIEW_SHELF : VIEW_PANEL;
+  L.views[1] = ((g_gpsp_config.library_view >> 8) & 1) ? VIEW_SHELF : VIEW_PANEL;
+  L.view = L.views[0];
+  L.art_game = -1;
   L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
   L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;  /* Favourites */
   L.sorts[2] = (g_gpsp_config.library_view >> 5) & 3;  /* Folders */
@@ -2966,6 +3192,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     if(L.top_f < UI_F_SCROLL) { L.top_f++; L.dirty = 1; }
     if(L.view == VIEW_LIST)
       list_step();
+    else if(L.view == VIEW_PANEL)
+      panel_step();
     if(L.cur_f < UI_F_CURSOR) L.cur_f++;
     L.marq_f++;
     if(L.dirty)
@@ -3001,6 +3229,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         fold_selection();
       else if(L.view == VIEW_GRID)
         grid_selection();
+      else if(L.view == VIEW_PANEL)
+        panel_selection();
       else
         list_selection();
     }
