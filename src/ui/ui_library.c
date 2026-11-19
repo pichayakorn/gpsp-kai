@@ -395,6 +395,14 @@ static void tell_apart(void)
 /* The game started from the library and the name it showed there */
 static char launched_file[MAX_FILE], launched_title[256];
 
+/* A file's name cleaned up as the library does, without telling same-named
+   games apart (the cheat engine finds a game's cheats by it). */
+void ui_clean_name(const char *file, char *out)
+{
+  const char *dot = strrchr(file, '.');
+  clean_name(file, dot ? dot - file : (int)strlen(file), out);
+}
+
 /* The name the library shows for a file (for the pause screen's chip). */
 void ui_display_name(const char *file, char *out)
 {
