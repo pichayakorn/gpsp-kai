@@ -166,27 +166,6 @@ void add_cheats(char *cheats_filename)
 
     fclose(cheats_file);
   }
-
-  /* The first time a game's cheats load, ROM fixes and master codes are
-     locked on: All off then skips them (spec section 4, Cheats). */
-  if(!g_game_config.cheat_locks_set && g_cheats_num)
-  {
-    u32 i;
-    for(i = 0; i < g_cheats_num; i++)
-    {
-      char low[CHEAT_NAME_LENGTH];
-      u32 k;
-      for(k = 0; g_game_config.cheats_flag[i].cheat_name[k] && (k < sizeof(low) - 1); k++)
-        low[k] = tolower((unsigned char)g_game_config.cheats_flag[i].cheat_name[k]);
-      low[k] = 0;
-      if(strstr(low, "fix") || strstr(low, "master"))
-      {
-        g_game_config.cheat_locks |= 1u << i;
-        g_game_config.cheats_flag[i].cheat_active = 1;
-      }
-    }
-    g_game_config.cheat_locks_set = YES;
-  }
 }
 
 static void process_cheat_gs1(cheat_t *cheat)

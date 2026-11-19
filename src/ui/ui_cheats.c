@@ -3,8 +3,8 @@
  * The pause screen's Cheats tile: the game's cheats from its .cht file as
  * one scrolling list of switches. × switches a cheat, △ turns every
  * unlocked one off (with Undo), SELECT locks a cheat on: All off skips it
- * and it turns off only after unlocking (ROM fixes, master codes). Locks
- * are kept per game in its .cfg. With no .cht file the page says where to
+ * and it turns off only after unlocking (ROM fixes, master codes; those
+ * lock themselves when switched on). Locks are kept per game in its .cfg. With no .cht file the page says where to
  * put one.
  */
 
@@ -50,6 +50,18 @@ static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
 static int locked(int i)
 {
   return (g_game_config.cheat_locks >> i) & 1;
+}
+
+/* a ROM fix or a master code, by its name */
+static int fix_or_master(int i)
+{
+  char low[CHEAT_NAME_LENGTH];
+  int k;
+
+  for(k = 0; g_game_config.cheats_flag[i].cheat_name[k] && (k < (int)sizeof(low) - 1); k++)
+    low[k] = tolower((unsigned char)g_game_config.cheats_flag[i].cheat_name[k]);
+  low[k] = 0;
+  return strstr(low, "fix") || strstr(low, "master");
 }
 
 static int is_on(int i)
@@ -342,6 +354,15 @@ void ui_cheats(void)
       else if(ui_pressed(ui_key_confirm) && !locked(c.cur))
       {
         g_game_config.cheats_flag[c.cur].cheat_active = !is_on(c.cur);
+        /* a ROM fix or master code locks itself as it is switched on: All
+           off then leaves it; kai never switches a code on by itself
+           (maintainer, 2026-11-20) */
+        if(is_on(c.cur) && fix_or_master(c.cur))
+        {
+          g_game_config.cheat_locks |= 1u << c.cur;
+          c.lock_row = c.cur;
+          c.lock_f = 0;
+        }
         c.value_row = c.cur;
         c.value_f = 0;
         c.dirty = 1;
