@@ -235,6 +235,9 @@ static void scan_dir(const char *path, int depth, int parent)
     {
       game_t *g = &L.games[L.count];
       const char *dot = strrchr(e.d_name, '.');
+      /* the pool isn't cleared: every field starts known (a stray byte in
+         fav made every game a favourite that △ couldn't clear) */
+      memset(g, 0, sizeof(*g));
       g->name = arena_str(e.d_name, strlen(e.d_name));
       g->title = g->name ? display_name(e.d_name, dot - e.d_name) : NULL;
       if(g->title == NULL)
