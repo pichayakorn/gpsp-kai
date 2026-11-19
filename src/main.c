@@ -468,6 +468,7 @@ int main(int argc, char *argv[])
   show_progress(msg[MSG_INIT_END]);
 #ifdef UI4
   progress_hook = NULL;
+  ui_startup_end();
 #endif
 
 #ifdef UI4

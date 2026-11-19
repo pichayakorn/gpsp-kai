@@ -3244,37 +3244,71 @@ u32 ui_library_switch(void)
   return 0;
 }
 
-/* ---- start-up (spec section 4, Start-up; r4 startup) --------------------------------------
+/* ---- start-up (spec section 4, Start-up; r4 startup, a9db06f) --------------------------
  * While kai starts (about a second), its start-up steps call this instead
- * of drawing the old dialog: the plum ground from the first step; once the
- * 4.0 fonts are in, "gpSP kai" at 2x and the version under it; past 30 f,
- * the Loading card's three dots under them (squares, no font needed). The
- * library then cuts in. */
-void ui_startup_hook(int current, int total)
+ * of drawing the old dialog: the plum ground from the first step. No fixed
+ * wait: ready within 20 f, the library follows the ground straight away and
+ * the name is never drawn (no flash). Past 20 f, once the 4.0 fonts are in,
+ * "gpSP kai" at 2x and the version under it, kept at least 20 f once shown
+ * (ui_startup_end) so they never blink; past 30 f, the Loading card's three
+ * dots under them (squares, no font needed). The library then cuts in. */
+#define STARTUP_NAME_AFTER  20
+#define STARTUP_NAME_HOLD   20
+#define STARTUP_DOTS_AFTER  30
+
+static u32 startup_t0, startup_name_at;  /* name_at: its first frame + 1 */
+
+static u32 startup_frames(void)
 {
-  static u32 t0 = 0;
-  u32 now = sceKernelGetSystemTimeLow(), f;
+  return (sceKernelGetSystemTimeLow() - startup_t0) / 16667;
+}
+
+static void startup_draw(void)
+{
+  u32 f = startup_frames();
   char ver[16];
   int i;
 
-  (void)total;
-  if((current == 0) && (t0 == 0))
-    t0 = now ? now : 1;
-  f = (now - t0) / 16667;  /* frames since the first */
   ui_frame_begin();
   ui_ground();
-  if(ui_font_loaded())
+  if((f >= STARTUP_NAME_AFTER) && ui_font_loaded())
   {
     static const char name[] = "gpSP kai";
+    if(startup_name_at == 0)
+      startup_name_at = f + 1;
     snprintf(ver, sizeof(ver), "%d.%d", VERSION_MAJOR, VERSION_MINOR);
     ui_print(240 - ui_print_width(name, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) / 2, 104,
      name, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
     ui_print(240 - ui_print_width(ver, UI_FONT_SMALL, 0) / 2, 140, ver, UI_COL_MUTE,
      UI_FONT_SMALL, 0);
   }
-  if(f >= 30)
+  if(f >= STARTUP_DOTS_AFTER)
     for(i = 0; i < 3; i++)
       ui_fill(230 + i * 8, 168 - ((i == (f / UI_F_LOADING) % 3) ? 3 : 0), 4, 4,
        UI_COL_TANGERINE);
   ui_frame_end_now();
+}
+
+void ui_startup_hook(int current, int total)
+{
+  (void)total;
+  if((current == 0) && (startup_t0 == 0))
+  {
+    startup_t0 = sceKernelGetSystemTimeLow();
+    if(startup_t0 == 0)
+      startup_t0 = 1;
+  }
+  startup_draw();
+}
+
+/* Start-up is over: once the name has shown, it stays its 20 frames. */
+void ui_startup_end(void)
+{
+  if(startup_t0 == 0)
+    return;
+  while(startup_name_at && (startup_frames() + 1 < startup_name_at + STARTUP_NAME_HOLD))
+  {
+    sceDisplayWaitVblankStart();
+    startup_draw();
+  }
 }
