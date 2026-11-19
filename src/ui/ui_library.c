@@ -25,11 +25,11 @@
    y 40 + 70 k (three in view; the third ends at 244, clear of the hints) */
 #define COVER      64
 #define GRID_X     20
-#define GRID_Y     40
+#define GRID_Y     grid_y0()
 #define GRID_PX    94
 #define GRID_PY    70
 #define GRID_COLS  5
-#define GRID_ROWS  3
+#define GRID_ROWS  grid_view_rows()
 #define VIEW_T     38   /* the list area, under the header */
 #define VIEW_B     248  /* the hint strip */
 
@@ -43,16 +43,13 @@
 #define POP_X  20
 #define POP_Y  128
 #define POP_W  300
-/* The first release ships the list view only (maintainer, 2026-11-19):
-   the grid is postponed and will be reworked. Its code stays behind this
-   switch; with it on, SELECT opens View & sort with a View row. */
-#define LIBRARY_GRID 0
 #define POP_FIRST_ROW (has_view_row() ? 0 : 1)
 #define POP_H  (has_view_row() ? 98 : 64)
 
-/* The list in two styles (maintainer, 2026-11-20): Panel, the default, a
-   fixed panel on the left with rows that never change size; Shelf, the
-   list whose selected row opens into a card. */
+/* Three styles for All and Favourites (View & sort): Panel, the default,
+   a fixed panel on the left with rows that never change size; Shelf, the
+   list whose selected row opens into a card (maintainer, 2026-11-20);
+   Grid, the covers five across (back, maintainer, 2026-11-19). */
 enum { VIEW_GRID, VIEW_LIST, VIEW_PANEL };
 #define VIEW_SHELF VIEW_LIST
 
@@ -103,7 +100,7 @@ static struct
   int arena_used;
 
   int view, sort;
-  int views[2];               /* All, Favourites: VIEW_PANEL or VIEW_SHELF */
+  int views[2];               /* All, Favourites: VIEW_PANEL, VIEW_SHELF or VIEW_GRID */
   int ptop, ptop_from, ptop_f;  /* Panel: the first row in view, sliding from px */
   int rest_f;                 /* Shelf: frames the list has rested, d-pad up */
   int art_game;               /* Panel: the game drawn in art (-1 none) */
@@ -484,7 +481,7 @@ static void covers_init(void)
   L.cover_count = 0;
   for(i = 0; i < ICON_CACHE; i++)
     L.icons[i].game = -1;
-  for(i = 0; i < (LIBRARY_GRID ? MAX_COVERS : 8); i++)
+  for(i = 0; i < MAX_COVERS; i++)
   {
     /* only what the pool can spare, keeping room for the game card; with
        none, covers are drawn each time */
@@ -868,6 +865,18 @@ static void grid_marquee(int x, int y, int game)
 
 /* ---- the grid --------------------------------------------------------------------- */
 
+/* the first row's top: under the No BIOS notice before the first game */
+static int grid_y0(void)
+{
+  return list_banner() ? 64 : 40;
+}
+
+/* whole rows in view: three, two under the notice */
+static int grid_view_rows(void)
+{
+  return list_banner() ? 2 : 3;
+}
+
 static int grid_rows(void)
 {
   return (L.n + GRID_COLS - 1) / GRID_COLS;
@@ -888,9 +897,9 @@ static void grid_item_xy(int i, int off, int *x, int *y)
    its art only, never half a name plate. */
 static void grid_cover(int i, int x, int y)
 {
-  int bottom = (y + COVER < VIEW_B) ? y + COVER : VIEW_B;
+  int bottom = (y + COVER < VIEW_B) ? y + COVER : VIEW_B, top = GRID_Y - 2;
 
-  ui_clip_set(0, VIEW_T, UI_SCREEN_W, bottom - VIEW_T);
+  ui_clip_set(0, top, UI_SCREEN_W, bottom - top);
   if(y + COVER > VIEW_B)
     /* cut by the strip: its art only, never half a name plate */
     if(L.games[L.order[i]].art != ART_NONE)
@@ -899,6 +908,7 @@ static void grid_cover(int i, int x, int y)
       draw_cover_any(x, y, COVER, L.games[L.order[i]].title, 0);
   else
     draw_cover(x, y, L.order[i]);
+  cover_heart(x, y, L.order[i]);
   ui_clip_reset();
 }
 
@@ -906,11 +916,13 @@ static void grid_ground(void)
 {
   int i, off = grid_off(), rows = grid_rows();
 
+  if(list_banner())
+    draw_banner_at(40);
   for(i = 0; i < L.n; i++)
   {
     int x, y;
     grid_item_xy(i, off, &x, &y);
-    if((y + COVER <= VIEW_T) || (y >= VIEW_B))
+    if((y + COVER <= GRID_Y - 2) || (y >= VIEW_B))
       continue;
     grid_cover(i, x, y);
   }
@@ -933,11 +945,12 @@ static void grid_selection(void)
   if(L.n == 0)
     return;
   grid_item_xy(L.cur, off, &x, &y);
-  if((y >= VIEW_T) && (y + COVER <= VIEW_B))
+  if((y >= GRID_Y - 2) && (y + COVER <= VIEW_B))
   {
-    ui_clip_set(0, VIEW_T, UI_SCREEN_W, VIEW_B - VIEW_T);
+    ui_clip_set(0, GRID_Y - 4, UI_SCREEN_W, VIEW_B - (GRID_Y - 4));
     ui_fill(x + 1, y + 1, COVER, COVER, UI_COL_SHADE);
     draw_cover(x - UI_LIFT, y - UI_LIFT, L.order[L.cur]);
+    cover_heart(x - UI_LIFT, y - UI_LIFT, L.order[L.cur]);
     ui_clip_reset();
     if(L.top_f >= UI_F_SCROLL)
       grid_marquee(x - UI_LIFT, y - UI_LIFT, L.order[L.cur]);
@@ -2655,7 +2668,7 @@ static int notice_in_view(void)
     return 0;
   if(L.tab_ids[L.tab] == TAB_RECENT)
     return 1;
-  if(L.view == VIEW_PANEL)
+  if((L.view == VIEW_PANEL) || (L.view == VIEW_GRID))
     return list_banner();  /* it stays at the top */
   return list_banner() && (L.ys[0] - 24 + 16 > VIEW_T);
 }
@@ -2686,7 +2699,13 @@ static void draw_banner_at(int y)
 /* ---- View & sort ------------------------------------------------------------------- */
 
 static int tab_is(int id);
-static const char *view_labels[2] = { "Panel", "Shelf" };
+static const char *view_labels[3] = { "Panel", "Shelf", "Grid" };
+static const int view_ids[3] = { VIEW_PANEL, VIEW_SHELF, VIEW_GRID };
+
+static int view_index(int view)
+{
+  return (view == VIEW_SHELF) ? 1 : (view == VIEW_GRID) ? 2 : 0;
+}
 static const char *sort_labels[SORTS] = { "Name", "Recently played", "Size" };
 
 /* All and Favourites choose their list style; Folders keeps its own rows */
@@ -2713,8 +2732,8 @@ static void draw_popup(void)
    UI_FONT_BODY, UI_TEXT_BOLD);
   for(j = POP_FIRST_ROW; j < 2; j++)
   {
-    int ry = y + 32 + (j - POP_FIRST_ROW) * 34, sx = x + 16 + 64, i, n = j ? SORTS : 2;
-    int k = j ? L.sort : (L.view == VIEW_SHELF);
+    int ry = y + 32 + (j - POP_FIRST_ROW) * 34, sx = x + 16 + 64, i, n = j ? SORTS : 3;
+    int k = j ? L.sort : view_index(L.view);
     const char **labels = j ? sort_labels : view_labels;
     if(j == L.pop_row)
       ui_round_fill(x + 10, ry - 4, POP_W - 20, 28, 2, COLOR16(21, 26, 27));
@@ -3109,10 +3128,11 @@ static void popup_input(void)
     /* written when the popup closes (spec section 7) */
     /* the sort is kept per tab */
     L.sorts[tab_is(TAB_FOLDERS) ? 2 : tab_is(TAB_FAV) ? 1 : 0] = L.sort;
-    /* bits 7 and 8: All and Favourites in Shelf style (0: Panel) */
+    /* bits 7-8 and 9-10: the views of All and Favourites (0 Panel,
+       1 Shelf, 2 Grid) */
     g_gpsp_config.library_view = (g_gpsp_config.library_view & 1) |
      ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5) |
-     ((L.views[0] == VIEW_SHELF) << 7) | ((L.views[1] == VIEW_SHELF) << 8);
+     (view_index(L.views[0]) << 7) | (view_index(L.views[1]) << 9);
     save_config_file();
     return;
   }
@@ -3123,10 +3143,10 @@ static void popup_input(void)
     int d = ui_down(PSP_CTRL_LEFT) ? -1 : 1;
     if(L.pop_row == 0)
     {
-      int k = (L.view == VIEW_SHELF) + d;
-      if((k >= 0) && (k < 2))
+      int k = view_index(L.view) + d;
+      if((k >= 0) && (k < 3))
       {
-        L.view = k ? VIEW_SHELF : VIEW_PANEL;
+        L.view = view_ids[k];
         L.views[tab_is(TAB_FAV)] = L.view;
         view_reset();
         L.pop_flash = 0;
@@ -3237,8 +3257,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
   memset(&L, 0, sizeof(L));
   L.played_game = -1;
-  L.views[0] = ((g_gpsp_config.library_view >> 7) & 1) ? VIEW_SHELF : VIEW_PANEL;
-  L.views[1] = ((g_gpsp_config.library_view >> 8) & 1) ? VIEW_SHELF : VIEW_PANEL;
+  L.views[0] = view_ids[((g_gpsp_config.library_view >> 7) & 3) % 3];
+  L.views[1] = view_ids[((g_gpsp_config.library_view >> 9) & 3) % 3];
   L.view = L.views[0];
   L.art_game = -1;
   L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
