@@ -73,7 +73,14 @@ typedef struct
   u16 dir;            /* index into dirs */
   s16 recent;         /* place in recent.txt, -1: not there */
   u8 fav;             /* hearted: on Favourites */
+  u8 art;             /* its box art: ART_NONE, or which name it is under */
 } game_t;
+
+/* Box art (#71): GBA/ART/<game>.art beside the ROM folder, <game> the ROM's
+   file name without its extension, else the library's cleaned name */
+enum { ART_NONE, ART_BY_FILE, ART_BY_NAME };
+#define ART_SLOTS  2048    /* the art folder's names, hashed, while it is read */
+#define ICON_CACHE 32      /* 16 px icons kept from box art */
 
 typedef struct
 {
@@ -150,6 +157,7 @@ static struct
 
   cover_t covers[MAX_COVERS];
   int cover_count;
+  struct { int game; u32 used; u16 px[16 * 16]; } icons[ICON_CACHE];
 } L;
 
 /* ---- the game list ------------------------------------------------------------ */
@@ -169,6 +177,8 @@ static char *arena_str(const char *s, int n)
 
 static const char *display_name(const char *name, int n);
 static void tell_apart(void);
+static void find_art(void);
+static int art_read(int game, int size, u16 *out);
 static const u16 icon_heart[11];
 static const u16 icon_folder[11];
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
@@ -507,6 +517,7 @@ static int load_games(void)
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0, -1);
   tell_apart();
+  find_art();
   /* every folder's games, its subfolders' included */
   memset(L.dir_games, 0, sizeof(L.dir_games));
   for(i = 0; i < L.count; i++)
@@ -535,6 +546,8 @@ static void covers_init(void)
   int i;
 
   L.cover_count = 0;
+  for(i = 0; i < ICON_CACHE; i++)
+    L.icons[i].game = -1;
   for(i = 0; i < (LIBRARY_GRID ? MAX_COVERS : 8); i++)
   {
     /* only what the pool can spare, keeping room for the game card; with
@@ -640,20 +653,242 @@ static void draw_cover(int x, int y, int game)
   }
   if(L.cover_count == 0)
   {
-    draw_cover_any(x, y, COVER, L.games[game].title, 1);
+    static u16 px[COVER * COVER];
+    if(art_read(game, COVER, px))
+      ui_blit(px, COVER, x, y, COVER, COVER);
+    else
+      draw_cover_any(x, y, COVER, L.games[game].title, 1);
     return;
   }
   c = &L.covers[(free_i >= 0) ? free_i : old_i];
   c->game = game;
   c->used = L.frame;
-  ui_cover_art(c->px, COVER, COVER, L.games[game].title);
-  /* the plate goes into the cached picture too */
-  if(ui_target_begin(c->px, COVER, COVER, COVER))
+  if(!art_read(game, COVER, c->px))
   {
-    cover_plate(0, 0, COVER, L.games[game].title);
-    ui_target_end();
+    ui_cover_art(c->px, COVER, COVER, L.games[game].title);
+    /* the plate goes into the cached picture too (box art has none) */
+    if(ui_target_begin(c->px, COVER, COVER, COVER))
+    {
+      cover_plate(0, 0, COVER, L.games[game].title);
+      ui_target_end();
+    }
   }
   ui_blit(c->px, COVER, x, y, COVER, COVER);
+}
+
+/* ---- box art (#71; the .art file of gpsp-kai-tools' docs/art-format.md) ---------------
+ * "KART", version 1, the number of pictures, 2 bytes 0; then per picture
+ * its width, height and 2 bytes 0; then the pictures, rows top to bottom,
+ * as kai's 16-bit colours. Made on a computer, so kai only copies pixels:
+ * no image decoder. A size the file lacks is shrunk from the next larger
+ * picture; a file that doesn't read right means the preset cover. Box art
+ * replaces the whole cover, with no name plate. */
+
+/* GBA/ART beside the ROM folder */
+static void art_dir(char *out, int size)
+{
+  char *slash;
+
+  snprintf(out, size, "%s", g_default_rom_dir);
+  while((strlen(out) > 1) && (out[strlen(out) - 1] == '/'))
+    out[strlen(out) - 1] = 0;
+  slash = strrchr(out, '/');
+  if(slash)
+    *slash = 0;
+  snprintf(out + strlen(out), size - strlen(out), "/ART");
+}
+
+static u32 name_hash(const char *s, int n)
+{
+  u32 h = 2166136261u;
+  int i;
+
+  for(i = 0; i < n; i++)
+    h = (h ^ (u8)tolower((unsigned char)s[i])) * 16777619u;
+  return h ? h : 1;
+}
+
+static int hash_has(const u32 *tab, u32 h)
+{
+  u32 k = h & (ART_SLOTS - 1);
+
+  while(tab[k])
+  {
+    if(tab[k] == h)
+      return 1;
+    k = (k + 1) & (ART_SLOTS - 1);
+  }
+  return 0;
+}
+
+/* which games have art: the folder is listed once, so drawing a row never
+   asks the Memory Stick */
+static void find_art(void)
+{
+  u32 mark = ui_pool_mark(), *tab = ui_pool_alloc(ART_SLOTS * 4), used = 0;
+  char dir[MAX_PATH], clean[256];
+  SceIoDirent e;
+  SceUID d;
+  int i;
+
+  if(tab == NULL)
+    return;
+  memset(tab, 0, ART_SLOTS * 4);
+  art_dir(dir, sizeof(dir));
+  d = sceIoDopen(dir);
+  if(d < 0)
+  {
+    ui_pool_release(mark);
+    return;
+  }
+  memset(&e, 0, sizeof(e));
+  while((sceIoDread(d, &e) > 0) && (used < ART_SLOTS / 2))
+  {
+    const char *dot = strrchr(e.d_name, '.');
+    if(dot && !strcasecmp(dot, ".art") && !FIO_S_ISDIR(e.d_stat.st_mode))
+    {
+      u32 h = name_hash(e.d_name, dot - e.d_name), k = h & (ART_SLOTS - 1);
+      while(tab[k] && (tab[k] != h))
+        k = (k + 1) & (ART_SLOTS - 1);
+      if(!tab[k])
+        used++;
+      tab[k] = h;
+    }
+    memset(&e, 0, sizeof(e));
+  }
+  sceIoDclose(d);
+  for(i = 0; i < L.count; i++)
+  {
+    game_t *g = &L.games[i];
+    const char *dot = strrchr(g->name, '.');
+    g->art = ART_NONE;
+    if(hash_has(tab, name_hash(g->name, dot ? dot - g->name : (int)strlen(g->name))))
+      g->art = ART_BY_FILE;
+    else
+    {
+      ui_clean_name(g->name, clean);
+      if(hash_has(tab, name_hash(clean, strlen(clean))))
+        g->art = ART_BY_NAME;
+    }
+  }
+  ui_pool_release(mark);
+}
+
+/* game's art at size x size into out; 0 when it has none that reads */
+static int art_read(int game, int size, u16 *out)
+{
+  static u16 big[128 * 128];
+  game_t *g = &L.games[game];
+  char path[MAX_PATH], name[256], *dot;
+  u8 head[8], list[8 * 4];
+  u32 off, best_at = 0;
+  int count, i, best = 0;
+  FILE *f;
+
+  if(g->art == ART_NONE)
+    return 0;
+  if(g->art == ART_BY_FILE)
+  {
+    snprintf(name, sizeof(name), "%s", g->name);
+    dot = strrchr(name, '.');
+    if(dot)
+      *dot = 0;
+  }
+  else
+    ui_clean_name(g->name, name);
+  art_dir(path, sizeof(path));
+  snprintf(path + strlen(path), sizeof(path) - strlen(path), "/%s.art", name);
+  f = fopen(path, "rb");
+  if(f == NULL)
+    goto none;
+  if((fread(head, 1, 8, f) != 8) || memcmp(head, "KART", 4) || (head[4] != 1) ||
+   (head[5] < 1) || (head[5] > 8))
+    goto bad;
+  count = head[5];
+  if(fread(list, 4, count, f) != (size_t)count)
+    goto bad;
+  /* the exact size, else the smallest larger one to shrink */
+  off = 8 + count * 4;
+  for(i = 0; i < count; i++)
+  {
+    int w = list[i * 4], h = list[i * 4 + 1];
+    if((w == h) && (w >= size) && (w <= 128) && (!best || (w < best)))
+    {
+      best = w;
+      best_at = off;
+    }
+    off += w * h * 2;
+  }
+  if(!best || fseek(f, best_at, SEEK_SET))
+    goto bad;
+  if(best == size)
+  {
+    if(fread(out, 2, size * size, f) != (size_t)(size * size))
+      goto bad;
+  }
+  else
+  {
+    if(fread(big, 2, best * best, f) != (size_t)(best * best))
+      goto bad;
+    ui_shrink_box(big, best, best, out, size, size);
+  }
+  fclose(f);
+  return 1;
+bad:
+  fclose(f);
+none:
+  g->art = ART_NONE;  /* the preset cover from now on */
+  return 0;
+}
+
+/* A game's cover at size x size: its box art when it has some, else the
+   preset (with its name plate when plate is set and the size has one) */
+static void game_cover(int game, int x, int y, int size, int plate)
+{
+  static int last_game = -1, last_size;
+  static u16 last[128 * 128];
+  int i, old = 0;
+
+  if(L.games[game].art != ART_NONE)
+  {
+    if(size == 16)
+    {
+      for(i = 0; i < ICON_CACHE; i++)
+      {
+        if(L.icons[i].game == game)
+        {
+          L.icons[i].used = L.frame;
+          ui_blit(L.icons[i].px, 16, x, y, 16, 16);
+          return;
+        }
+        if(L.icons[i].used < L.icons[old].used)
+          old = i;
+      }
+      if(art_read(game, 16, L.icons[old].px))
+      {
+        L.icons[old].game = game;
+        L.icons[old].used = L.frame;
+        ui_blit(L.icons[old].px, 16, x, y, 16, 16);
+        return;
+      }
+    }
+    else if(size == COVER)
+    {
+      draw_cover(x, y, game);
+      return;
+    }
+    else if(size <= 128)
+    {
+      if(((last_game == game) && (last_size == size)) || art_read(game, size, last))
+      {
+        last_game = game;
+        last_size = size;
+        ui_blit(last, size, x, y, size, size);
+        return;
+      }
+    }
+  }
+  draw_cover_any(x, y, size, L.games[game].title, plate);
 }
 
 /* ---- the marquee ---------------------------------------------------------------------
@@ -718,7 +953,11 @@ static void grid_cover(int i, int x, int y)
 
   ui_clip_set(0, VIEW_T, UI_SCREEN_W, bottom - VIEW_T);
   if(y + COVER > VIEW_B)
-    draw_cover_any(x, y, COVER, L.games[L.order[i]].title, 0);
+    /* cut by the strip: its art only, never half a name plate */
+    if(L.games[L.order[i]].art != ART_NONE)
+      draw_cover(x, y, L.order[i]);
+    else
+      draw_cover_any(x, y, COVER, L.games[L.order[i]].title, 0);
   else
     draw_cover(x, y, L.order[i]);
   ui_clip_reset();
@@ -904,7 +1143,7 @@ static void list_slim_contents(const game_t *g, int y, int lift, int on_card)
 {
   char size[16];
 
-  draw_cover_any(23 - lift, y + 3 - lift, 16, g->title, 0);
+  game_cover(g - L.games, 23 - lift, y + 3 - lift, 16, 0);
   ui_print_fit(46 - lift, y + 3 - lift, g->title, on_card ? UI_COL_PLUM : UI_COL_CREAM,
    UI_FONT_BODY, on_card ? UI_TEXT_BOLD : 0, 330);
   if(g->fav)
@@ -932,7 +1171,7 @@ static void list_card(int i, int y, int o)
   /* open: the full art (no plate, the name is beside it), 76 px in the
      80 px plum box, 2 px of tangerine round the box */
   ui_fill(20, y, 80, 80, UI_COL_PLUM);
-  draw_cover_any(22, y + 2, 76, g->title, 0);
+  game_cover(L.order[i], 22, y + 2, 76, 0);
   ui_print_fit(110, y + 6, g->title, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD, 330);
   played_text(game_played(L.order[i]), played, sizeof(played));
   ui_print(110, y + 26, played, UI_COL_PLUM, UI_FONT_SMALL, 0);
@@ -1097,7 +1336,7 @@ static void panel_row(int i, int y, int sel)
   if(sel)
     ui_round_fill(PANEL_LX + 1, y + 1, PANEL_LW, UI_ROW_H, 2, UI_COL_SHADE);
   ui_round_fill(x, yy, PANEL_LW, UI_ROW_H, 2, sel ? UI_COL_TANGERINE : UI_COL_CARD);
-  draw_cover_any(x + 3, yy + 2, 16, g->title, 0);
+  game_cover(g - L.games, x + 3, yy + 2, 16, 0);
   ui_print_fit(x + 26, yy + 2, g->title, sel ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_BODY, 0,
    PANEL_LW - 82);
   if(g->fav)
@@ -1126,7 +1365,8 @@ static void panel_card(void)
   if(L.art_game != L.order[L.cur])
   {
     /* drawn once per game, not on every frame of a slide */
-    ui_cover_art(L.art, art - 4, art - 4, g->title);
+    if(!art_read(L.order[L.cur], art - 4, L.art))
+      ui_cover_art(L.art, art - 4, art - 4, g->title);
     L.art_game = L.order[L.cur];
   }
   ui_blit(L.art, art - 4, ax + 2, py + 12, art - 4, art - 4);
@@ -1538,7 +1778,7 @@ static void draw_continue(int hero)
   if(L.pic_ok)
     ui_blit(L.pic, PIC_W, x + 4, y + 4, PIC_W, PIC_H);
   else  /* nothing saved yet: its cover */
-    draw_cover_any(x + 4 + (PIC_W - PIC_H) / 2, y + 4, PIC_H, L.games[game].title, 0);
+    game_cover(game, x + 4 + (PIC_W - PIC_H) / 2, y + 4, PIC_H, 0);
   w = ui_print_width(chip, UI_FONT_SMALL, 0) + 12;
   ui_round_fill(x + 160, y + 10, w, 16, 2, hero ? UI_COL_PLUM : UI_COL_TANGERINE);
   ui_print(x + 166, y + 11, chip, hero ? UI_COL_TANGERINE : UI_COL_PLUM, UI_FONT_SMALL, 0);
@@ -1552,7 +1792,7 @@ static void draw_continue(int hero)
   else
     snprintf(meta, sizeof(meta), "%s", played);
   ui_print_fit(x + 160, y + 64, meta, ink, UI_FONT_SMALL, 0, 270);
-  draw_cover_any(x + 160, y + 82, 16, L.games[game].title, 0);
+  game_cover(game, x + 160, y + 82, 16, 0);
   ui_print_fit(x + 182, y + 82, L.games[game].name,
    hero ? COLOR16(14, 8, 7) : COLOR16(24, 21, 22), UI_FONT_SMALL, 0, 248);
 }
@@ -1942,7 +2182,8 @@ static int card_open(int game)
   card_name_layout(L.games[game].title);
   card_read_tiles();
   /* the art alone: the name is beside it */
-  ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
+  if(!art_read(game, CARD_COVER, L.card_cover))
+    ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
   L.card = 1;
   L.card_f = 0;
   L.card_out = 0;
@@ -2363,7 +2604,7 @@ static void fold_row(int i, int y, int sel)
   if(kind == ROW_GAME)
   {
     const game_t *g = &L.games[item];
-    draw_cover_any(23 - lift, y + 2 - lift, 16, g->title, 0);
+    game_cover(item, 23 - lift, y + 2 - lift, 16, 0);
     name = g->title;
     size_text(g->size, meta, sizeof(meta));
   }
