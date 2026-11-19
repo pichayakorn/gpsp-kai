@@ -151,9 +151,9 @@ static struct
   u32 frame;
 
   int pop, pop_f, pop_out, pop_row, pop_flash;  /* View & sort */
-  int played_game;            /* the game whose play time is read */
-  u32 played;                 /* its seconds */
-  u32 last_played;            /* when it was last left, Unix time (0: never) */
+  u32 played;                 /* the last game_played(): its seconds */
+  u32 last_played;            /* and when it was last left, Unix time (0: never) */
+  struct { u32 secs, last; u8 known; } *play;  /* every game's, read once */
 
   cover_t covers[MAX_COVERS];
   int cover_count;
@@ -447,6 +447,9 @@ static int load_games(void)
   L.dirs = ui_pool_alloc(MAX_DIRS * sizeof(char *));
   L.arena = ui_pool_alloc(ARENA_SIZE);
   L.ys = ui_pool_alloc(MAX_GAMES * sizeof(int));
+  L.play = ui_pool_alloc(MAX_GAMES * sizeof(*L.play));
+  if(L.play)
+    memset(L.play, 0, MAX_GAMES * sizeof(*L.play));
   if(!L.games || !L.order || !L.dirs || !L.arena || !L.ys)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
@@ -785,62 +788,64 @@ none:
 
 /* A game's cover at size x size: its box art when it has some, else the
    preset (with its name plate when plate is set and the size has one) */
+/* A small picture cache: 16 px row icons, 32 px Recent covers. A game's
+   box art, else its preset cover, made once and kept, so a list that
+   slides or a cursor that moves only copies pixels. */
+static u16 *small_cover(int game, int size)
+{
+  int i, old = 0, n = (size == 16) ? ICON_CACHE : ROW_CACHE;
+
+  for(i = 0; i < n; i++)
+  {
+    int *g = (size == 16) ? &L.icons[i].game : &L.rowart[i].game;
+    u32 *used = (size == 16) ? &L.icons[i].used : &L.rowart[i].used;
+    u32 old_used = (size == 16) ? L.icons[old].used : L.rowart[old].used;
+    if(*g == game)
+    {
+      *used = L.frame;
+      return (size == 16) ? L.icons[i].px : L.rowart[i].px;
+    }
+    if(*used < old_used)
+      old = i;
+  }
+  {
+    u16 *px = (size == 16) ? L.icons[old].px : L.rowart[old].px;
+    if(!art_read(game, size, px))
+      ui_cover_art(px, size, size, L.games[game].title);
+    if(size == 16)
+    {
+      L.icons[old].game = game;
+      L.icons[old].used = L.frame;
+    }
+    else
+    {
+      L.rowart[old].game = game;
+      L.rowart[old].used = L.frame;
+    }
+    return px;
+  }
+}
+
+/* A game's cover at size x size: its box art when it has some, else the
+   preset (with its name plate when plate is set and the size has one) */
 static void game_cover(int game, int x, int y, int size, int plate)
 {
   static int last_game = -1, last_size;
   static u16 last[128 * 128];
-  int i, old = 0;
 
+  if((size == 16) || (size == 32))
+  {
+    ui_blit(small_cover(game, size), size, x, y, size, size);
+    return;
+  }
   if(L.games[game].art != ART_NONE)
   {
-    if(size == 16)
-    {
-      for(i = 0; i < ICON_CACHE; i++)
-      {
-        if(L.icons[i].game == game)
-        {
-          L.icons[i].used = L.frame;
-          ui_blit(L.icons[i].px, 16, x, y, 16, 16);
-          return;
-        }
-        if(L.icons[i].used < L.icons[old].used)
-          old = i;
-      }
-      if(art_read(game, 16, L.icons[old].px))
-      {
-        L.icons[old].game = game;
-        L.icons[old].used = L.frame;
-        ui_blit(L.icons[old].px, 16, x, y, 16, 16);
-        return;
-      }
-    }
-    else if(size == 32)
-    {
-      for(i = 0; i < ROW_CACHE; i++)
-      {
-        if(L.rowart[i].game == game)
-        {
-          L.rowart[i].used = L.frame;
-          ui_blit(L.rowart[i].px, 32, x, y, 32, 32);
-          return;
-        }
-        if(L.rowart[i].used < L.rowart[old].used)
-          old = i;
-      }
-      if(art_read(game, 32, L.rowart[old].px))
-      {
-        L.rowart[old].game = game;
-        L.rowart[old].used = L.frame;
-        ui_blit(L.rowart[old].px, 32, x, y, 32, 32);
-        return;
-      }
-    }
-    else if(size == COVER)
+    if(size == COVER)
     {
       draw_cover(x, y, game);
       return;
     }
-    else if(size <= 128)
+    if(size <= 128)
     {
       if(((last_game == game) && (last_size == size)) || art_read(game, size, last))
       {
@@ -1110,39 +1115,52 @@ static void size_text(u32 bytes, char *out, int n)
 }
 
 /* The play time of a game, from its .cfg (read once per selection). */
+/* game_played() reads play_seconds and last_played as one 8-byte pair */
+typedef char play_pair_check[(offsetof(game_config_t, last_played) ==
+ offsetof(game_config_t, play_seconds) + 4) ? 1 : -1];
+
+/* A game's play time and when it was last played, from its .cfg: only
+ * those 8 bytes are read (by seeking), once per game while the library is
+ * open, so moving the cursor never reads the Memory Stick again. Also sets
+ * L.last_played. */
 static u32 game_played(int game)
 {
   char path[MAX_PATH], name[MAX_PATH];
-  game_config_t cfg;
   FILE *f;
   char *dot;
-  size_t n;
-  u32 head[2];
+  u32 head[2], v[2];
 
-  if(L.played_game == game)
-    return L.played;
-  L.played_game = game;
-  L.played = 0;
-  L.last_played = 0;
+  if(L.play && L.play[game].known)
+  {
+    L.last_played = L.play[game].last;
+    return L.play[game].secs;
+  }
+  L.played = L.last_played = 0;
   snprintf(name, sizeof(name), "%s", L.games[game].name);
   dot = strrchr(name, '.');
   if(dot)
     *dot = 0;
   path_printf(path, sizeof(path), "%s/%s.cfg", g_default_cfg_dir, name);
   f = fopen(path, "rb");
-  if(f == NULL)
-    return 0;
-  /* the file: "gcfg", the version, then the settings (gui.c) */
-  memset(&cfg, 0, sizeof(cfg));
-  if((fread(head, 4, 2, f) == 2) && !memcmp(head, "gcfg", 4))
+  if(f)
   {
-    n = fread(&cfg, 1, sizeof(cfg), f);
-    if(n >= offsetof(game_config_t, play_seconds) + sizeof(u32))
-      L.played = cfg.play_seconds;
-    if(n >= offsetof(game_config_t, last_played) + sizeof(u32))
-      L.last_played = cfg.last_played;
+    /* the file: "gcfg", the version, then the settings (gui.c), where
+       play_seconds and last_played sit side by side */
+    if((fread(head, 4, 2, f) == 2) && !memcmp(head, "gcfg", 4) &&
+     !fseek(f, 8 + offsetof(game_config_t, play_seconds), SEEK_SET) &&
+     (fread(v, 4, 2, f) == 2))
+    {
+      L.played = v[0];
+      L.last_played = v[1];
+    }
+    fclose(f);
   }
-  fclose(f);
+  if(L.play)
+  {
+    L.play[game].secs = L.played;
+    L.play[game].last = L.last_played;
+    L.play[game].known = 1;
+  }
   return L.played;
 }
 
@@ -3407,7 +3425,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   int chosen = 0;
 
   memset(&L, 0, sizeof(L));
-  L.played_game = -1;
   L.views[0] = view_ids[((g_gpsp_config.library_view >> 7) & 3) % 3];
   L.views[1] = view_ids[((g_gpsp_config.library_view >> 9) & 3) % 3];
   L.view = L.views[0];
@@ -3468,7 +3485,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         ui_layer_reset();
         ui_pool_release(mark);
         memset(&L, 0, sizeof(L));
-        L.played_game = -1;
         load_games();
         covers_init();
         view_reset();
