@@ -120,6 +120,8 @@ static struct
   u16 toast_edge;
   int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
   char facts[96];             /* the card's cheats and settings line */
+  int name_mode;              /* the card's name: NAME_* */
+  char name_l1[256], name_l2[256];  /* its two 2x lines */
   int dirty;
   u32 frame;
 
@@ -1502,6 +1504,97 @@ static void card_facts(int game)
   ui_pool_release(mark);
 }
 
+/* ---- the game card's name ("B balanced", maintainer, 2026-11-20) ----------------------
+ * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
+ * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
+ * their full-width forms; the mark stays on line 1), else at the break
+ * that makes the two lines closest in width; then the file name line is
+ * left out. Too long for that: 1x on one line (the rest moves up 12 px),
+ * or the headline rule (big_title) on two. */
+enum { NAME_2X, NAME_2X_TWO, NAME_1X, NAME_BIG };
+
+static int cjk_cp(u32 c)
+{
+  return ((c >= 0x3000) && (c <= 0x9FFF)) || ((c >= 0xFF00) && (c <= 0xFFEF));
+}
+
+static u32 utf8_at(const char *s, int *len)
+{
+  const u8 *u = (const u8 *)s;
+  if(u[0] < 0x80) { *len = 1; return u[0]; }
+  if((u[0] & 0xE0) == 0xC0) { *len = 2; return ((u[0] & 0x1F) << 6) | (u[1] & 0x3F); }
+  if((u[0] & 0xF0) == 0xE0)
+  {
+    *len = 3;
+    return ((u[0] & 0x0F) << 12) | ((u[1] & 0x3F) << 6) | (u[2] & 0x3F);
+  }
+  *len = 4;
+  return 0xFFFD;
+}
+
+static int ends_with(const char *a, int n, const char *mark)
+{
+  int m = strlen(mark);
+  return (n >= m) && !memcmp(a + n - m, mark, m);
+}
+
+/* The two lines for t (each at most w at 1x bold), or 0. */
+static int name_lines2(const char *t, int w, char *l1, char *l2, int size)
+{
+  int best_rank = 3, best_diff = 0, i = 0, prev_cjk = 0, len;
+
+  while(t[i])
+  {
+    u32 c = utf8_at(t + i, &len);
+    if((i > 0) && ((c == ' ') || prev_cjk))
+    {
+      char a[256], b[256];
+      int na = i, wa, wb, rank, diff;
+      const char *bs = t + i;
+      while((na > 0) && (t[na - 1] == ' '))
+        na--;
+      while(*bs == ' ')
+        bs++;
+      if((na > 0) && *bs && (na < (int)sizeof(a)) && (strlen(bs) < sizeof(b)))
+      {
+        memcpy(a, t, na);
+        a[na] = 0;
+        snprintf(b, sizeof(b), "%s", bs);
+        wa = ui_print_width(a, UI_FONT_BODY, UI_TEXT_BOLD);
+        wb = ui_print_width(b, UI_FONT_BODY, UI_TEXT_BOLD);
+        if((wa <= w) && (wb <= w))
+        {
+          rank = (ends_with(a, na, " -") || ends_with(a, na, ":") || ends_with(a, na, "~") ||
+           ends_with(a, na, "\xEF\xBC\x9A") || ends_with(a, na, "\xEF\xBD\x9E")) ? 0 : 1;
+          diff = (wa > wb) ? wa - wb : wb - wa;
+          if((rank < best_rank) || ((rank == best_rank) && (diff < best_diff)))
+          {
+            best_rank = rank;
+            best_diff = diff;
+            snprintf(l1, size, "%s", a);
+            snprintf(l2, size, "%s", b);
+          }
+        }
+      }
+    }
+    prev_cjk = cjk_cp(c);
+    i += len;
+  }
+  return best_rank < 3;
+}
+
+static void card_name_layout(const char *t)
+{
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= 316)
+    L.name_mode = NAME_2X;
+  else if(name_lines2(t, 158, L.name_l1, L.name_l2, sizeof(L.name_l1)))
+    L.name_mode = NAME_2X_TWO;
+  else if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) <= 316)
+    L.name_mode = NAME_1X;
+  else
+    L.name_mode = NAME_BIG;
+}
+
 static int card_open(int game)
 {
   L.card_mark = ui_pool_mark();
@@ -1514,6 +1607,7 @@ static int card_open(int game)
   }
   L.card_game = game;
   card_facts(game);
+  card_name_layout(L.games[game].title);
   card_read_tiles();
   /* the art alone: the name is beside it */
   ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
@@ -1583,7 +1677,7 @@ static void tile_when(u64 tick, char *out, int n)
 static void draw_card(void)
 {
   const game_t *g = &L.games[L.card_game];
-  int x = CARD_X, y = card_y(), i, cx, first = card_first_px();
+  int x = CARD_X, y = card_y(), i, cx, first = card_first_px(), dy;
   char chip[48], size[16], played[32];
 
   ui_round_fill(x + 3, y + 3, CARD_W, CARD_H, 3, UI_COL_SHADE);
@@ -1591,33 +1685,56 @@ static void draw_card(void)
   ui_fill(x + 4, y, CARD_W - 8, 4, UI_COL_TANGERINE);
   ui_fill(x + 12, y + 14, 100, 100, UI_COL_PLUM);
   ui_blit(L.card_cover, CARD_COVER, x + 14, y + 16, CARD_COVER, CARD_COVER);
-  /* 316 px: 2x when it fits, else two lines; the card is focused, so a
-     longer name's second line runs sideways */
-  big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
-   (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
+  /* the name (card_name_layout); dy moves what follows it */
+  switch(L.name_mode)
+  {
+    case NAME_2X:
+      ui_print(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      dy = 0;
+      break;
+    case NAME_2X_TWO:
+      ui_print(x + 124, y + 10, L.name_l1, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      ui_print(x + 124, y + 38, L.name_l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      dy = 28;
+      break;
+    case NAME_1X:
+      ui_print(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+      dy = -12;
+      break;
+    default:
+      /* the card is focused: a cut second line runs sideways */
+      big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
+       (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
+      dy = 0;
+      break;
+  }
 
   /* chips: size, play time, the heart (△ flashes it) */
   cx = x + 124;
   size_text(g->size, size, sizeof(size));
   snprintf(chip, sizeof(chip), "GBA \xC2\xB7 %s", size);
-  ui_round_fill(cx, y + 46, ui_print_width(chip, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
-  ui_print(cx + 6, y + 47, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
+  ui_round_fill(cx, y + 46 + dy, ui_print_width(chip, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
+  ui_print(cx + 6, y + 47 + dy, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
   cx += ui_print_width(chip, UI_FONT_SMALL, 0) + 18;
   played_text(game_played(L.card_game), played, sizeof(played));
-  ui_round_fill(cx, y + 46, ui_print_width(played, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
-  ui_print(cx + 6, y + 47, played, UI_COL_SKY, UI_FONT_SMALL, 0);
+  ui_round_fill(cx, y + 46 + dy, ui_print_width(played, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
+  ui_print(cx + 6, y + 47 + dy, played, UI_COL_SKY, UI_FONT_SMALL, 0);
   cx += ui_print_width(played, UI_FONT_SMALL, 0) + 18;
   {
     int w = 11 + 4 + ui_print_width("Favourite", UI_FONT_SMALL, 0) + 12;
     u16 ink = g->fav ? UI_COL_PINK : UI_COL_MUTE;
     u16 fill = (L.fav_flash < UI_F_FLASH) ? ((L.fav_flash < UI_F_FLASH / 2) ? UI_COL_CREAM :
      COLOR16(18, 16, 16)) : UI_COL_PLUM;
-    ui_round_fill(cx, y + 46, w, 16, 2, fill);
-    draw_icon11(cx + 5, y + 49, icon_heart, ink, 1);
-    ui_print(cx + 20, y + 47, "Favourite", ink, UI_FONT_SMALL, 0);
+    ui_round_fill(cx, y + 46 + dy, w, 16, 2, fill);
+    draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
+    ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
   }
-  ui_print_fit(x + 124, y + 70, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
-  ui_print_fit(x + 124, y + 86, L.facts, UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
+  if(L.name_mode != NAME_2X_TWO)  /* two 2x lines leave the file name out */
+    ui_print_fit(x + 124, y + 70 + dy, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
+  /* the facts line: under the file name, or at +96 when two 2x lines
+     leave the file name out */
+  ui_print_fit(x + 124, (L.name_mode == NAME_2X_TWO) ? y + 96 : y + 86 + dy, L.facts,
+   UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
   /* the savestates */
   ui_print(x + 12, y + 118, "Savestates", UI_COL_MUTE, UI_FONT_SMALL, 0);
