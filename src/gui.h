@@ -68,7 +68,7 @@ typedef struct
   u32 side_bars;           // SIDE_BARS_*: what fills the space beside the picture
   u32 confirm_button;      // CONFIRM_*: which key confirms in the 4.0 menus
   u32 ff_speed;            // FF_SPEED_*: how fast fast forward runs
-  u32 library_view;        // Library: bit 0 list view, bits 1-2 the sort (name, recent, size)
+  u32 library_view;        // Library: bits 1-2, 3-4, 5-6 the sorts of All, Favourites, Folders; bits 7-8 All, Favourites in Shelf style
   u32 bios_note;           // YES: the library notes a missing GBA BIOS
   u32 first_run_done;      // YES once the 4.0 first-run cards were shown
 #if 0
