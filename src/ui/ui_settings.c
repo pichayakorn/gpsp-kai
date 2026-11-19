@@ -451,18 +451,19 @@ static const chip_t chips[12] =
   { 11, PSP_CTRL_START,    248, 188, PAD_BX + 137,         PAD_BY + 99 },
 };
 
-/* The picker's 20 choices with their 4.0 labels (maintainer, 2026-11-20):
+/* The picker's 21 choices with their 4.0 labels (maintainer, 2026-11-20):
    Volume up and down are dropped (they do nothing in kai), so a map that
-   still holds one reads as None. pick_ids[] turns a picker cell into an
-   action id. */
-#define PICKS 20
+   still holds one reads as None; Cheats opens the Cheats page straight from
+   the game (an option, never a default). pick_ids[] turns a picker cell
+   into an action id. */
+#define PICKS 21
 static const u8 pick_ids[PICKS] =
 {
   BUTTON_ID_UP, BUTTON_ID_DOWN, BUTTON_ID_LEFT, BUTTON_ID_RIGHT, BUTTON_ID_A, BUTTON_ID_B,
   BUTTON_ID_L, BUTTON_ID_R, BUTTON_ID_START, BUTTON_ID_SELECT, BUTTON_ID_MENU,
   BUTTON_ID_FASTFORWARD, BUTTON_ID_LOADSTATE, BUTTON_ID_SAVESTATE, BUTTON_ID_RAPIDFIRE_A,
   BUTTON_ID_RAPIDFIRE_B, BUTTON_ID_RAPIDFIRE_L, BUTTON_ID_RAPIDFIRE_R, BUTTON_ID_FPS,
-  BUTTON_ID_NONE
+  BUTTON_ID_CHEATS, BUTTON_ID_NONE
 };
 
 static const char *action_name(u32 id)
@@ -473,6 +474,8 @@ static const char *action_name(u32 id)
     "Fast forward", "Quick load", "Quick save", "Rapid A", "Rapid B", "Rapid L", "Rapid R",
     "None", "None", "Show FPS", "None"
   };
+  if(id == BUTTON_ID_CHEATS)
+    return "Cheats";
   return names[(id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1];
 }
 
@@ -596,7 +599,7 @@ static int chip_step(int i, u32 dir)
 /* ---- Controls: the action picker ------------------------------------------ */
 
 #define PICK_W 400
-#define PICK_H 152  /* 28 + 24 per row of four + 4: five rows */
+#define PICK_H 176  /* 28 + 24 per row of four + 4: six rows */
 #define PICK_X ((UI_SCREEN_W - PICK_W) / 2)
 #define PICK_Y 46
 #define PICK_CW 92

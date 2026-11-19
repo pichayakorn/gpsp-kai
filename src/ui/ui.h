@@ -183,6 +183,9 @@ void ui_components(void);
 /* The pause screen (the menu button in a game); returns 1 when the game's
  * state changed (a load or a restart), like menu(). */
 u32 ui_pause(u16 *game_picture);
+/* The Cheats page straight from the game (a button mapped to Cheats): set
+   up as the pause screen is, and ○ goes back to the game */
+u32 ui_pause_cheats(u16 *game_picture);
 
 /* The Library (ui_library.c). ui_library() lets the player pick a game and
  * returns 1 with its folder and file name, and in *slot the savestate to
