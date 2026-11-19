@@ -739,6 +739,17 @@ u32 update_gba()
 
 #ifdef UI4
           cheat_engine_frame();
+          {
+            /* a runs-once cheat ran: a toast over the game says so */
+            char name[CE_NAME_LENGTH], text[CE_NAME_LENGTH + 16];
+            u32 n = cheat_engine_applied(name, sizeof(name));
+            if(n == 1)
+              snprintf(text, sizeof(text), "Applied: %s", name);
+            else if(n > 1)
+              snprintf(text, sizeof(text), "Applied: %u cheats", (unsigned)n);
+            if(n)
+              ui_game_toast(text, UI_COL_LIME);
+          }
 #else
           process_cheats();
 #endif

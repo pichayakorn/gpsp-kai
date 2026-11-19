@@ -1347,6 +1347,7 @@ static void action_restart_game(void)
     strcpy(p.game_toast, "Restarted \xC2\xB7 the game before is in Last");
   }
   reset_gba();
+  cheat_engine_restarted();  /* cheats waiting for a restart have it */
   reg[CHANGED_PC_STATUS] = 1;
   p.changed = 1;
   p.closing = 1;
@@ -1788,7 +1789,13 @@ u32 ui_pause(u16 *game_picture)
             case TILE_CHEATS:
               /* Cheats draws its own ground; the pause screen's comes back */
               shot_wait();
-              ui_cheats();
+              if(ui_cheats())
+              {
+                /* a cheat that works from the game's start: Restart now */
+                build_layer(1);
+                action_restart_game();
+                break;
+              }
               build_layer(1);
               ui_status_read();
               ui_input_init();

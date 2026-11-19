@@ -1561,43 +1561,14 @@ static void card_read_tiles(void)
   L.tile_count = n;
 }
 
-/* How many cheats a game's .cht file holds (as add_cheats() counts them). */
-static int cht_count(int game)
-{
-  static const char *kinds[] = { "gameshark_v1", "gameshark_v2", "gameshark_v3", "PAR_v1",
-   "PAR_v2", "PAR_v3", "direct_v1", "direct_v2", "direct_v3", NULL };
-  char name[MAX_FILE], path[MAX_PATH], line[256];
-  FILE *f;
-  int n = 0, k;
-
-  change_ext((char *)L.games[game].name, name, ".cht");
-  path_printf(path, sizeof(path), "%s/%s", g_default_cheat_dir, name);
-  f = fopen(path, "rb");
-  if(f == NULL)
-    return 0;
-  while(fgets(line, sizeof(line), f) && (n < MAX_CHEATS))
-  {
-    char *sp = strchr(line, ' ');
-    if(sp)
-      *sp = 0;
-    for(k = 0; kinds[k]; k++)
-      if(!strcasecmp(line, kinds[k]))
-      {
-        n++;
-        break;
-      }
-  }
-  fclose(f);
-  return n;
-}
-
 /* The card's facts line: "Cheats: 2 / 8  ·  Settings: 5 saved for this
  * game", from the running game's config or the game's .cfg. */
 static void card_facts(int game)
 {
   const game_t *g = &L.games[game];
   const game_config_t *cfg = NULL;
-  int total = cht_count(game), on = 0, saved = 0, i;
+  u32 on = 0, total = cheat_engine_peek(g->name, &on);
+  int saved = 0;
   u32 mark = ui_pool_mark();
   char ch[32], st[48];
 
@@ -1622,13 +1593,9 @@ static void card_facts(int game)
     }
   }
   if(cfg)
-  {
-    for(i = 0; i < total; i++)
-      on += (cfg->cheats_flag[i].cheat_active == 1);
     saved = ui_settings_saved_for_game(cfg);
-  }
   if(total)
-    snprintf(ch, sizeof(ch), "Cheats: %d / %d", on, total);
+    snprintf(ch, sizeof(ch), "Cheats: %u / %u", (unsigned)on, (unsigned)total);
   else
     snprintf(ch, sizeof(ch), "Cheats: none");
   if(saved)

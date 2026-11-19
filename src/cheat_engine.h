@@ -72,6 +72,9 @@ u32 cheat_waits_restart(u32 i);
 void cheat_engine_restarted(void);
 /* Runs-once cheats that ran since the last call, and the first one's name */
 u32 cheat_engine_applied(char *name, u32 size);
+/* Any game's cheats without loading them (the library's game card): how
+   many, and how many it remembers on */
+u32 cheat_engine_peek(const char *rom_name, u32 *on);
 /* Where the game's cheat files go: GBA/CHT/<game>/ */
 void cheat_engine_folder(char *out, u32 size);
 

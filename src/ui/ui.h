@@ -196,8 +196,9 @@ void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start 
 u32 ui_library_switch(void);
 u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot);
 int ui_library_has_rom(const char *rom_name);
-/* Cheats (ui_cheats.c), from the pause screen's Cheats tile. */
-void ui_cheats(void);
+/* Cheats (ui_cheats.c), from the pause screen's Cheats tile. Returns 1
+   when the player chose to restart the game for a cheat. */
+int ui_cheats(void);
 extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
 void ui_display_name(const char *file, char *out);  /* out: 256 bytes */
 void ui_clean_name(const char *file, char *out);    /* out: 256 bytes */

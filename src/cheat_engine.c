@@ -118,6 +118,7 @@ static u32 ce_answer_count;
 static u32 ce_file;     /* the file being read */
 static u32 ce_answer;   /* its answer, CE_KIND_* or 0 */
 static u32 ce_applied;  /* runs-once cheats that ran, since the last ask */
+static u32 ce_counting, ce_counted;  /* cheat_engine_peek(): only count */
 static char ce_applied_name[CE_NAME_LENGTH];
 
 static cheat_entry ce[CE_MAX_CHEATS];
@@ -1105,6 +1106,12 @@ static void finish_cheat(const char *name, int kind)
   ce_error err;
   u32 save_rec = ce_rec_used, save_patch = ce_patch_used;
 
+  if(ce_counting)
+  {
+    ce_counted += (kind != K_NONE) && (code_len != 0);
+    code_len = 0;
+    return;
+  }
   if((kind == K_NONE) || (code_len == 0) || (ce_count >= CE_MAX_CHEATS) ||
    (ce_group_count == 0))
   {
@@ -1151,6 +1158,8 @@ static void group_begin(const char *name)
 {
   cheat_group *g;
 
+  if(ce_counting)
+    return;
   if((ce_group_count > 0) && (ce_groups[ce_group_count - 1].count == 0))
     g = &ce_groups[ce_group_count - 1];
   else if(ce_group_count >= CE_MAX_GROUPS)
@@ -1179,7 +1188,8 @@ static int rule_line(const char *s)
   while((*s == ' ') || (*s == '\t'))
     s++;
   for(i = 0; rules[i].word; i++)
-    if(!strncasecmp(s, rules[i].word, strlen(rules[i].word)))
+    if(!strncasecmp(s, rules[i].word, strlen(rules[i].word)) && !ce_counting &&
+     ce_group_count)
       ce_groups[ce_group_count - 1].rule = rules[i].rule;
   return 1;
 }
@@ -1385,15 +1395,20 @@ static void read_file(FILE *f)
 
 /* ---- what is on ---------------------------------------------------------------- */
 
-static void on_path(char *path)
+static void on_path_for(const char *rom, char *path)
 {
   char base[MAX_FILE], *dot;
 
-  snprintf(base, sizeof(base), "%s", ce_rom);
+  snprintf(base, sizeof(base), "%s", rom);
   dot = strrchr(base, '.');
   if(dot)
     *dot = 0;
   path_printf(path, MAX_PATH, "%s/%s.on", g_default_cfg_dir, base);
+}
+
+static void on_path(char *path)
+{
+  on_path_for(ce_rom, path);
 }
 
 static void read_answers(void)
@@ -1594,17 +1609,12 @@ static void drop_empty_groups(void)
   ce_group_count = k;
 }
 
-void cheat_engine_load(const char *rom_name)
+/* The game's folder or file, by the ROM's own name, then the library's */
+static void read_cheats_for(const char *rom_name)
 {
   char path[MAX_PATH], names[2][MAX_FILE], *dot;
-  u32 i, k, found = 0;
+  u32 k, found = 0;
 
-  cheat_engine_clear();
-  if(!rom_name || !rom_name[0])
-    return;
-  snprintf(ce_rom, sizeof(ce_rom), "%s", rom_name);
-  read_answers();
-  /* the ROM's own name, then the library's */
   snprintf(names[0], MAX_FILE, "%s", rom_name);
   dot = strrchr(names[0], '.');
   if(dot)
@@ -1626,6 +1636,18 @@ void cheat_engine_load(const char *rom_name)
     path_printf(path, sizeof(path), "%s/%s", g_default_cheat_dir, file);
     found = read_path(path, file, "Cheats");
   }
+}
+
+void cheat_engine_load(const char *rom_name)
+{
+  u32 i;
+
+  cheat_engine_clear();
+  if(!rom_name || !rom_name[0])
+    return;
+  snprintf(ce_rom, sizeof(ce_rom), "%s", rom_name);
+  read_answers();
+  read_cheats_for(rom_name);
   drop_empty_groups();
   read_on();
   /* the ROM patches of what is on, before the game runs */
@@ -1852,4 +1874,39 @@ void cheat_engine_folder(char *out, u32 size)
 
   ui_clean_name(ce_rom, name);
   path_printf(out, size, "%s/%s/", g_default_cheat_dir, name);
+}
+
+u32 cheat_engine_peek(const char *rom_name, u32 *on)
+{
+  char path[MAX_PATH], line[128];
+  FILE *f;
+  u32 i, n;
+
+  *on = 0;
+  if(ce_rom[0] && !strcmp(rom_name, ce_rom))
+  {
+    /* the game that is running */
+    for(i = 0; i < ce_count; i++)
+      *on += kept_on(i);
+    return ce_count;
+  }
+  ce_counting = 1;
+  ce_counted = 0;
+  read_cheats_for(rom_name);
+  ce_counting = 0;
+  n = ce_counted;
+  on_path_for(rom_name, path);
+  f = fopen(path, "r");
+  if(f)
+  {
+    while(fgets(line, sizeof(line), f))
+    {
+      unsigned int h;
+      char mode;
+      if((line[0] != 'K') && (sscanf(line, "%8x %c", &h, &mode) == 2))
+        (*on)++;
+    }
+    fclose(f);
+  }
+  return n;
 }
