@@ -13,6 +13,7 @@
 #include "../common.h"
 #include "ui.h"
 #include "ui_cover.h"
+#include "../game_name.h"
 
 #define MAX_GAMES   1024
 #define MAX_DIRS    128
@@ -258,67 +259,10 @@ static void scan_dir(const char *path, int depth, int parent)
   sceIoDclose(d);
 }
 
-/* The name shown for a file: its name without the extension, cleaned up
- * so a downloaded library reads well (#14): bracketed tags such as
- * "(USA, Europe)", "[!]" or "(Rev 1)" go, so does a leading release number
- * ("1986 - Golden Sun"), and underscores become spaces. The cover is drawn
- * from this name, so these rules must not change once released. */
-static int clean_name(const char *name, int n, char *out)
-{
-  int i = 0, o = 0, depth = 0;
-
-  if(n > 255)
-    n = 255;
-  /* a leading release number: digits, then " - " */
-  while((i < n) && (name[i] >= '0') && (name[i] <= '9'))
-    i++;
-  if(i > 0)
-  {
-    int j = i;
-    while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
-      j++;
-    if((j < n) && (name[j] == '-'))
-    {
-      j++;
-      while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
-        j++;
-      i = j;
-    }
-    else
-      i = 0;
-  }
-  for(; i < n; i++)
-  {
-    char c = name[i];
-    if((c == '(') || (c == '['))
-      depth++;
-    else if(((c == ')') || (c == ']')) && depth)
-      depth--;
-    else if(depth == 0)
-    {
-      if(c == '_')
-        c = ' ';
-      /* one space between words, none at the start */
-      if((c == ' ') && ((o == 0) || (out[o - 1] == ' ')))
-        continue;
-      out[o++] = c;
-    }
-  }
-  while((o > 0) && ((out[o - 1] == ' ') || (out[o - 1] == '-')))
-    o--;
-  if(o == 0)
-  {
-    memcpy(out, name, n);  /* nothing left: the plain name */
-    o = n;
-  }
-  out[o] = 0;
-  return o;
-}
-
 static const char *display_name(const char *name, int n)
 {
   char out[256];
-  int o = clean_name(name, n, out);
+  int o = game_name_clean(name, n, out);
   return arena_str(out, o);
 }
 
@@ -423,14 +367,6 @@ static void tell_apart(void)
 /* The game started from the library and the name it showed there */
 static char launched_file[MAX_FILE], launched_title[256];
 
-/* A file's name cleaned up as the library does, without telling same-named
-   games apart (the cheat engine finds a game's cheats by it). */
-void ui_clean_name(const char *file, char *out)
-{
-  const char *dot = strrchr(file, '.');
-  clean_name(file, dot ? dot - file : (int)strlen(file), out);
-}
-
 /* The name the library shows for a file (for the pause screen's chip). */
 void ui_display_name(const char *file, char *out)
 {
@@ -441,7 +377,7 @@ void ui_display_name(const char *file, char *out)
     strcpy(out, launched_title);
     return;
   }
-  clean_name(file, n, out);
+  game_name_clean(file, n, out);
 }
 
 /* recent.txt (written on leaving a game): full paths, newest first */
