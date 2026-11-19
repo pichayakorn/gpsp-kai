@@ -150,6 +150,7 @@ static char *arena_str(const char *s, int n)
 }
 
 static const char *display_name(const char *name, int n);
+static void tell_apart(void);
 static const u16 icon_heart[11];
 static const u16 icon_folder[11];
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
@@ -293,11 +294,117 @@ static const char *display_name(const char *name, int n)
   return arena_str(out, o);
 }
 
+/* The i-th (...) or [...] part of a file name, brackets included.
+   Returns 0 when there are fewer parts. */
+static int name_part(const char *file, int i, const char **at, int *len)
+{
+  const char *dot = strrchr(file, '.');
+  int n = dot ? dot - file : (int)strlen(file), k, start = -1, depth = 0;
+
+  for(k = 0; k < n; k++)
+  {
+    char c = file[k];
+    if((c == '(') || (c == '['))
+    {
+      if(depth++ == 0)
+        start = k;
+    }
+    else if(((c == ')') || (c == ']')) && depth && (--depth == 0))
+    {
+      if(i-- == 0)
+      {
+        *at = file + start;
+        *len = k + 1 - start;
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+static int has_part(const char *file, const char *part, int len)
+{
+  const char *at;
+  int i, n;
+
+  for(i = 0; name_part(file, i, &at, &n); i++)
+    if((n == len) && !strncasecmp(at, part, len))
+      return 1;
+  return 0;
+}
+
+static int title_order(const void *a, const void *b)
+{
+  return strcasecmp(L.games[*(const int *)a].title, L.games[*(const int *)b].title);
+}
+
+/* Same-named games (spec section 4, #14): when two games would show the
+ * same name, each keeps the parts of its file name that tell them apart,
+ * e.g. "Pokemon - FireRed Version (Rev 1)". When no part does, the whole
+ * file name (without its extension) is shown. */
+static void tell_apart(void)
+{
+  u32 mark = ui_pool_mark();
+  int *idx = ui_pool_alloc(L.count * sizeof(int)), i, j, k, m;
+
+  if(idx == NULL)
+    return;
+  for(i = 0; i < L.count; i++)
+    idx[i] = i;
+  qsort(idx, L.count, sizeof(int), title_order);
+  for(i = 0; i < L.count; i = j)
+  {
+    for(j = i + 1; (j < L.count) && !title_order(&idx[i], &idx[j]); j++)
+      ;
+    if(j - i < 2)
+      continue;
+    for(k = i; k < j; k++)
+    {
+      game_t *g = &L.games[idx[k]];
+      char out[256];
+      const char *at;
+      int o = snprintf(out, sizeof(out), "%s", g->title), p, n;
+      for(p = 0; name_part(g->name, p, &at, &n); p++)
+      {
+        int shared = 1;
+        for(m = i; m < j; m++)
+          if(!has_part(L.games[idx[m]].name, at, n))
+            shared = 0;
+        if(!shared && (o + 1 + n < (int)sizeof(out)))
+          o += snprintf(out + o, sizeof(out) - o, " %.*s", n, at);
+      }
+      g->title = arena_str(out, o);
+      if(g->title == NULL)
+        g->title = g->name;
+    }
+    /* still the same: the file names */
+    for(k = i; k < j; k++)
+      for(m = i; m < j; m++)
+        if((m != k) && !strcasecmp(L.games[idx[k]].title, L.games[idx[m]].title))
+        {
+          game_t *g = &L.games[idx[k]];
+          const char *dot = strrchr(g->name, '.');
+          const char *t = arena_str(g->name, dot ? dot - g->name : (int)strlen(g->name));
+          g->title = t ? t : g->name;
+          break;
+        }
+  }
+  ui_pool_release(mark);
+}
+
+/* The game started from the library and the name it showed there */
+static char launched_file[MAX_FILE], launched_title[256];
+
 /* The name the library shows for a file (for the pause screen's chip). */
 void ui_display_name(const char *file, char *out)
 {
   const char *dot = strrchr(file, '.');
   int n = dot ? dot - file : (int)strlen(file);
+  if(launched_file[0] && !strcmp(file, launched_file))
+  {
+    strcpy(out, launched_title);
+    return;
+  }
   clean_name(file, n, out);
 }
 
@@ -373,6 +480,7 @@ static int load_games(void)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0, -1);
+  tell_apart();
   /* every folder's games, its subfolders' included */
   memset(L.dir_games, 0, sizeof(L.dir_games));
   for(i = 0; i < L.count; i++)
@@ -1527,9 +1635,9 @@ static void card_facts(int game)
  * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
  * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
  * their full-width forms; the mark stays on line 1), else at the break
- * that makes the two lines closest in width; then the file name line is
- * left out. Too long for that: 1x on one line (the rest moves up 12 px),
- * or the headline rule (big_title) on two. */
+ * that makes the two lines closest in width. Too long for that: 1x on one
+ * line (the rest moves up 12 px), or the headline rule (big_title) on two.
+ * No file name line: the facts sit 22 px under the chips. */
 enum { NAME_2X, NAME_2X_TWO, NAME_1X, NAME_BIG };
 
 static int cjk_cp(u32 c)
@@ -1748,11 +1856,8 @@ static void draw_card(void)
     draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
     ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
   }
-  if(L.name_mode != NAME_2X_TWO)  /* two 2x lines leave the file name out */
-    ui_print_fit(x + 124, y + 70 + dy, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
-  /* the facts line: under the file name, or at +96 when two 2x lines
-     leave the file name out */
-  ui_print_fit(x + 124, (L.name_mode == NAME_2X_TWO) ? y + 96 : y + 86 + dy, L.facts,
+  /* the facts line, 22 px under the chips */
+  ui_print_fit(x + 124, y + 68 + dy, L.facts,
    UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
   /* the savestates */
@@ -2962,6 +3067,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
   {
     const game_t *g = &L.games[L.chosen_game];
+    snprintf(launched_file, sizeof(launched_file), "%s", g->name);
+    snprintf(launched_title, sizeof(launched_title), "%s", g->title);
     snprintf(dir, dir_size, "%s", L.dirs[g->dir]);
     snprintf(name, name_size, "%s", g->name);
     *slot = L.chosen_slot;
