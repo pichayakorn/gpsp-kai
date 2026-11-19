@@ -1145,6 +1145,7 @@ static void finish_cheat(const char *name, int kind)
     ce_patch_used = save_patch;
   }
   c->detail = err;
+  code_text[code_len] = 0;  /* no code kept: the text before isn't this cheat's */
   c->hash = hash_text(hash_text(2166136261u, c->name, 0), code_text, 1);
   c->group = ce_group_count - 1;
   ce_groups[c->group].count++;
