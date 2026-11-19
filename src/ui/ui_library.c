@@ -848,8 +848,11 @@ static void grid_marquee(int x, int y, int game)
 {
   char lines[PLATE_LINES][128], rest[256];
   const char *title = L.games[game].title;
-  int n = plate_lines(title, COVER, lines, rest, sizeof(rest)), w, ly;
+  int n, w, ly;
 
+  if(L.games[game].art != ART_NONE)
+    return;  /* box art has no name plate, so nothing runs over it */
+  n = plate_lines(title, COVER, lines, rest, sizeof(rest));
   if(n >= 0)
     return;  /* three lines or fewer: nothing moves */
   w = ui_print_width(rest, UI_FONT_BODY, 0);
