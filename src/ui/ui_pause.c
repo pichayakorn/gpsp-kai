@@ -23,21 +23,16 @@
                                  steps of both filters (4 for the .thm, 5 for 5:3) */
 #define CHUNKS (160 / CHUNK_ROWS)
 #define STRIP_CX  240
-#define TILE_W    60
+#define TILE_W    70
 #define TILE_H    62
+#define TILE_PITCH 74         /* 4 px apart */
+#define TILE_X(i) (18 + (i) * TILE_PITCH)  /* the last one ends at 458 */
 #define TILE_Y    176         /* 10 px above the hint strip */
 #define F_OPEN    UI_F_PAUSE_OPEN
 #define F_CLOSE   UI_F_PAUSE_CLOSE
 
 /* 20 x 20 two-tone tile icons, from gpsp-kai-design app-ui/scripts/icons20.py:
  * per row, ink then fill, bit 19 the left pixel. */
-static const u32 icon20_play[2][20] =
-{
-  { 0x00000, 0x00000, 0x00000, 0x0C000, 0x0B000, 0x08C00, 0x08300, 0x080C0, 0x08030, 0x0800C,
-    0x0800C, 0x08030, 0x080C0, 0x08300, 0x08C00, 0x0B000, 0x0C000, 0x00000, 0x00000, 0x00000 },
-  { 0x00000, 0x00000, 0x00000, 0x00000, 0x04000, 0x07000, 0x07C00, 0x07F00, 0x07FC0, 0x07FF0,
-    0x07FF0, 0x07FC0, 0x07F00, 0x07C00, 0x07000, 0x04000, 0x00000, 0x00000, 0x00000, 0x00000 }
-};
 static const u32 icon20_gear[2][20] =
 {
   { 0x00600, 0x00900, 0x08910, 0x14928, 0x230C4, 0x10008, 0x08610, 0x08910, 0x7108E, 0x82081,
@@ -81,8 +76,10 @@ static const u32 icon20_exit[2][20] =
     0x10008, 0x10008, 0x10008, 0x18018, 0x0C030, 0x0E070, 0x079E0, 0x01F80, 0x00000, 0x00000 }
 };
 
-enum { TILE_RESUME, TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY,
-       TILE_EXIT, TILE_COUNT };
+/* No Resume tile (maintainer, 2026-11-20): △, HOME and ○ resume, as the
+   hint strip says */
+enum { TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY, TILE_EXIT,
+       TILE_COUNT };
 
 typedef struct
 {
@@ -93,7 +90,6 @@ typedef struct
 
 static const tile_t tiles[TILE_COUNT] =
 {
-  { "Resume",     icon20_play,    UI_COL_LIME },
   { "Settings",   icon20_gear,    UI_COL_LIME },
   { "Cheats",     icon20_cheats,  UI_COL_LIME },
   { "Screenshot", icon20_camera,  UI_COL_SKY },
@@ -778,7 +774,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
 
 static void draw_tile(int i, int ty, int selected)
 {
-  int tx = 18 + i * 64, lift = selected ? UI_LIFT : 0, j, lines = 0;
+  int tx = TILE_X(i), lift = selected ? UI_LIFT : 0, j, lines = 0;
   char line[2][64];
 
   /* lifted straight up, so with 4 px between tiles the cursor frame keeps
@@ -789,13 +785,13 @@ static void draw_tile(int i, int ty, int selected)
   ty -= lift;
   /* centred in the tile: 10 px above the icon box, about 11 under the
      label (design repo 4aff042) */
-  ui_round_fill(tx + 16, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
-  draw_icon20(tx + 19, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
+  ui_round_fill(tx + 21, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
+  draw_icon20(tx + 24, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
   for(j = 0; j < 2; j++)
-    if(ui_wrap_line(tiles[i].label, j, 56, UI_FONT_SMALL, line[j], sizeof(line[j])))
+    if(ui_wrap_line(tiles[i].label, j, 66, UI_FONT_SMALL, line[j], sizeof(line[j])))
       lines++;
   for(j = 0; j < lines; j++)
-    ui_text(tx + 30 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
+    ui_text(tx + TILE_W / 2 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
      line[j], selected ? UI_COL_PLUM : UI_COL_CREAM);
 }
 
@@ -1016,7 +1012,7 @@ static void draw_screen(int bar_fill)
   if((p.row == 1) && done && !p.closing && !p.bar_text)
   {
     int tx = (p.tile_f < UI_F_CURSOR) ?
-     ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
+     ui_ease_out_back(p.tile_from, TILE_X(p.tile), p.tile_f, UI_F_CURSOR) : TILE_X(p.tile);
     ui_cursor_frame(tx, TILE_Y - 2, TILE_W, TILE_H);
   }
   PERF_SECTION(4);
@@ -1471,7 +1467,7 @@ static void move_tile(int to)
     return;
   end_undo();
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
-   ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
+   ui_ease_out_back(p.tile_from, TILE_X(p.tile), p.tile_f, UI_F_CURSOR) : TILE_X(p.tile);
   p.tile = to;
   p.tile_f = 0;
   memset(&p.exit_hold, 0, sizeof(p.exit_hold));
@@ -1769,9 +1765,6 @@ u32 ui_pause(u16 *game_picture)
         {
           switch(p.tile)
           {
-            case TILE_RESUME:
-              p.closing = 1;
-              break;
             case TILE_SETTINGS:
               /* Settings draws its own ground; the pause screen's comes
                  back after it */
