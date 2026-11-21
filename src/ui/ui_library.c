@@ -114,6 +114,9 @@ static struct
   int close_row, close_from, close_f;  /* list: the card closing, from how open */
   int *ys;                    /* list: every row's top this frame */
   int marq_f;                 /* frames the selection has rested (marquee) */
+  int jump_t, rail_f;         /* letter jump: frames since the last (-1: rail gone); rail in */
+  int letter_f, letter_keep;  /* the big letter (-1: none); a jump while it was up */
+  int letter;                 /* the letter it shows */
 
   int tab, tab_prev, tab_f;   /* the tab shown (TAB_*), the one before, its slide */
   int tab_ids[4], tab_count;  /* the tabs on the bar */
@@ -185,6 +188,7 @@ static const u16 icon_folder[11];
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
 static void read_favourites(void);
 static void view_reset(void);
+static int jump_here(void);
 static int list_banner(void);
 static void draw_banner_at(int y);
 
@@ -3087,6 +3091,10 @@ static void draw_hints(void)
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
     h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+    if(jump_here())
+    {
+      h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Jump";
+    }
     h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
   }
   ui_hint_packed(h, n, 14);
@@ -3257,6 +3265,8 @@ static void view_reset(void)
 {
   int row = L.cur / GRID_COLS;
 
+  L.jump_t = L.letter_f = -1;
+
   L.top = (row >= GRID_ROWS) ? row - GRID_ROWS + 1 : 0;
   L.off_from = L.top * GRID_PY;
   L.top_f = UI_F_LIST_SCROLL;
@@ -3276,10 +3286,187 @@ static void view_reset(void)
   L.dirty = 1;
 }
 
+/* ---- the letter jump (spec section 4, Letter jump; r5) -------------------------------
+ * List views only: ←→ jumps to the next or previous first letter; a rail of
+ * the first letters present slides in at the right, and a big letter shows
+ * where the cursor landed. Titles that start with anything but A-Z share
+ * one entry, "#". */
+
+#define RAIL_X      464
+#define RAIL_T      38
+#define RAIL_H      208
+#define RAIL_SLOTS  13
+#define RAIL_STAY   60    /* the rail goes this long after the last jump */
+
+static int letter_of(int game)
+{
+  int ch = toupper((unsigned char)L.games[game].title[0]);
+  return ((ch >= 'A') && (ch <= 'Z')) ? ch : '#';
+}
+
+/* the first letters in list order, and the first row of each */
+static int letters(int *key, int *first)
+{
+  int i, j, n = 0;
+
+  for(i = 0; i < L.n; i++)
+  {
+    int k = letter_of(L.order[i]);
+    for(j = 0; (j < n) && (key[j] != k); j++)
+      ;
+    if((j == n) && (n < 27))
+    {
+      key[n] = k;
+      first[n++] = i;
+    }
+  }
+  return n;
+}
+
+static int jump_here(void)
+{
+  return (L.n > 0) && !tab_is(TAB_RECENT) && !tab_is(TAB_FOLDERS) && (L.view != VIEW_GRID);
+}
+
+static void letter_jump(int dir)
+{
+  int key[27], first[27], n = letters(key, first), j, here = letter_of(L.order[L.cur]);
+
+  for(j = 0; (j < n) && (key[j] != here); j++)
+    ;
+  if(dir > 0)
+    j++;
+  else if(L.cur <= first[j])
+    j--;
+  if((j < 0) || (j >= n))
+    return;
+  select_game(first[j]);
+  /* a jump while the big letter is up keeps the tile and swaps the letter */
+  L.letter_keep = (L.letter_f >= 0);
+  L.letter_f = 0;
+  L.letter = key[j];
+  if(L.jump_t < 0)
+    L.rail_f = 0;  /* the rail slides in on the first */
+  L.jump_t = 0;
+}
+
+static void letter_step(void)
+{
+  if(L.jump_t >= 0)
+  {
+    if(L.rail_f < UI_F_RAIL_IN)
+      L.rail_f++;
+    if(++L.jump_t >= RAIL_STAY + UI_F_RAIL_OUT)
+      L.jump_t = -1;
+  }
+  if((L.letter_f >= 0) && (++L.letter_f >= UI_F_LETTER_POP))
+    L.letter_f = -1;
+}
+
+/* a colour t/256 of the way from a to b, per 5-bit channel */
+static u16 mix_to(u16 a, u16 b, int t)
+{
+  int r = (a & 31) + (((b & 31) - (a & 31)) * t + 128) / 256;
+  int g = ((a >> 5) & 31) + ((((b >> 5) & 31) - ((a >> 5) & 31)) * t + 128) / 256;
+  int bl = ((a >> 10) & 31) + ((((b >> 10) & 31) - ((a >> 10) & 31)) * t + 128) / 256;
+  return r | (g << 5) | (bl << 10);
+}
+
+static void draw_letter_jump(void)
+{
+  int key[27], first[27], n, j, lo = 0, here, rx;
+  char t[4];
+
+  if(!jump_here())
+    return;
+  if(L.jump_t >= 0)
+  {
+    n = letters(key, first);
+    here = letter_of(L.order[L.cur]);
+    if(L.jump_t < RAIL_STAY)
+      rx = RAIL_X + 16 - ui_ease_out_cubic(0, 16, L.rail_f, UI_F_RAIL_IN);
+    else
+      rx = RAIL_X + ui_ease_in_cubic(0, 16, L.jump_t - RAIL_STAY, UI_F_RAIL_OUT);
+    for(j = 0; (j < n) && (key[j] != here); j++)
+      ;
+    if(n > RAIL_SLOTS)
+    {
+      /* a window centred on the current letter */
+      lo = j - RAIL_SLOTS / 2;
+      if(lo > n - RAIL_SLOTS)
+        lo = n - RAIL_SLOTS;
+      if(lo < 0)
+        lo = 0;
+    }
+    ui_clip_set(RAIL_X, RAIL_T, 16, RAIL_H);
+    ui_fill(rx, RAIL_T, 16, RAIL_H, UI_COL_PLUM);
+    for(j = 0; (j < RAIL_SLOTS) && (lo + j < n); j++)
+    {
+      int y = RAIL_T + 4 + j * 15, k = lo + j, on = key[k] == here, w;
+      if((j == 0) && (lo > 0))
+        snprintf(t, sizeof(t), "\xE2\x96\xB2");
+      else if((j == RAIL_SLOTS - 1) && (lo + RAIL_SLOTS < n))
+        snprintf(t, sizeof(t), "\xE2\x96\xBC");
+      else
+      {
+        t[0] = key[k];
+        t[1] = 0;
+        if(on)
+          ui_round_fill(rx + 1, y + 1, 14, 15, 2, UI_COL_TANGERINE);
+      }
+      w = ui_print_width(t, UI_FONT_BODY, 0);
+      ui_print(rx + 8 - w / 2, y, t, (on && (t[1] == 0)) ? UI_COL_PLUM : UI_COL_MUTE,
+       UI_FONT_BODY, 0);
+    }
+    ui_clip_reset();
+  }
+  if(L.letter_f >= 0)
+  {
+    /* it grows over 20 f with its letter on it (out-back), holds, and fades
+       over the last 8 f; a jump while it is up only pops it by 2 px */
+    int f = L.letter_f, size, fade, x, y, w;
+    u16 tile, ink;
+    if(L.letter_keep)
+      size = ui_ease_out_back(60, 64, (f < 8) ? f : 8, 8);
+    else
+      size = (f < UI_F_LETTER_POP / 2) ? ui_ease_out_back(0, 64, f, UI_F_LETTER_POP / 2) : 64;
+    fade = (f < UI_F_LETTER_POP - 8) ? 256 : (UI_F_LETTER_POP - f) * 256 / 8;
+    if(size < 4)
+      return;
+    if(size > 72)
+      size = 72;
+    tile = mix_to(UI_COL_PLUM, UI_COL_CREAM, fade);
+    ink = mix_to(UI_COL_CREAM, UI_COL_PLUM, fade);
+    x = 300 - size / 2;
+    y = 127 - size / 2;
+    ui_round_fill(x + 3, y + 3, size, size, 4, UI_COL_SHADE);
+    ui_round_fill(x, y, size, size, 4, tile);
+    t[0] = L.letter;
+    t[1] = 0;
+    if(size >= 48)
+    {
+      w = ui_print_width(t, UI_FONT_BODY, UI_TEXT_3X);
+      ui_print(300 - w / 2, y + size / 2 - 26, t, ink, UI_FONT_BODY, UI_TEXT_3X);
+    }
+    else if(size >= 24)
+    {
+      w = ui_print_width(t, UI_FONT_BODY, UI_TEXT_2X);
+      ui_print(300 - w / 2, y + size / 2 - 17, t, ink, UI_FONT_BODY, UI_TEXT_2X);
+    }
+  }
+}
+
 static void move(void)
 {
   if(L.n == 0)
     return;
+  if(jump_here())
+  {
+    if(ui_repeat(PSP_CTRL_LEFT))
+      letter_jump(-1);
+    else if(ui_repeat(PSP_CTRL_RIGHT))
+      letter_jump(1);
+  }
   if(L.view == VIEW_GRID)
   {
     if(ui_repeat(PSP_CTRL_LEFT) && (L.cur > 0))
@@ -3623,6 +3810,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       panel_step();
     if(L.cur_f < UI_F_CURSOR) L.cur_f++;
     L.marq_f++;
+    letter_step();
     if(L.dirty)
       build_ground();
 
@@ -3660,6 +3848,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         panel_selection();
       else
         list_selection();
+      if(!L.pop)
+        draw_letter_jump();
     }
     if(L.pop)
     {

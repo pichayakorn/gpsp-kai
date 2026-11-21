@@ -160,7 +160,7 @@ static void put(int x, int y, u16 color)
     ui_fb[y * ui_fb_pitch + x] = color;
 }
 
-/* Draw one glyph's set pixels; scale is 1 or 2. */
+/* Draw one glyph's set pixels; scale is 1, 2 or 3. */
 static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, int scale)
 {
   int j, inside = (x >= ui_clip_x0) && (y >= ui_clip_y0) && (x + font->width * scale <= ui_clip_x1) &&
@@ -180,7 +180,7 @@ static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, 
     {
       int i = __builtin_clz(v);
       v &= ~(0x80000000u >> i);
-      if(inside)
+      if(inside && (scale < 3))
       {
         if(scale == 1)
           row[i] = color;
@@ -192,13 +192,10 @@ static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, 
       }
       else
       {
-        put(x + i * scale, y + j * scale, color);
-        if(scale == 2)
-        {
-          put(x + i * 2 + 1, y + j * 2, color);
-          put(x + i * 2, y + j * 2 + 1, color);
-          put(x + i * 2 + 1, y + j * 2 + 1, color);
-        }
+        int a, b;
+        for(b = 0; b < scale; b++)
+          for(a = 0; a < scale; a++)
+            put(x + i * scale + a, y + j * scale + b, color);
       }
     }
   }
@@ -210,7 +207,7 @@ static int glyph(int x, int y, u32 c, u16 color, int size, int flags, int draw)
 {
   const ui_fbm_t *font = NULL;
   const u8 *g = find_glyph(c, size, &font);
-  int scale = (flags & UI_TEXT_2X) ? 2 : 1;
+  int scale = (flags & UI_TEXT_3X) ? 3 : (flags & UI_TEXT_2X) ? 2 : 1;
   int bold = (flags & UI_TEXT_BOLD) && boldable(c);
   /* bold advances 1 px per glyph; the "…" is not struck (its dots would
      run into a bar) but advances the same (spec section 1, Type) */
