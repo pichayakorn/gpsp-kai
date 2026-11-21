@@ -60,6 +60,10 @@ void cheat_engine_frame(void);
 void cheat_engine_page_loaded(u32 physical_index, u8 *page);
 
 u32 cheat_count(void);
+/* Every cheat the files hold, past CE_MAX_CHEATS too (master codes aside) */
+u32 cheat_total(void);
+/* A master code by its name ("(M)", "must be on"): never loaded */
+u32 cheat_name_is_master(const char *name);
 const char *cheat_name(u32 i);
 u32 cheat_status(u32 i);           /* CE_* */
 const char *cheat_why(u32 i);      /* the reason in plain words, or NULL */

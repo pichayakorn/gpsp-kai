@@ -8,8 +8,11 @@
  * A group's page: × switches a cheat, △ turns every unlocked one off (with
  * Undo), SELECT locks a cheat on (All off skips it; it turns off only after
  * unlocking; a ROM fix or master code locks itself when switched on, and
- * kai never switches a cheat on by itself). A cheat the engine can't run is
- * greyed, and the tip line says why. A group's rule changes its rows:
+ * kai never switches a cheat on by itself). Cheats the engine can't run
+ * are folded at the bottom under one "Can't run (N)" row (× opens it);
+ * opened they are greyed, and the tip line says why. In a page taller than
+ * the screen ←→ jumps along a rail of marks made from the part of the
+ * names that differs. A group's rule changes its rows:
  * one at a time has round marks (choosing one switches the one before
  * off, with Undo), runs once has Apply (it runs when the game goes on,
  * then switches itself off), needs a restart offers to restart the game.
@@ -27,6 +30,12 @@
 #define TOAST_Y    214
 #define ON_NOW     (-1)        /* the page of every cheat that is on */
 #define GROUPS     (-2)        /* the list of groups */
+#define FOLD       0xFFFF      /* the "Can't run (N)" row of a page */
+#define MARKS      11          /* the jump rail: marks every ~10 % */
+#define RAIL_X     464
+#define RAIL_Y     38
+#define MARK_PITCH 17
+#define JUMP_F     24          /* the big tile after a jump */
 
 static const u16 icon_lock[11] =
  { 0x000, 0x0F8, 0x104, 0x104, 0x3FE, 0x3FE, 0x3DE, 0x3DE, 0x3FE, 0x3FE, 0x000 };
@@ -38,7 +47,7 @@ static const u16 icon_star[11] =
  { 0x020, 0x020, 0x070, 0x070, 0x7FF, 0x3FE, 0x1FC, 0x1FC, 0x3DE, 0x306, 0x202 };
 
 /* what a row is */
-enum { R_ON_NOW, R_GROUP, R_CANT, R_SWITCH, R_RADIO, R_ONCE };
+enum { R_ON_NOW, R_GROUP, R_CANT, R_SWITCH, R_RADIO, R_ONCE, R_FOLD };
 
 /* what Undo puts back */
 enum { UNDO_NONE, UNDO_ALL_OFF, UNDO_CHOICE };
@@ -61,6 +70,13 @@ static struct
   int restart;                 /* Restart now was chosen */
   int dirty;
   int view_b;                  /* the bottom of the last whole row in view */
+  int fold_open;               /* the cheats that can't run are shown */
+  int n_cant;                  /* cheats under the fold */
+  int marks, mark_row[MARKS];  /* the jump rail; 0: none */
+  char mark_text[MARKS][12];
+  int jump_f, jump_mark;       /* the big tile; -1: none */
+  int marq_f;                  /* frames the cursor has rested (the marquee) */
+  int label_x, label_w;        /* the selected row's name, for the marquee */
 } c;
 
 static u16 rows[CE_MAX_CHEATS + 1];   /* a page's cheats, or the list's groups */
@@ -100,6 +116,8 @@ static int row_kind(int r)
 
   if(on_list())
     return (r == 0) ? R_ON_NOW : R_GROUP;
+  if(rows[r] == FOLD)
+    return R_FOLD;
   i = cheat_at(r);
   if(cheat_status(i) != CE_OK)
     return R_CANT;
@@ -124,11 +142,25 @@ static int fix_or_master(int i)
   return strstr(low, "fix") || strstr(low, "master");
 }
 
+/* runs-once cheats marked Ready, counted apart from the ones that are on */
+static int is_ready(int i)
+{
+  return cheat_is_on(i) && (rule_of(i) == CE_RULE_ONCE);
+}
+
 static int count_on_all(void)
 {
   int i, n = 0;
   for(i = 0; i < (int)cheat_count(); i++)
-    n += cheat_is_on(i);
+    n += cheat_is_on(i) && !is_ready(i);
+  return n;
+}
+
+static int count_ready_all(void)
+{
+  int i, n = 0;
+  for(i = 0; i < (int)cheat_count(); i++)
+    n += is_ready(i);
   return n;
 }
 
@@ -203,6 +235,17 @@ static int chip(int x, const char *s, u16 fill)
   return x + w + 6;
 }
 
+/* past kai's limit: "first 1024 of 1210" */
+static int limit_chip(int x)
+{
+  char s[40];
+
+  if(cheat_total() <= cheat_count())
+    return x;
+  snprintf(s, sizeof(s), "first %d of %d", (int)cheat_count(), (int)cheat_total());
+  return chip(x, s, UI_COL_MUTE);
+}
+
 static void draw_header(void)
 {
   const char *title = (on_list() || !cheat_count()) ? "Cheats" :
@@ -220,6 +263,7 @@ static void draw_header(void)
   {
     snprintf(s1, sizeof(s1), "%d cheats", (int)cheat_count());
     x = chip(x, s1, UI_COL_LIME);
+    x = limit_chip(x);
     if(count_cant_all())
     {
       snprintf(s2, sizeof(s2), "%d can't run", count_cant_all());
@@ -229,15 +273,22 @@ static void draw_header(void)
   else if(c.page == ON_NOW)
   {
     snprintf(s1, sizeof(s1), "%d on", count_on_all());
-    chip(x, s1, UI_COL_LIME);
+    x = chip(x, s1, UI_COL_LIME);
+    if(count_ready_all())
+    {
+      snprintf(s2, sizeof(s2), "%d ready", count_ready_all());
+      chip(x, s2, UI_COL_SKY);
+    }
   }
   else
   {
     int on, cant, rule = cheat_group_rule(c.page);
     group_counts(c.page, &on, &cant);
-    snprintf(s1, sizeof(s1), "%d of %d on", on, c.n);
+    snprintf(s1, sizeof(s1), "%d of %d on", on, (int)cheat_group_size(c.page));
     if(rule != CE_RULE_ONCE)
       x = chip(x, s1, UI_COL_LIME);
+    if(c.single)
+      x = limit_chip(x);
     switch(rule)
     {
       case CE_RULE_ONE:     x = chip(x, "One at a time", UI_COL_SKY); break;
@@ -274,8 +325,9 @@ static void draw_row(int r, int y, int sel)
 {
   static const char *const rule_words[] = { "", "one at a time", "runs once", "needs a restart" };
   int kind = row_kind(r), lift = sel ? UI_LIFT : 0, x = UI_MARGIN - lift, yy = y - lift;
-  int lx = x + 8, xr = x + 440 - 8, i = on_list() ? -1 : cheat_at(r);
-  int cant = kind == R_CANT;
+  int lx = x + 8, xr = x + 440 - 8, i = (on_list() || (kind == R_FOLD)) ? -1 : cheat_at(r);
+  int cant = (kind == R_CANT) || (kind == R_FOLD);
+  char fold[32];
   u16 ink = sel ? UI_COL_PLUM : (cant ? UI_COL_MUTE : UI_COL_CREAM);
   u16 note = sel ? UI_COL_PLUM : UI_COL_MUTE;
   char meta[64];
@@ -294,6 +346,9 @@ static void draw_row(int r, int y, int sel)
       draw_icon11(lx, yy + 4, icon_star, sel ? UI_COL_PLUM : UI_COL_LIME, 1);
       label = "On now";
       snprintf(meta, sizeof(meta), "%d on", count_on_all());
+      if(count_ready_all())
+        snprintf(meta + strlen(meta), sizeof(meta) - strlen(meta), " \xC2\xB7 %d ready",
+         count_ready_all());
     }
     else
     {
@@ -305,6 +360,12 @@ static void draw_row(int r, int y, int sel)
        cheat_group_rule(g) ? " \xC2\xB7 " : "", rule_words[cheat_group_rule(g) & 3]);
     }
     lx += 22;
+  }
+  else if(kind == R_FOLD)
+  {
+    snprintf(fold, sizeof(fold), "Can't run (%d)", c.n_cant);
+    label = fold;
+    xr = print_r(xr, yy + 3, c.fold_open ? "\xE2\x96\xBE" : "\xE2\x96\xB8", note) - 10;
   }
   else
   {
@@ -364,6 +425,11 @@ static void draw_row(int r, int y, int sel)
       xr = print_r(xr, yy + 3, meta, note);
   }
   ui_print_fit(lx, yy + 2, label[0] ? label : "\xE2\x80\x94", ink, UI_FONT_BODY, 0, xr - 6 - lx);
+  if(sel)
+  {
+    c.label_x = lx;
+    c.label_w = xr - 6 - lx;
+  }
 }
 
 static void draw_hints(void)
@@ -379,9 +445,9 @@ static void draw_hints(void)
     return;
   }
   kind = row_kind(c.cur);
-  if(!on_list() && (c.n > ROWS_SEEN))
+  if(c.marks)
   {
-    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Page";
+    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Jump";
   }
   /* while a toast offers Undo, SELECT is Undo */
   if(c.undo != UNDO_NONE)
@@ -402,6 +468,7 @@ static void draw_hints(void)
   {
     case R_ON_NOW:
     case R_GROUP:  h[n++].verb = "Open"; break;
+    case R_FOLD:   h[n++].verb = c.fold_open ? "Close" : "Open"; break;
     case R_SWITCH:
       if(!cheat_is_locked(cheat_at(c.cur)))  /* a locked cheat ignores confirm */
         h[n++].verb = "Switch";
@@ -431,6 +498,41 @@ static void draw_empty(void)
   if(w > 440)
     w = 440;
   ui_print_fit(240 - w / 2, 166, b, UI_COL_MUTE, UI_FONT_SMALL, 0, 440);
+}
+
+/* the mark the cursor is at: the last one at or above it */
+static int mark_at(int r)
+{
+  int j = 0;
+  while((j + 1 < c.marks) && (c.mark_row[j + 1] <= r))
+    j++;
+  return j;
+}
+
+static void draw_rail(void)
+{
+  int j, cur = mark_at(c.cur);
+
+  ui_fill(RAIL_X, RAIL_Y, 16, LIST_B - RAIL_Y, UI_COL_PLUM);
+  for(j = 0; j < c.marks; j++)
+  {
+    int y = RAIL_Y + 2 + j * MARK_PITCH, w = ui_print_width(c.mark_text[j], UI_FONT_SMALL, 0);
+    if(j == cur)
+      ui_round_fill(RAIL_X, y + 1, 16, 14, 2, UI_COL_TANGERINE);
+    ui_print((w > 16) ? UI_SCREEN_W - 1 - w : RAIL_X + 8 - w / 2, y + 1, c.mark_text[j], (j == cur) ? UI_COL_PLUM : UI_COL_MUTE,
+     UI_FONT_SMALL, 0);
+  }
+}
+
+/* the big tile after a jump: the mark at 2x */
+static void draw_jump_tile(void)
+{
+  const char *t = c.mark_text[c.jump_mark];
+  int w = ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+
+  ui_round_fill(270, 98, 64, 64, 4, UI_COL_SHADE);
+  ui_round_fill(267, 95, 64, 64, 4, UI_COL_PLUM);
+  ui_print(299 - w / 2, 95 + 18, t, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
 }
 
 static void build_ground(void)
@@ -463,7 +565,9 @@ static void build_ground(void)
       draw_row(r, y, 0);
     }
     ui_clip_reset();
-    if(c.n > ROWS_SEEN)
+    if(c.marks)
+      draw_rail();
+    else if(c.n > ROWS_SEEN)
     {
       int track = LIST_B - LIST_T - 8, th = track * ROWS_SEEN / c.n, ty;
       if(th < 8)
@@ -486,6 +590,8 @@ static const char *tip_text(void)
     return NULL;
   if(on_list())
     return "Each file in the game's cheat folder is a group.";
+  if(rows[c.cur] == FOLD)
+    return "Cheats kai can't run, folded away: \xC3\x97 shows them.";
   i = cheat_at(c.cur);
   if(cheat_status(i) != CE_OK)
     return cheat_why(i);
@@ -508,11 +614,11 @@ static void help_text(const char **t, const char **b)
   if((c.n > 0) && !on_list())
   {
     int i = cheat_at(c.cur);
-    if(cheat_status(i) != CE_OK)
+    if((rows[c.cur] == FOLD) || (cheat_status(i) != CE_OK))
     {
       *t = "Can't run";
       *b = "kai checks every code when the file loads. A greyed cheat can't be switched on; "
-       "the tip line says why.";
+       "the tip line says why. Master codes (\"must be on\") are hidden: kai doesn't need them.";
       return;
     }
     rule = rule_of(i);
@@ -541,6 +647,32 @@ static void help_text(const char **t, const char **b)
   }
 }
 
+/* A name longer than its row runs sideways once the cursor has rested, as
+   the library's do: 1 px a frame, a wait at the end, then again. */
+static void draw_marquee(int yy)
+{
+  int kind = row_kind(c.cur), w, over, t, cycle, shift;
+  const char *name;
+
+  if(on_list() || (kind == R_FOLD) || (c.top_f < UI_F_SCROLL) || (yy < LIST_T - 4) ||
+   (yy + UI_ROW_H > c.view_b + 3))
+    return;
+  name = cheat_name(cheat_at(c.cur));
+  w = ui_print_width(name, UI_FONT_BODY, 0);
+  over = w - c.label_w;
+  t = c.marq_f - UI_MARQUEE_DELAY;
+  if((over <= 0) || (t <= 0))
+    return;
+  cycle = over + 2 * UI_MARQUEE_DELAY;
+  t %= cycle;
+  shift = (t < over) ? t : (t < over + UI_MARQUEE_DELAY) ? over : 0;
+  ui_fill(c.label_x, yy + 1, c.label_w + 6, UI_ROW_H - 2,
+   (kind == R_CANT) ? UI_COL_MUTE : UI_COL_LIME);
+  ui_clip_set(c.label_x, yy, c.label_w, UI_ROW_H);
+  ui_print(c.label_x - shift, yy + 2, name, UI_COL_PLUM, UI_FONT_BODY, 0);
+  ui_clip_reset();
+}
+
 /* the selected row over the ground, the cursor frame, the tip */
 static void draw_selection(void)
 {
@@ -556,6 +688,9 @@ static void draw_selection(void)
   ui_cursor_frame(UI_MARGIN - UI_LIFT, ui_ease_out_back(y0, y1, c.cur_f, UI_F_CURSOR) - UI_LIFT,
    440, UI_ROW_H);
   ui_clip_reset();
+  draw_marquee(y1 - UI_LIFT);
+  if(c.jump_f >= 0)
+    draw_jump_tile();
   tip = tip_text();
   if(tip && (c.rest > UI_F_TIP_DELAY))
   {
@@ -653,8 +788,11 @@ static int ask(const char *title, const char *body, const char *b0, const char *
 /* A cheat that works from the game's start was switched on. */
 static void ask_restart(void)
 {
-  if(ask("Restart the game?", "This cheat works from the game's start. kai saves to Last, then "
-   "starts the game again.", "Restart now", "Later", UI_COL_TANGERINE, "Later", NULL) == 0)
+  const char *body = g_gpsp_config.save_on_leave ?
+   "This cheat works from the game's start. kai saves to Last, then starts the game again." :
+   "The game starts again from its beginning. Your save file is kept.";
+
+  if(ask("Restart the game?", body, "Restart now", "Later", UI_COL_TANGERINE, "Later", NULL) == 0)
     c.restart = 1;
 }
 
@@ -672,6 +810,7 @@ static void select_row(int i)
   c.cur = i;
   c.cur_f = 0;
   c.rest = 0;
+  c.marq_f = 0;
   if((i < c.top) || (i >= c.top + ROWS_SEEN))
   {
     c.top_from = top_px();  /* a new slide starts from where it is now */
@@ -689,30 +828,132 @@ static void show_toast(const char *text, int undo)
   c.dirty = 1;
 }
 
-/* a page: GROUPS, ON_NOW or a group, its cursor on row cur */
-static void open_page(int page, int cur)
+/* the part of a name after the start every name shares, cut back to a
+   word; its first word, as much as the rail's 16 px holds */
+static void mark_text(const char *name, int skip, char *out)
 {
-  int i;
+  int k = 0, w;
 
-  c.page = page;
-  c.n = 0;
-  if(page == GROUPS)
+  name += skip;
+  while(*name == ' ')
+    name++;
+  /* a number is never cut short: its leading zeros go first, and a long
+     one keeps every digit */
+  for(k = 0; (k < 11) && isdigit((unsigned char)name[k]); k++)
+    ;
+  if(k && (!name[k] || (name[k] == ' ')))
+  {
+    while((*name == '0') && isdigit((unsigned char)name[1]) && (k > 3))
+    {
+      name++;
+      k--;
+    }
+    memcpy(out, name, k);
+    out[k] = 0;
+    return;
+  }
+  k = 0;
+  while(name[k] && (name[k] != ' ') && (k < 11))
+  {
+    int len = 1;
+    while((((u8)name[k + len] & 0xC0) == 0x80) && (k + len < 11))
+      len++;
+    memcpy(out, name, k + len);
+    out[k + len] = 0;
+    w = ui_print_width(out, UI_FONT_SMALL, 0);
+    if((w > 15) && k)
+      break;
+    k += len;
+  }
+  out[k] = 0;
+  if(!k)
+    snprintf(out, 12, "\xC2\xB7");
+}
+
+/* the jump rail of a page taller than the screen: ~10 marks evenly
+   through its cheats, named by what differs */
+static void build_marks(void)
+{
+  static u16 at[CE_MAX_CHEATS + 1];
+  int r, n = 0, j, skip = -1;
+
+  c.marks = 0;
+  if(on_list() || (c.n <= ROWS_SEEN))
+    return;
+  for(r = 0; r < c.n; r++)
+    if(rows[r] != FOLD)
+      at[n++] = r;
+  if(n < 2)
+    return;
+  /* the start every name shares */
+  for(r = 1; r < n; r++)
+  {
+    const char *a = cheat_name(cheat_at(at[0])), *b = cheat_name(cheat_at(at[r]));
+    int k = 0;
+    while(a[k] && (a[k] == b[k]) && ((skip < 0) || (k < skip)))
+      k++;
+    skip = k;
+  }
+  {
+    const char *a = cheat_name(cheat_at(at[0]));
+    while((skip > 0) && (a[skip - 1] != ' '))
+      skip--;  /* back to a whole word */
+  }
+  c.marks = (n < MARKS) ? n : MARKS;
+  for(j = 0; j < c.marks; j++)
+  {
+    c.mark_row[j] = at[j * (n - 1) / (c.marks - 1)];
+    mark_text(cheat_name(cheat_at(c.mark_row[j])), skip, c.mark_text[j]);
+  }
+}
+
+/* a page's rows: runnable cheats, then the fold, then (open) the rest */
+static void fill_rows(void)
+{
+  int i, k;
+
+  c.n = c.n_cant = 0;
+  if(c.page == GROUPS)
   {
     rows[c.n++] = 0;  /* On now */
     for(i = 0; i < (int)cheat_group_count(); i++)
       rows[c.n++] = i;
   }
-  else if(page == ON_NOW)
+  else if(c.page == ON_NOW)
   {
     /* what is on now: the list stays as it is while the page is open, so a
-       cheat switched off here can be switched back on */
-    for(i = 0; i < (int)cheat_count(); i++)
-      if(cheat_is_on(i))
-        rows[c.n++] = i;
+       cheat switched off here can be switched back on; Ready ones last */
+    for(k = 0; k < 2; k++)
+      for(i = 0; i < (int)cheat_count(); i++)
+        if(cheat_is_on(i) && (is_ready(i) == k))
+          rows[c.n++] = i;
   }
   else
-    for(i = 0; i < (int)cheat_group_size(page); i++)
-      rows[c.n++] = cheat_group_first(page) + i;
+  {
+    int first = cheat_group_first(c.page), end = first + cheat_group_size(c.page);
+    for(i = first; i < end; i++)
+      if(cheat_status(i) == CE_OK)
+        rows[c.n++] = i;
+      else
+        c.n_cant++;
+    if(c.n_cant)
+    {
+      rows[c.n++] = FOLD;
+      if(c.fold_open)
+        for(i = first; i < end; i++)
+          if(cheat_status(i) != CE_OK)
+            rows[c.n++] = i;
+    }
+  }
+  build_marks();
+}
+
+/* a page: GROUPS, ON_NOW or a group, its cursor on row cur */
+static void open_page(int page, int cur)
+{
+  c.page = page;
+  c.fold_open = 0;  /* shut each time a page opens */
+  fill_rows();
   c.cur = c.from = (cur < c.n) ? cur : 0;
   c.cur_f = UI_F_CURSOR;
   c.top = (c.cur >= ROWS_SEEN) ? c.cur - ROWS_SEEN + 1 : 0;
@@ -722,6 +963,47 @@ static void open_page(int page, int cur)
   c.rest = 0;
   c.toast_f = -1;
   c.undo = UNDO_NONE;
+  c.jump_f = -1;
+  c.marq_f = 0;
+  c.dirty = 1;
+}
+
+/* × on the fold: the cheats that can't run show or go */
+static void toggle_fold(void)
+{
+  c.fold_open = !c.fold_open;
+  fill_rows();
+  if(c.top > c.n - ROWS_SEEN)
+  {
+    c.top_from = top_px();
+    c.top = (c.n > ROWS_SEEN) ? c.n - ROWS_SEEN : 0;
+    c.top_f = 0;
+  }
+  if(c.fold_open && (c.cur + 1 < c.n) && (c.cur + 1 >= c.top + ROWS_SEEN))
+  {
+    /* the first one shows under the fold */
+    c.top_from = top_px();
+    c.top = c.cur + 2 - ROWS_SEEN;
+    c.top_f = 0;
+  }
+  c.rest = 0;
+  c.dirty = 1;
+}
+
+/* ←→ on a page with a rail: the next mark, or back to this one's start */
+static void jump(int dir)
+{
+  int j = mark_at(c.cur);
+
+  if(dir > 0)
+    j++;
+  else if(c.cur <= c.mark_row[j])
+    j--;
+  if((j < 0) || (j >= c.marks))
+    return;
+  select_row(c.mark_row[j]);
+  c.jump_mark = j;
+  c.jump_f = 0;
   c.dirty = 1;
 }
 
@@ -759,6 +1041,9 @@ static void press_confirm(void)
       return;
     case R_GROUP:
       open_group(rows[r]);
+      return;
+    case R_FOLD:
+      toggle_fold();
       return;
     case R_CANT:
       return;
@@ -845,7 +1130,8 @@ static void press_all_off(void)
     for(r = 0; r < c.n; r++)
     {
       i = cheat_at(r);
-      undo_on[i] = cheat_is_on(i) && !cheat_is_locked(i);
+      if(i != FOLD)
+        undo_on[i] = cheat_is_on(i) && !cheat_is_locked(i);
     }
   for(i = 0; i < (int)cheat_count(); i++)
     if(undo_on[i])
@@ -860,6 +1146,7 @@ int ui_cheats(void)
   u32 mark = ui_pool_mark();
 
   memset(&c, 0, sizeof(c));
+  c.jump_f = -1;
   c.value_f = UI_F_VALUE;
   c.lock_f = UI_F_VALUE;
   ui_status_read();
@@ -897,13 +1184,12 @@ int ui_cheats(void)
     else if(c.n > 0)
     {
       select_row(ui_step(c.cur, c.n, PSP_CTRL_UP, PSP_CTRL_DOWN));
-      if(!on_list() && (c.n > ROWS_SEEN))
+      if(c.marks)
       {
-        /* ←→ a page: the rows in view */
         if(ui_repeat(PSP_CTRL_LEFT))
-          select_row(c.cur - ROWS_SEEN);
+          jump(-1);
         else if(ui_repeat(PSP_CTRL_RIGHT))
-          select_row(c.cur + ROWS_SEEN);
+          jump(1);
       }
       if(ui_pressed(PSP_CTRL_SELECT))
         press_select();
@@ -920,6 +1206,8 @@ int ui_cheats(void)
     if(c.value_f < UI_F_VALUE) { c.value_f++; c.dirty = 1; }
     if(c.lock_f < UI_F_VALUE) { c.lock_f++; c.dirty = 1; }
     if(c.rest < UI_F_TIP_DELAY + 8) c.rest++;
+    if(c.marq_f < 30000) c.marq_f++;
+    if(c.jump_f >= 0) { if(++c.jump_f >= JUMP_F) c.jump_f = -1; }
     if(c.dirty)
       build_ground();
 
