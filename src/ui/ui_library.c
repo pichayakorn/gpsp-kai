@@ -1543,6 +1543,14 @@ static void panel_step(void)
 
 static int banner_up(void);
 
+/* the Recent tab shows once a game has been played, unless System's "Show
+   Recent tab" is off: then the library opens on All, as before the first
+   game (maintainer, 2026-11-21) */
+static int recent_tab_on(void)
+{
+  return (L.recent_count > 0) && g_gpsp_config.show_recent;
+}
+
 /* a game's savestate file for slot 0-10 */
 static void state_path(int game, int slot, char *out)
 {
@@ -2852,7 +2860,7 @@ static int notice_in_view(void)
    list instead, so it hides no game (design session, 2026-11-19) */
 static int list_banner(void)
 {
-  return banner_up() && (L.recent_count == 0) && (L.tab_ids[L.tab] == TAB_ALL) && (L.n > 0);
+  return banner_up() && !recent_tab_on() && (L.tab_ids[L.tab] == TAB_ALL) && (L.n > 0);
 }
 
 /* the notice: one cream line, 440 x 16 at x 20 with a 4 px tangerine edge;
@@ -2932,7 +2940,8 @@ static void draw_popup(void)
 
 /* ---- hints, the empty library, the ground --------------------------------------------- */
 
-static const char *tab_names[4] = { "Recent", "All", "\xE2\x98\x85 Favourites", "Folders" };
+/* the heart means favourite everywhere (maintainer, 2026-11-21) */
+static const char *tab_names[4] = { "Recent", "All", "\xE2\x99\xA5 Favourites", "Folders" };
 
 static int tab_is(int id)
 {
@@ -2962,7 +2971,7 @@ static void fill_order(void)
 static void tabs_init(void)
 {
   L.tab_count = 0;
-  if(L.recent_count > 0)
+  if(recent_tab_on())
     L.tab_ids[L.tab_count++] = TAB_RECENT;
   L.tab_ids[L.tab_count++] = TAB_ALL;
   L.tab_ids[L.tab_count++] = TAB_FAV;

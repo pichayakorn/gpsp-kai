@@ -71,6 +71,7 @@ typedef struct
   u32 library_view;        // Library: bits 1-2, 3-4, 5-6 the sorts of All, Favourites, Folders; bits 7-8, 9-10 the views of All, Favourites (0 Panel, 1 Shelf, 2 Grid)
   u32 bios_note;           // YES: the library notes a missing GBA BIOS
   u32 first_run_done;      // YES once the 4.0 first-run cards were shown
+  u32 show_recent;         // YES: the library has its Recent tab
 #if 0
   u32 solar_level;
 #endif
