@@ -55,6 +55,9 @@
  * (GameShark v1/v2 or Action Replay v3, each encrypted or already
  * decrypted): the file is read with the one under which the most of its
  * cheats can run (maintainer, 2026-11-19: kai tells the kind itself).
+ * Master codes ("(M) Must Be On") only mattered to a cheat device: they
+ * are skipped, neither kept nor counted. A game keeps its first 1024
+ * cheats; cheat_total() says how many its files hold.
  * Ported from another GPL-2.0 PSP GBA emulator; the
  * cipher tables in cheats_gs_cipher.h keep their own MPL-2.0 notice.
  *
@@ -116,6 +119,7 @@ static u32 ce_group_count;
 static u32 ce_answer;   /* how bare codes are read: a TAG_*, or 0 (they wait) */
 static u32 ce_applied;  /* runs-once cheats that ran, since the last ask */
 static u32 ce_counting, ce_counted;  /* cheat_engine_peek(): only count */
+static u32 ce_total;                 /* every cheat the files hold, kept or not */
 static char ce_applied_name[CE_NAME_LENGTH];
 
 static cheat_entry ce[CE_MAX_CHEATS];
@@ -1102,15 +1106,23 @@ static void finish_cheat(const char *name, int kind)
   ce_error err;
   u32 save_rec = ce_rec_used, save_patch = ce_patch_used;
 
-  if(ce_counting)
+  if((kind == K_NONE) || (!code_len && !code_cut) || cheat_name_is_master(name))
   {
-    ce_counted += (kind != K_NONE) && (code_len || code_cut);
+    /* nothing to run; a master code does nothing in kai: not kept, not counted */
     code_len = 0;
     code_cut = 0;
     return;
   }
-  if((kind == K_NONE) || (!code_len && !code_cut) || (ce_count >= CE_MAX_CHEATS) ||
-   (ce_group_count == 0))
+  if(ce_counting)
+  {
+    ce_counted++;
+    code_len = 0;
+    code_cut = 0;
+    return;
+  }
+  if(ce_group_count)
+    ce_total++;
+  if((ce_count >= CE_MAX_CHEATS) || (ce_group_count == 0))
   {
     code_len = 0;
     code_cut = 0;
@@ -1258,7 +1270,7 @@ static void trim(char *s)
 static char db_text[CE_DB_TEXT];
 static u32 db_used;
 static struct { u32 desc, code; u8 cut; } db[CE_MAX_CHEATS];
-static u32 db_top;
+static u32 db_top, db_past;  /* db_past: entries past CE_MAX_CHEATS */
 
 static int db_line(char *line, int cut)
 {
@@ -1268,6 +1280,8 @@ static int db_line(char *line, int cut)
   if(sscanf(line, " cheat%u_%7[a-z]", &n, key) != 2)
     return 0;
   eq = strchr(line, '=');
+  if(eq && (n >= CE_MAX_CHEATS) && !strcmp(key, "code") && (n + 1 - CE_MAX_CHEATS > db_past))
+    db_past = n + 1 - CE_MAX_CHEATS;
   if(!eq || (n >= CE_MAX_CHEATS))
     return 1;
   v = eq + 1;
@@ -1316,7 +1330,7 @@ static void read_file(FILE *f)
   name[0] = 0;
   code_len = 0;
   code_cut = 0;
-  db_used = db_top = 0;
+  db_used = db_top = db_past = 0;
   memset(db, 0, sizeof(db));
   while(fgets(line, sizeof(line), f))
   {
@@ -1424,6 +1438,10 @@ static void read_file(FILE *f)
         code_cut |= db[i].cut;
         finish_cheat(db[i].desc ? db_text + db[i].desc - 1 : "", K_NEW);
       }
+  if(ce_counting)
+    ce_counted += db_past;
+  else if(ce_group_count)
+    ce_total += db_past;
 }
 
 /* ---- what is on ---------------------------------------------------------------- */
@@ -1505,7 +1523,7 @@ void cheat_engine_save(void)
 
 void cheat_engine_clear(void)
 {
-  ce_count = ce_rec_used = ce_patch_used = ce_work_used = 0;
+  ce_count = ce_rec_used = ce_patch_used = ce_work_used = ce_total = 0;
   ce_group_count = 0;
   ce_applied = 0;
   ce_rom[0] = 0;
@@ -1515,7 +1533,7 @@ void cheat_engine_clear(void)
 /* What a file's reading added, to take back for another reading */
 typedef struct
 {
-  u32 count, rec_used, patch_used, work_used, group_count;
+  u32 count, rec_used, patch_used, work_used, group_count, total;
   cheat_group group;
 } read_mark;
 
@@ -1526,6 +1544,7 @@ static void mark_set(read_mark *m)
   m->patch_used = ce_patch_used;
   m->work_used = ce_work_used;
   m->group_count = ce_group_count;
+  m->total = ce_total;
   if(ce_group_count)
     m->group = ce_groups[ce_group_count - 1];
 }
@@ -1537,6 +1556,7 @@ static void mark_back(const read_mark *m)
   ce_patch_used = m->patch_used;
   ce_work_used = m->work_used;
   ce_group_count = m->group_count;
+  ce_total = m->total;
   if(ce_group_count)
     ce_groups[ce_group_count - 1] = m->group;
 }
@@ -1770,6 +1790,23 @@ u32 cheat_count(void)
   return ce_count;
 }
 
+u32 cheat_total(void)
+{
+  return (ce_total > ce_count) ? ce_total : ce_count;
+}
+
+/* "(M) Must Be On" and the like: a master code a cheat device needed */
+u32 cheat_name_is_master(const char *name)
+{
+  char low[CE_NAME_LENGTH];
+  u32 k;
+
+  for(k = 0; name[k] && (k < sizeof(low) - 1); k++)
+    low[k] = tolower((unsigned char)name[k]);
+  low[k] = 0;
+  return strstr(low, "(m)") || strstr(low, "[m]") || strstr(low, "must be on");
+}
+
 const char *cheat_name(u32 i)
 {
   return (i < ce_count) ? ce[i].name : "";
@@ -1782,12 +1819,20 @@ u32 cheat_status(u32 i)
 
 const char *cheat_why(u32 i)
 {
-  switch(cheat_status(i))
+  if(cheat_status(i) == CE_OK)
+    return NULL;
+  if(cheat_status(i) == CE_CANT_SAVE)
+    return "This code would write to the game's save.";
+  /* the finest reason kai knows */
+  switch(ce[i].detail)
   {
-    case CE_CANT_KIND: return "This kind of code isn't supported.";
-    case CE_CANT_SAVE: return "This code would write to the game's save.";
+    case CE_E_TOOBIG:    return "This code is cut short or too long for kai.";
+    case CE_E_ALIGN:     return "This code writes to an odd address.";
+    case CE_E_WORK:      return "This code does too much each frame.";
+    case CE_E_SYNTAX:
+    case CE_E_GAMESHARK: return "kai can't read this code.";
   }
-  return NULL;
+  return "This kind of code isn't supported.";
 }
 
 u32 cheat_is_on(u32 i)
@@ -1909,7 +1954,7 @@ u32 cheat_engine_peek(const char *rom_name, u32 *on)
     /* the game that is running */
     for(i = 0; i < ce_count; i++)
       *on += kept_on(i);
-    return ce_count;
+    return cheat_total();
   }
   ce_counting = 1;
   ce_counted = 0;
