@@ -49,8 +49,10 @@
  *
  * Codes in the last two: CodeBreaker (8 + 4 digits), raw "address:value"
  * writes, and GameShark v1/v2 or Action Replay v3 marked "GS1:", "AR3:",
- * "GS1RAW:" or "AR3RAW:". They may only read and write the work RAM; a
- * code that would touch the save, I/O, video or ROM can't be switched on,
+ * "GS1RAW:" or "AR3RAW:". They may only read and write the work RAM, or
+ * patch the ROM (GameShark's and Action Replay's ROM patch codes, put in
+ * and taken out as for kai's own); a code that would write to the save,
+ * I/O or video can't be switched on,
  * and bare 8 + 8 digit codes are read the four ways they can be meant
  * (GameShark v1/v2 or Action Replay v3, each encrypted or already
  * decrypted): the file is read with the one under which the most of its
@@ -530,6 +532,8 @@ static ce_error gs_emit(cheat_entry *c, u32 a, u32 v, u32 width, u32 count, int 
   return CE_E_NONE;
 }
 
+static int add_patch(cheat_entry *c, u32 offset, u16 value);
+
 static ce_error gs_compile(cheat_entry *c, const char *s, u32 family)
 {
   static const u32 initial[2][4] =
@@ -539,7 +543,7 @@ static ce_error gs_compile(cheat_entry *c, const char *s, u32 family)
   };
   int ar3 = family >= TAG_AR3;
   int encrypted = (family == TAG_GS1) || (family == TAG_AR3);
-  u32 seeds[4], n, n2, i;
+  u32 seeds[4], n, n2, i, patch_at = 0, patching = 0;
   const char *t, *t2;
 
   memcpy(seeds, initial[ar3], sizeof(seeds));
@@ -569,11 +573,39 @@ static ce_error gs_compile(cheat_entry *c, const char *s, u32 family)
       return CE_E_SYNTAX;
     if(encrypted)
       cheat_gs_decrypt(&a, &v, seeds);
+    if(patching)
+    {
+      /* the line after a ROM patch: its halfword */
+      if(!add_patch(c, patch_at, a & 0xFFFF))
+        return CE_E_TOOBIG;
+      patching = 0;
+      continue;
+    }
     if(a == 0xDEADFACEu)
     {
       if(v > 0xFFFF)
         return CE_E_UNSUPPORTED;
       cheat_gs_reseed(seeds, (u16)v, ar3);
+      continue;
+    }
+    if(ar3 && !a)
+    {
+      /* Action Replay's ROM patches 1-4: "00000000 1Xaaaaaa", then the
+         halfword on the next line, at (a * 2) in the ROM */
+      u32 type = v >> 24;
+      if((type == 0x18) || (type == 0x1A) || (type == 0x1C) || (type == 0x1E))
+      {
+        patch_at = (v & 0xFFFFFF) << 1;
+        patching = 1;
+        continue;
+      }
+      return CE_E_UNSUPPORTED;
+    }
+    if(!ar3 && ((a >> 28) == 0x6) && (v <= 0xFFFF))
+    {
+      /* GameShark's ROM patch: one halfword at (address * 2) */
+      if(!add_patch(c, (((a & 0x0FFFFFFF) * 2) - 0x08000000) & 0x01FFFFFE, v))
+        return CE_E_TOOBIG;
       continue;
     }
     if(!ar3)
@@ -631,7 +663,7 @@ static ce_error gs_compile(cheat_entry *c, const char *s, u32 family)
     if(err != CE_E_NONE)
       return err;
   }
-  if(!c->count)
+  if(patching || (!c->count && !c->patches))
     return CE_E_SYNTAX;
   /* a compare needs the operations it controls */
   for(i = 0; i < c->count; i += gs_len(ce_recs + c->first, i))
