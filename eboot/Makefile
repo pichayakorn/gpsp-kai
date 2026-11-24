@@ -96,6 +96,12 @@ endif
 ifeq ($(PERF), settings)
 CFLAGS          += -DUI_PERF -DUI_PERF_SETTINGS
 endif
+# make PERF=game BENCH_TAG=name: after a game starts or a savestate loads,
+# time 1800 frames run flat out into perf_game.csv, tagged with the build's
+# name (#148)
+ifeq ($(PERF), game)
+CFLAGS          += -DGAME_BENCH -DBENCH_TAG=\"$(or $(BENCH_TAG),game)\"
+endif
 
 ifeq ($(PSP_LARGE_MEMORY), 0)
 CFLAGS          += -DUSE_EXT_MEM

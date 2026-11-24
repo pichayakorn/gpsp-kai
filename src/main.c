@@ -193,6 +193,9 @@ void init_main()
   flush_translation_cache_rom();
   flush_translation_cache_ram();
   flush_translation_cache_bios();
+#ifdef GAME_BENCH
+  game_bench_arm();  /* a game that starts from its beginning: the intro is the scene */
+#endif
 }
 
 int exit_callback(int arg1, int arg2, void *common)
@@ -844,6 +847,96 @@ static void count_play_time(void)
   }
 }
 
+#ifdef GAME_BENCH
+/* Measuring build (make PERF=game, #148): after a game starts or a
+ * savestate loads, wait
+ * BENCH_WARM frames, then run BENCH_FRAMES frames as fast as kai can (no
+ * waiting for the screen, every frame drawn) and add a line to
+ * <kai>/perf_game.csv: the time per 60 frames and the C block lookups.
+ * Loading the same savestate in two builds compares them. */
+#define BENCH_WARM   120
+#define BENCH_FRAMES 1800
+#ifndef BENCH_TAG
+#define BENCH_TAG "game"
+#endif
+u32 game_bench_lookups;
+static int bench_state;  /* 0 idle, 1 warming up, 2 running */
+static u32 bench_f, bench_t0, bench_t, bench_lookups0, bench_sync, bench_ff;
+static u32 bench_chunk[BENCH_FRAMES / 60];
+
+void game_bench_arm(void)
+{
+  if(bench_state != 2)
+  {
+    bench_state = 1;
+    bench_f = 0;
+  }
+}
+
+static void bench_write(u32 total)
+{
+  char path[MAX_PATH], line[400];
+  SceUID fd;
+  u32 i;
+
+  path_printf(path, sizeof(path), "%s/perf_game.csv", main_path);
+  fd = sceIoOpen(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_APPEND, 0777);
+  if(fd < 0)
+    return;
+  /* the game's name in quotes: it may hold commas ("(USA, Europe)") */
+  sprintf(line, "%s,\"%s\",%d MHz,frames %d,total_us %u,fps_x100 %u,lookups %u,chunks_us",
+   BENCH_TAG, gamepak_filename, scePowerGetCpuClockFrequency(), BENCH_FRAMES, (unsigned)total,
+   (unsigned)((u64)BENCH_FRAMES * 100000000ULL / (total ? total : 1)),
+   (unsigned)(game_bench_lookups - bench_lookups0));
+  sceIoWrite(fd, line, strlen(line));
+  for(i = 0; i < BENCH_FRAMES / 60; i++)
+  {
+    sprintf(line, ",%u", (unsigned)bench_chunk[i]);
+    sceIoWrite(fd, line, strlen(line));
+  }
+  sceIoWrite(fd, "\n", 1);
+  sceIoClose(fd);
+}
+
+static void bench_frame(void)
+{
+  u32 now = sceKernelGetSystemTimeLow();
+
+  if(bench_state == 1)
+  {
+    if(++bench_f >= BENCH_WARM)
+    {
+      bench_state = 2;
+      bench_f = 0;
+      bench_t0 = bench_t = now;
+      bench_lookups0 = game_bench_lookups;
+      bench_sync = g_synchronize_flag;
+      bench_ff = g_gpsp_config.ff_speed;
+      g_synchronize_flag = 0;
+      g_gpsp_config.ff_speed = FF_SPEED_MAX;
+    }
+  }
+  else if(bench_state == 2)
+  {
+    bench_f++;
+    if((bench_f % 60) == 0)
+    {
+      bench_chunk[bench_f / 60 - 1] = now - bench_t;
+      bench_t = now;
+    }
+    if(bench_f >= BENCH_FRAMES)
+    {
+      g_synchronize_flag = bench_sync;
+      g_gpsp_config.ff_speed = bench_ff;
+      bench_state = 0;
+      bench_write(now - bench_t0);
+    }
+  }
+  if(bench_state == 2)
+    skip_next_frame_flag = 0;  /* every frame drawn, as in normal play */
+}
+#endif
+
 void synchronize()
 {
 //  char char_buffer[64];
@@ -1005,6 +1098,9 @@ void synchronize()
     PRINT_STRING_BG(fps_buffer, 0xFFFF, 0x000,
      screen_width - fbm_getwidth(fps_buffer) - 1, screen_height - FONT_HEIGHT - 1);
   }
+#endif
+#ifdef GAME_BENCH
+  bench_frame();
 #endif
 }
 

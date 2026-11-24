@@ -158,6 +158,10 @@ void set_cpu_clock(u32 clock);
 u32 update_gba();
 void reset_gba();
 void synchronize();
+#ifdef GAME_BENCH
+void game_bench_arm(void);
+extern u32 game_bench_lookups;
+#endif
 void quit(u32 mode);
 void game_name_ext(u8 *src, u8 *buffer, u8 *extension);
 void main_read_mem_savestate(u32 ver);

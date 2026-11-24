@@ -3932,6 +3932,9 @@ u32 load_state(char *savestate_filename, u32 slot_num)
   real_frame_count = 0;
   virtual_frame_count = 0;
   pause_sound(0);
+#ifdef GAME_BENCH
+  game_bench_arm();
+#endif
   return 1;
 }
 

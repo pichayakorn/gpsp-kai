@@ -2814,6 +2814,12 @@ u32 translation_recursion_level = 0;
 u32 translation_flush_count = 0;
 
 // Called once emulation starts
+#ifdef GAME_BENCH
+#define game_bench_count() game_bench_lookups++
+#else
+#define game_bench_count()
+#endif
+
 #define block_lookup_address_body(type)                                       \
 {                                                                             \
   u16 *location;                                                              \
@@ -2823,6 +2829,7 @@ u32 translation_flush_count = 0;
   /* Starting at the beginning, we allow for one translation cache flush. */  \
   if(translation_recursion_level == 0)                                        \
     translation_flush_count = 0;                                              \
+  game_bench_count();                                                         \
   block_lookup_address_pc_##type();                                           \
   switch(pc >> 24)                                                            \
   {                                                                           \
