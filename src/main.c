@@ -193,6 +193,9 @@ void init_main()
   flush_translation_cache_rom();
   flush_translation_cache_ram();
   flush_translation_cache_bios();
+#ifdef GAME_BENCH
+  game_bench_arm();  /* a game that starts from its beginning: the intro is the scene */
+#endif
 }
 
 int exit_callback(int arg1, int arg2, void *common)
@@ -845,7 +848,8 @@ static void count_play_time(void)
 }
 
 #ifdef GAME_BENCH
-/* Measuring build (make PERF=game, #148): after a savestate loads, wait
+/* Measuring build (make PERF=game, #148): after a game starts or a
+ * savestate loads, wait
  * BENCH_WARM frames, then run BENCH_FRAMES frames as fast as kai can (no
  * waiting for the screen, every frame drawn) and add a line to
  * <kai>/perf_game.csv: the time per 60 frames and the C block lookups.
