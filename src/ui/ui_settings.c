@@ -1398,3 +1398,23 @@ void ui_settings_where(int *tab, int *row)
   *tab = s.tab;
   *row = s.cur;
 }
+
+/* How many of a game's own settings differ from their defaults, read from
+ * a game_config_t that need not be the running game's (the library's game
+ * card: "Settings: 5 saved for this game"). */
+int ui_settings_saved_for_game(const game_config_t *cfg)
+{
+  int tab, i, n = 0;
+
+  for(tab = 0; tab < TABS; tab++)
+    for(i = 0; i < row_count(tab); i++)
+    {
+      const row_t *r = &rows[tab][i];
+      u8 *base = (u8 *)&g_game_config, *v = (u8 *)r->value;
+      if(!r->per_game || !r->value || (v < base) || (v >= base + sizeof(game_config_t)))
+        continue;
+      if((int)*(const u32 *)((const u8 *)cfg + (v - base)) != r->def)
+        n++;
+    }
+  return n;
+}

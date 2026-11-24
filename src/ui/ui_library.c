@@ -119,6 +119,7 @@ static struct
   char toast[64];
   u16 toast_edge;
   int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
+  char facts[96];             /* the card's cheats and settings line */
   int name_mode;              /* the card's name: NAME_* */
   char name_l1[256], name_l2[256];  /* its two 2x lines */
   int dirty;
@@ -1428,6 +1429,84 @@ static void card_read_tiles(void)
   L.tile_count = n;
 }
 
+/* How many cheats a game's .cht file holds (as add_cheats() counts them). */
+static int cht_count(int game)
+{
+  static const char *kinds[] = { "gameshark_v1", "gameshark_v2", "gameshark_v3", "PAR_v1",
+   "PAR_v2", "PAR_v3", "direct_v1", "direct_v2", "direct_v3", NULL };
+  char name[MAX_FILE], path[MAX_PATH], line[256];
+  FILE *f;
+  int n = 0, k;
+
+  change_ext((char *)L.games[game].name, name, ".cht");
+  path_printf(path, sizeof(path), "%s/%s", g_default_cheat_dir, name);
+  f = fopen(path, "rb");
+  if(f == NULL)
+    return 0;
+  while(fgets(line, sizeof(line), f) && (n < MAX_CHEATS))
+  {
+    char *sp = strchr(line, ' ');
+    if(sp)
+      *sp = 0;
+    for(k = 0; kinds[k]; k++)
+      if(!strcasecmp(line, kinds[k]))
+      {
+        n++;
+        break;
+      }
+  }
+  fclose(f);
+  return n;
+}
+
+/* The card's facts line: "Cheats: 2 / 8  ·  Settings: 5 saved for this
+ * game", from the running game's config or the game's .cfg. */
+static void card_facts(int game)
+{
+  const game_t *g = &L.games[game];
+  const game_config_t *cfg = NULL;
+  int total = cht_count(game), on = 0, saved = 0, i;
+  u32 mark = ui_pool_mark();
+  char ch[32], st[48];
+
+  if(gamepak_filename[0] && !strcasecmp(gamepak_filename, g->name) &&
+   !strcasecmp(rom_path, L.dirs[g->dir]))
+    cfg = &g_game_config;  /* the game behind the pause screen */
+  else
+  {
+    char name[MAX_FILE], path[MAX_PATH];
+    game_config_t *c = ui_pool_alloc(sizeof(game_config_t));
+    FILE *f;
+    change_ext((char *)g->name, name, ".cfg");
+    path_printf(path, sizeof(path), "%s/%s", g_default_cfg_dir, name);
+    f = c ? fopen(path, "rb") : NULL;
+    if(f)
+    {
+      u32 head[2];
+      if((fread(head, 4, 2, f) == 2) && !memcmp(head, "gcfg", 4) &&
+       (fread(c, 1, sizeof(*c), f) >= offsetof(game_config_t, rapidfire_speed)))
+        cfg = c;
+      fclose(f);
+    }
+  }
+  if(cfg)
+  {
+    for(i = 0; i < total; i++)
+      on += (cfg->cheats_flag[i].cheat_active == 1);
+    saved = ui_settings_saved_for_game(cfg);
+  }
+  if(total)
+    snprintf(ch, sizeof(ch), "Cheats: %d / %d", on, total);
+  else
+    snprintf(ch, sizeof(ch), "Cheats: none");
+  if(saved)
+    snprintf(st, sizeof(st), "Settings: %d saved for this game", saved);
+  else
+    snprintf(st, sizeof(st), "Settings: none saved for this game");
+  snprintf(L.facts, sizeof(L.facts), "%s  \xC2\xB7  %s", ch, st);
+  ui_pool_release(mark);
+}
+
 /* ---- the game card's name ("B balanced", maintainer, 2026-11-20) ----------------------
  * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
  * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
@@ -1530,6 +1609,7 @@ static int card_open(int game)
     return 0;
   }
   L.card_game = game;
+  card_facts(game);
   card_name_layout(L.games[game].title);
   card_read_tiles();
   /* the art alone: the name is beside it */
@@ -1654,6 +1734,10 @@ static void draw_card(void)
   }
   if(L.name_mode != NAME_2X_TWO)  /* two 2x lines leave the file name out */
     ui_print_fit(x + 124, y + 70 + dy, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
+  /* the facts line: under the file name, or at +96 when two 2x lines
+     leave the file name out */
+  ui_print_fit(x + 124, (L.name_mode == NAME_2X_TWO) ? y + 96 : y + 86 + dy, L.facts,
+   UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
   /* the savestates */
   ui_print(x + 12, y + 118, "Savestates", UI_COL_MUTE, UI_FONT_SMALL, 0);

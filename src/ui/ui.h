@@ -166,6 +166,7 @@ int ui_hold_step(ui_hold_t *h, u32 key);
 void ui_hold_bar(int x, int y, int w, int p, u16 color);
 
 int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size);
+void ui_tip_line(const char *text, int k);  /* k: 1..8 frames into its fade */
 void ui_dialog(const char *title, const char *body, const char **buttons,
  int button_count, int selected, u16 edge, int f, int closing);
 
@@ -188,6 +189,8 @@ u32 ui_pause(u16 *game_picture);
 int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot);
 void ui_library_resume(int slot);  /* slot from ui_library(): -1 from the start */
 u32 ui_library_switch(void);
+/* Cheats (ui_cheats.c), from the pause screen's Cheats tile. */
+void ui_cheats(void);
 extern int ui_no_bios;  /* the built-in BIOS is in use: the library's banner */
 s32 ui_library_load(const char *dir, char *name);  /* with the Loading card */
 void ui_startup_hook(int current, int total);  /* kai's start-up steps */
@@ -197,6 +200,7 @@ void ui_startup_hook(int current, int total);  /* kai's start-up steps */
  * back. The caller draws its own ground again. */
 int ui_settings(int tab, int row);
 void ui_settings_where(int *tab, int *row);
+int ui_settings_saved_for_game(const game_config_t *cfg);
 extern const u16 *ui_settings_game;  /* the game picture for Controls (240 x 160) */
 extern u32 ui_start_language;  /* the language kai started with */
 

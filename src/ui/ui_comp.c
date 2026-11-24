@@ -726,8 +726,70 @@ int ui_hold_step(ui_hold_t *h, u32 key)
   return h->p;
 }
 
-/* Word wrap: copies line n of text (fitting max_width in font) into out. Breaks at
- * spaces, or anywhere in text without spaces (CJK). Returns 0 past the end. */
+/* The tip line (spec section 2, Tip line): "▸ " and the text in 10 px at
+ * y 231, k of 8 frames into its fade (plum to mute, rising 6 px). */
+void ui_tip_line(const char *text, int k)
+{
+  char line[200];
+  int c, col = UI_COL_MUTE & 0x8000;
+
+  if(k < 1)
+    return;
+  if(k > 8)
+    k = 8;
+  snprintf(line, sizeof(line), "\xE2\x96\xB8 %s", text);
+  for(c = 0; c < 15; c += 5)
+  {
+    int a = (UI_COL_PLUM >> c) & 31, b = (UI_COL_MUTE >> c) & 31;
+    col |= ((a + (b - a) * k / 8) & 31) << c;
+  }
+  ui_print_fit(UI_MARGIN, 231 + 6 - 6 * UI_EASE_OUT_CUBIC_8[k - 1] / 256, line, (u16)col,
+   UI_FONT_SMALL, 0, UI_SCREEN_W - 2 * UI_MARGIN);
+}
+
+/* The code point at s (UTF-8). */
+static u32 wrap_cp(const char *s)
+{
+  const u8 *u = (const u8 *)s;
+
+  if(u[0] < 0x80)
+    return u[0];
+  if((u[0] & 0xE0) == 0xC0)
+    return ((u[0] & 0x1F) << 6) | (u[1] & 0x3F);
+  if((u[0] & 0xF0) == 0xE0)
+    return ((u[0] & 0x0F) << 12) | ((u[1] & 0x3F) << 6) | (u[2] & 0x3F);
+  return 0xFFFD;
+}
+
+static int wrap_cjk(u32 c)
+{
+  return ((c >= 0x3000) && (c <= 0x9FFF)) || ((c >= 0xAC00) && (c <= 0xD7AF)) ||
+   ((c >= 0xFF00) && (c <= 0xFFEF));
+}
+
+/* closing punctuation, small kana and the long mark never start a line */
+static int wrap_no_start(u32 c)
+{
+  static const u16 no[] =
+  {
+    0x3002, 0x3001, 0xFF0C, 0xFF0E, 0xFF01, 0xFF1F, 0xFF1A, 0xFF1B, 0xFF09, 0x300D, 0x300F,
+    0x3011, 0x2026, 0x3041, 0x3043, 0x3045, 0x3047, 0x3049, 0x3063, 0x3083, 0x3085, 0x3087,
+    0x30A1, 0x30A3, 0x30A5, 0x30A7, 0x30A9, 0x30C3, 0x30E3, 0x30E5, 0x30E7, 0x30FC, 0
+  };
+  int i;
+
+  for(i = 0; no[i]; i++)
+    if(c == no[i])
+      return 1;
+  return 0;
+}
+
+/* Word wrap: copies line n of text (fitting max_width in font) into out.
+ * A line may break at a space, and before or after a CJK character, so a
+ * Latin run stops where CJK starts (as the design's wrap); never before
+ * closing punctuation, small kana or the long mark. A word wider than the
+ * line breaks between characters. Lines are measured without their
+ * trailing spaces. Returns 0 past the end. */
 int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size)
 {
   const char *p = text;
@@ -735,54 +797,66 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
 
   while(*p)
   {
-    const char *q = p, *last_space = NULL, *end = p;
+    const char *q, *brk = NULL, *end;
     char buf[256];
+    u32 prev = 0;
 
-    while(*q == ' ')
-      q++;
-    p = q;
+    while(*p == ' ')
+      p++;
+    if(!*p)
+      break;
+    q = end = p;
     /* grow the line one UTF-8 character at a time */
     while(*q && (*q != '\n'))
     {
       const char *next = q + 1;
+      u32 cp = wrap_cp(q);
       int len;
       while((*next & 0xC0) == 0x80)
         next++;
       len = next - p;
       if(len >= (int)sizeof(buf))
         break;
-      /* a space never makes a line too wide: lines are measured without
-         their trailing spaces, as in the design's wrap */
-      if(*q == ' ')
+      if(cp == ' ')
       {
-        last_space = q;
+        brk = q;
         q = next;
         end = q;
+        prev = cp;
         continue;
       }
+      /* before this character, after a CJK one or before a CJK one */
+      if((q > p) && (prev != ' ') && (wrap_cjk(cp) || wrap_cjk(prev)) && !wrap_no_start(cp))
+        brk = q;
       memcpy(buf, p, len);
       buf[len] = 0;
       if(((font == UI_FONT_BODY) ? body_width(buf, 0) : small_width(buf)) > max_width)
         break;
       q = next;
       end = q;
+      prev = cp;
     }
-    if(*q && (*q != '\n') && last_space)
-      end = last_space;
+    if(*q && (*q != '\n') && brk && (brk > p))
+      end = brk;
     if(end == p)  /* one character wider than the line */
     {
       end = p + 1;
       while((*end & 0xC0) == 0x80)
         end++;
     }
-    if(line == n)
+    /* trailing spaces stay off the line */
     {
       int len = end - p;
-      if(len >= out_size)
-        len = out_size - 1;
-      memcpy(out, p, len);
-      out[len] = 0;
-      return 1;
+      while((len > 0) && (p[len - 1] == ' '))
+        len--;
+      if(line == n)
+      {
+        if(len >= out_size)
+          len = out_size - 1;
+        memcpy(out, p, len);
+        out[len] = 0;
+        return 1;
+      }
     }
     line++;
     p = end;
