@@ -44,6 +44,7 @@ extern u32 ui_key_back;
 #define UI_FONT_BODY  1  /* 12 px, 16 px line */
 #define UI_TEXT_BOLD  1  /* double-struck, for Latin and Cyrillic only */
 #define UI_TEXT_2X    2  /* drawn at twice the size (page titles) */
+#define UI_TEXT_3X    4  /* three times (the library's big letter) */
 u32 ui_font_init(u32 language);
 int ui_font_loaded(void);
 u32 ui_font_bytes(void);
