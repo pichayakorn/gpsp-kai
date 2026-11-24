@@ -40,7 +40,7 @@ typedef struct
 } row_t;
 
 #define TABS 5
-#define MAX_ROWS 9
+#define MAX_ROWS 10
 #define ROWS_Y 62
 #define VIEW_T 60
 #define VIEW_B 226
@@ -121,6 +121,8 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Start games with", "GBA BIOS shows the GBA's start-up logo first; Game Cart skips it.", K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
     { "No-BIOS notice", "Shows a line in the library each time kai starts without a GBA BIOS.",
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.bios_note, NULL, YES },
+    { "Show Recent tab", "Off: the library opens on All.",
+      K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_recent, NULL, YES },
     { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models.",
       K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
@@ -872,6 +874,7 @@ static const char *const help_copy[][2] =
   { "Write game saves", "Right away writes the game's own save as soon as the game saves. On exit waits until you leave the game." },
   { "Start games with", "GBA BIOS shows the GBA's start-up logo first, as on a real GBA. Game Cart skips it and works without a BIOS." },
   { "No-BIOS notice", "Off hides the No GBA BIOS line in the library, for when you play without a BIOS." },
+  { "Show Recent tab", "Off hides the Recent tab and its Continue card; the library opens on All. \xC3\x97 Play still picks up where you left off." },
   { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models. Or choose one here." },
   { "Restart kai", "Saves like Exit, then starts kai again and brings you back here." },
   { "Quit kai", "Saves like Exit, then closes kai and goes back to the PSP's home menu." },

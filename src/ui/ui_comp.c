@@ -1024,6 +1024,47 @@ static void box_tables(void)
   }
 }
 
+/* 240-wide rows to 180, 3:4 (the Continue card's save picture): every 4
+ * source pixels make 3, each weighted by the area it covers, across and
+ * down. rows is a multiple of 4; dst gets rows * 3 / 4 rows. */
+static u32 mix43(u16 a, u16 b, int wa, int wb)
+{
+  u32 r = (a & 31) * wa + (b & 31) * wb, g = ((a >> 5) & 31) * wa + ((b >> 5) & 31) * wb;
+  u32 bl = ((a >> 10) & 31) * wa + ((b >> 10) & 31) * wb;
+  return ((r + 2) >> 2) | (((g + 2) >> 2) << 5) | (((bl + 2) >> 2) << 10);
+}
+
+static void shrink43_line(const u16 *s, u16 *d)
+{
+  int i;
+  for(i = 0; i < 60; i++, s += 4, d += 3)
+  {
+    d[0] = mix43(s[0], s[1], 3, 1);
+    d[1] = mix43(s[1], s[2], 2, 2);
+    d[2] = mix43(s[2], s[3], 1, 3);
+  }
+}
+
+void ui_shrink_43_rows(const u16 *src, int rows, u16 *dst)
+{
+  static u16 a[180], b[180], c[180], e[180];
+  int j, x;
+
+  for(j = 0; j + 4 <= rows; j += 4, src += 4 * 240, dst += 3 * 180)
+  {
+    shrink43_line(src, a);
+    shrink43_line(src + 240, b);
+    shrink43_line(src + 480, c);
+    shrink43_line(src + 720, e);
+    for(x = 0; x < 180; x++)
+    {
+      dst[x] = mix43(a[x], b[x], 3, 1);
+      dst[180 + x] = mix43(b[x], c[x], 2, 2);
+      dst[360 + x] = mix43(c[x], e[x], 1, 3);
+    }
+  }
+}
+
 /* rows (a multiple of 5) screenshot rows, 240 wide, to rows * 3 / 5 rows of
    a 144-wide picture: the pause screen's big picture, the Continue card */
 void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
