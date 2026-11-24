@@ -236,8 +236,24 @@ mips_update_gba:
 # Perform an indirect branch.
 
 # $4: GBA address to branch to
+# The dispatch cache (cpu_asm.c, #148) is tried first: an entry is
+# { pc | 1, MIPS address }, chosen by the pc's low bits. Only $1, $2, $4 and
+# $5 are used before the registers are saved.
 
 mips_indirect_branch_arm:
+  ins $4, $0, 0, 2                # pc &= ~3
+  ext $1, $4, 2, 9                # entry = (pc >> 2) & 511
+  sll $1, $1, 3
+  lui $2, %hi(dispatch_arm)
+  addiu $2, $2, %lo(dispatch_arm)
+  addu $1, $1, $2
+  lw $2, 0($1)                    # its pc | 1
+  ori $5, $4, 1
+  bne $2, $5, 1f                  # not this pc: the C lookup
+  lw $2, 4($1)                    # its MIPS address (delay slot)
+  jr $2
+  nop
+1:
   save_registers
   jal block_lookup_address_arm    # $2 = MIPS address to jump to
   nop
@@ -246,6 +262,19 @@ mips_indirect_branch_arm:
   nop
 
 mips_indirect_branch_thumb:
+  ins $4, $0, 0, 1                # pc &= ~1
+  ext $1, $4, 1, 9                # entry = (pc >> 1) & 511
+  sll $1, $1, 3
+  lui $2, %hi(dispatch_thumb)
+  addiu $2, $2, %lo(dispatch_thumb)
+  addu $1, $1, $2
+  lw $2, 0($1)
+  ori $5, $4, 1
+  bne $2, $5, 1f
+  lw $2, 4($1)                    # (delay slot)
+  jr $2
+  nop
+1:
   save_registers
   jal block_lookup_address_thumb  # $2 = MIPS address to jump to
   nop
@@ -253,13 +282,19 @@ mips_indirect_branch_thumb:
   jr $2                           # jump to it
   nop
 
+# BX: bit 0 picks Thumb or ARM, as block_lookup_address_dual does: set the
+# CPSR's T bit, then go on as a Thumb or ARM indirect branch.
 mips_indirect_branch_dual:
-  save_registers
-  jal block_lookup_address_dual   # $2 = MIPS address to jump to
-  nop
-  restore_registers
-  jr $2                           # jump to it
-  nop
+  andi $1, $4, 1
+  beq $1, $0, 2f
+  lw $2, REG_CPSR($16)            # (delay slot)
+  ori $2, $2, 0x20                # Thumb
+  j mips_indirect_branch_thumb
+  sw $2, REG_CPSR($16)            # (delay slot)
+2:
+  ins $2, $0, 5, 1                # ARM
+  j mips_indirect_branch_arm
+  sw $2, REG_CPSR($16)            # (delay slot)
 
 
 # $4: address to write to
