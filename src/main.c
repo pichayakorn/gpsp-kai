@@ -522,13 +522,17 @@ int main(int argc, char *argv[])
   else
   {
     s32 loaded = -1;
+#ifdef UI4
+    int ui_start_slot = -1;
+#endif
 
     // On a failed load, the error has been shown; pick another file
 #ifdef UI4
     {
       char dir[MAX_PATH];
 
-      while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename)))
+      while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename),
+       &ui_start_slot))
       {
         loaded = ui_library_load(dir, load_filename);
         if(loaded != -1)
@@ -562,6 +566,9 @@ int main(int argc, char *argv[])
       init_cpu();
       init_memory();
       reset_sound();
+#ifdef UI4
+      ui_library_resume(ui_start_slot);  /* Continue: Last or a savestate */
+#endif
     }
   }
 
