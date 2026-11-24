@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.1](https://github.com/pichayakorn/gpsp-kai/compare/v3.9.0...v3.9.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* CPU accuracy fixes before 4.0 ([#156](https://github.com/pichayakorn/gpsp-kai/issues/156)) ([bdc7d35](https://github.com/pichayakorn/gpsp-kai/commit/bdc7d35ae8ede8810df3f8f923eb9aa4b5360201))
+* **dynarec:** code run at a RAM mirror gets its own translation ([#158](https://github.com/pichayakorn/gpsp-kai/issues/158)) ([bafaf72](https://github.com/pichayakorn/gpsp-kai/commit/bafaf7270f9ac90355607607ba545e81425de659))
+
 ## [3.9.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.8.0...v3.9.0) (2026-11-16)
 
 
