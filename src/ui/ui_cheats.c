@@ -31,6 +31,7 @@
 #define ON_NOW     (-1)        /* the page of every cheat that is on */
 #define GROUPS     (-2)        /* the list of groups */
 #define FOLD       0xFFFF      /* the "Can't run (N)" row of a page */
+#define ON_ROW     0xFFFE      /* a one-group page's On now row */
 #define MARKS      11          /* the jump rail: marks every ~10 % */
 #define RAIL_X     464
 #define RAIL_Y     38
@@ -116,6 +117,8 @@ static int row_kind(int r)
 
   if(on_list())
     return (r == 0) ? R_ON_NOW : R_GROUP;
+  if(rows[r] == ON_ROW)
+    return R_ON_NOW;
   if(rows[r] == FOLD)
     return R_FOLD;
   i = cheat_at(r);
@@ -211,7 +214,7 @@ static int all_off_here(void)
       return 0;
   }
   for(r = 0; r < c.n; r++)
-    if(cheat_is_on(cheat_at(r)) && !cheat_is_locked(cheat_at(r)))
+    if((rows[r] < ON_ROW) && cheat_is_on(cheat_at(r)) && !cheat_is_locked(cheat_at(r)))
       return 1;
   return 0;
 }
@@ -282,8 +285,10 @@ static void draw_header(void)
   }
   else
   {
-    int on, cant, rule = cheat_group_rule(c.page);
+    int on, cant, i, rule = cheat_group_rule(c.page);
     group_counts(c.page, &on, &cant);
+    for(i = cheat_group_first(c.page); i < (int)(cheat_group_first(c.page) + cheat_group_size(c.page)); i++)
+      on -= is_ready(i);  /* Ready ones aren't on yet */
     snprintf(s1, sizeof(s1), "%d of %d on", on, (int)cheat_group_size(c.page));
     if(rule != CE_RULE_ONCE)
       x = chip(x, s1, UI_COL_LIME);
@@ -325,7 +330,8 @@ static void draw_row(int r, int y, int sel)
 {
   static const char *const rule_words[] = { "", "one at a time", "runs once", "needs a restart" };
   int kind = row_kind(r), lift = sel ? UI_LIFT : 0, x = UI_MARGIN - lift, yy = y - lift;
-  int lx = x + 8, xr = x + 440 - 8, i = (on_list() || (kind == R_FOLD)) ? -1 : cheat_at(r);
+  int lx = x + 8, xr = x + 440 - 8;
+  int i = (on_list() || (kind == R_FOLD) || (kind == R_ON_NOW)) ? -1 : cheat_at(r);
   int cant = (kind == R_CANT) || (kind == R_FOLD);
   char fold[32];
   u16 ink = sel ? UI_COL_PLUM : (cant ? UI_COL_MUTE : UI_COL_CREAM);
@@ -339,7 +345,7 @@ static void draw_row(int r, int y, int sel)
    (cant ? UI_COL_PLUM_2 : UI_COL_CARD));
   meta[0] = 0;
 
-  if(on_list())
+  if(on_list() || (kind == R_ON_NOW))
   {
     if(kind == R_ON_NOW)
     {
@@ -590,6 +596,8 @@ static const char *tip_text(void)
     return NULL;
   if(on_list())
     return "Each file in the game's cheat folder is a group.";
+  if(rows[c.cur] == ON_ROW)
+    return NULL;
   if(rows[c.cur] == FOLD)
     return "Cheats kai can't run, folded away: \xC3\x97 shows them.";
   i = cheat_at(c.cur);
@@ -611,7 +619,7 @@ static void help_text(const char **t, const char **b)
 {
   int rule = CE_RULE_NONE;
 
-  if((c.n > 0) && !on_list())
+  if((c.n > 0) && !on_list() && (rows[c.cur] != ON_ROW))
   {
     int i = cheat_at(c.cur);
     if((rows[c.cur] == FOLD) || (cheat_status(i) != CE_OK))
@@ -654,7 +662,7 @@ static void draw_marquee(int yy)
   int kind = row_kind(c.cur), w, over, t, cycle, shift;
   const char *name;
 
-  if(on_list() || (kind == R_FOLD) || (c.top_f < UI_F_SCROLL) || (yy < LIST_T - 4) ||
+  if(on_list() || (kind == R_FOLD) || (kind == R_ON_NOW) || (c.top_f < UI_F_SCROLL) || (yy < LIST_T - 4) ||
    (yy + UI_ROW_H > c.view_b + 3))
     return;
   name = cheat_name(cheat_at(c.cur));
@@ -881,7 +889,7 @@ static void build_marks(void)
   if(on_list() || (c.n <= ROWS_SEEN))
     return;
   for(r = 0; r < c.n; r++)
-    if(rows[r] != FOLD)
+    if(rows[r] < ON_ROW)
       at[n++] = r;
   if(n < 2)
     return;
@@ -905,6 +913,19 @@ static void build_marks(void)
     c.mark_row[j] = at[j * (n - 1) / (c.marks - 1)];
     mark_text(cheat_name(cheat_at(c.mark_row[j])), skip, c.mark_text[j]);
   }
+}
+
+/* a one-group game: an On now row heads the page while any cheat is on */
+static int on_row_wanted(void)
+{
+  int i;
+
+  if(!c.single || (c.page < 0))
+    return 0;
+  for(i = 0; i < (int)cheat_count(); i++)
+    if(cheat_is_on(i))
+      return 1;
+  return 0;
 }
 
 /* a page's rows: runnable cheats, then the fold, then (open) the rest */
@@ -931,6 +952,8 @@ static void fill_rows(void)
   else
   {
     int first = cheat_group_first(c.page), end = first + cheat_group_size(c.page);
+    if(on_row_wanted())
+      rows[c.n++] = ON_ROW;
     for(i = first; i < end; i++)
       if(cheat_status(i) == CE_OK)
         rows[c.n++] = i;
@@ -987,6 +1010,35 @@ static void toggle_fold(void)
     c.top_f = 0;
   }
   c.rest = 0;
+  c.dirty = 1;
+}
+
+/* The On now row comes when the first cheat goes on and goes with the
+   last; the rows under it move by one and the view moves with them, so
+   nothing on screen jumps. A cursor on the row moves to the first cheat. */
+static void sync_on_row(void)
+{
+  int has = (c.n > 0) && (rows[0] == ON_ROW), d;
+
+  if(has == on_row_wanted())
+    return;
+  d = has ? -1 : 1;
+  fill_rows();
+  c.cur = (c.cur + d < 0) ? 0 : c.cur + d;
+  c.from = (c.from + d < 0) ? 0 : c.from + d;
+  if(c.value_row >= 0)
+    c.value_row += d;
+  if(c.lock_row >= 0)
+    c.lock_row += d;
+  if((c.top > 0) || (d < 0))
+  {
+    c.top = (c.top + d < 0) ? 0 : c.top + d;
+    c.top_from += d * PITCH;
+    if(c.top_from < 0)
+      c.top_from = 0;
+  }
+  if(c.cur < c.top)
+    c.top = c.cur;
   c.dirty = 1;
 }
 
@@ -1130,7 +1182,7 @@ static void press_all_off(void)
     for(r = 0; r < c.n; r++)
     {
       i = cheat_at(r);
-      if(i != FOLD)
+      if(i < ON_ROW)
         undo_on[i] = cheat_is_on(i) && !cheat_is_locked(i);
     }
   for(i = 0; i < (int)cheat_count(); i++)
@@ -1155,7 +1207,13 @@ int ui_cheats(void)
   if(!c.single)
     open_page(GROUPS, 1);  /* on the first group, On now above it */
   else
-    open_page(0, 0);  /* no cheats: no rows, and where the files go */
+  {
+    /* one group, or no cheats (no rows, and where the files go); the
+       cursor starts on the first cheat, under On now if it shows */
+    open_page(0, 0);
+    if((c.n > 1) && (rows[0] == ON_ROW))
+      open_page(0, 1);
+  }
 
   while(!c.restart)
   {
@@ -1171,9 +1229,12 @@ int ui_cheats(void)
     }
     else if(ui_pressed(ui_key_back))
     {
-      if(on_list() || c.single)
+      if(c.single && (c.page == ON_NOW))
+        open_page(0, 0);  /* back on the On now row, or the first cheat when none is left */
+      else if(on_list() || c.single)
         break;
-      open_page(GROUPS, c.list_cur);
+      else
+        open_page(GROUPS, c.list_cur);
     }
     else if(ui_pressed(PSP_CTRL_SQUARE))
     {
@@ -1197,6 +1258,7 @@ int ui_cheats(void)
         press_all_off();
       else if(ui_pressed(ui_key_confirm))
         press_confirm();
+      sync_on_row();
     }
     if(c.restart)
       break;
