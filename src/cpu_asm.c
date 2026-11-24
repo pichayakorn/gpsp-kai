@@ -86,6 +86,15 @@ u8 *bios_translation_ptr = bios_translation_cache;
 
 u32 *rom_branch_hash[ROM_BRANCH_HASH_SIZE];
 
+/* Code run at a mirror of IWRAM or EWRAM (any address but the first copy)
+   gets its own translation, found by its full pc in this hash: a
+   translation carries the pc it was made at (return addresses, pc-relative
+   loads, its exits), so one mirror must never run another's. The first
+   copy keeps the tags in the shadow memory. Cleared with the RAM cache. */
+#define RAM_MIRROR_HASH_SIZE 1024
+u32 *ram_mirror_hash[RAM_MIRROR_HASH_SIZE];
+u32 ram_mirror_used = 0;
+
 // Default
 u32 idle_loop_targets = 0;
 u32 idle_loop_target_pc[MAX_IDLE_LOOPS];
@@ -2830,14 +2839,69 @@ u32 translation_flush_count = 0;
       break;                                                                  \
                                                                               \
     case 0x2:                                                                 \
+      if(pc & 0x00FC0000)                                                     \
+        goto ram_mirror;                                                      \
       location = (u16 *)(ewram + (pc & 0x7FFF) + ((pc & 0x38000) << 1));      \
       block_lookup_translate(type, ram, 1);                                   \
       break;                                                                  \
                                                                               \
     case 0x3:                                                                 \
+      if(pc & 0x00FF8000)                                                     \
+        goto ram_mirror;                                                      \
       location = (u16 *)(iwram + (pc & 0x7FFF));                              \
       block_lookup_translate(type, ram, 1);                                   \
       break;                                                                  \
+                                                                              \
+    ram_mirror:                                                               \
+    {                                                                         \
+      /* a mirror of RAM: its own translation, by pc (see ram_mirror_hash).   \
+         A new entry goes in at the head, so a retry after a failed           \
+         translation finds the retry, not the failed one. */                  \
+      __label__ mirror_redo;                                                  \
+      u32 hash_target = ((pc * 2654435761U) >> 16) &                          \
+       (RAM_MIRROR_HASH_SIZE - 1);                                            \
+      u32 *block_ptr = ram_mirror_hash[hash_target];                          \
+                                                                              \
+      while(block_ptr)                                                        \
+      {                                                                       \
+        if(block_ptr[0] == pc)                                                \
+        {                                                                     \
+          block_address = (u8 *)(block_ptr + 2) + block_prologue_size;        \
+          break;                                                              \
+        }                                                                     \
+        block_ptr = (u32 *)block_ptr[1];                                      \
+      }                                                                       \
+                                                                              \
+      if(block_ptr == NULL)                                                   \
+      {                                                                       \
+        s32 translation_result;                                               \
+                                                                              \
+        mirror_redo:                                                          \
+                                                                              \
+        translation_recursion_level++;                                        \
+        block_ptr = (u32 *)ram_translation_ptr;                               \
+        block_ptr[0] = pc;                                                    \
+        block_ptr[1] = (u32)ram_mirror_hash[hash_target];                     \
+        ram_mirror_hash[hash_target] = block_ptr;                             \
+        ram_mirror_used = 1;                                                  \
+        ram_translation_ptr += 8;                                             \
+        block_address = ram_translation_ptr + block_prologue_size;            \
+        block_lookup_translate_##type(ram, 1);                                \
+        translation_recursion_level--;                                        \
+                                                                              \
+        if(translation_result == -1)                                          \
+        {                                                                     \
+          if(translation_recursion_level)                                     \
+            return NULL;                                                      \
+                                                                              \
+          goto mirror_redo;                                                   \
+        }                                                                     \
+                                                                              \
+        if(translation_recursion_level == 0)                                  \
+          translate_invalidate_dcache();                                      \
+      }                                                                       \
+      break;                                                                  \
+    }                                                                         \
                                                                               \
     case 0x8 ... 0xD:                                                         \
     {                                                                         \
@@ -3309,17 +3373,20 @@ s32 translate_block_##type(u32 pc, TRANSLATION_REGION_TYPE                    \
   switch(translation_region)                                                  \
   {                                                                           \
     case TRANSLATION_REGION_RAM:                                              \
+      /* the code range is kept as offsets into one copy of the RAM, so       \
+         code at different mirrors compares right */                          \
       if(pc >= 0x3000000)                                                     \
       {                                                                       \
-        if((pc < iwram_code_min) || (iwram_code_min == 0xFFFFFFFF))           \
-          iwram_code_min = pc;                                                \
+        if((iwram_code_min == 0xFFFFFFFF) || ((pc & 0x7FFF) < iwram_code_min))\
+          iwram_code_min = pc & 0x7FFF;                                       \
       }                                                                       \
       else                                                                    \
                                                                               \
       if(pc >= 0x2000000)                                                     \
       {                                                                       \
-        if((pc < ewram_code_min) || (ewram_code_min == 0xFFFFFFFF))           \
-          ewram_code_min = pc;                                                \
+        if((ewram_code_min == 0xFFFFFFFF) ||                                  \
+         ((pc & 0x3FFFF) < ewram_code_min))                                   \
+          ewram_code_min = pc & 0x3FFFF;                                      \
       }                                                                       \
                                                                               \
       translation_ptr = ram_translation_ptr;                                  \
@@ -3465,17 +3532,31 @@ s32 translate_block_##type(u32 pc, TRANSLATION_REGION_TYPE                    \
   switch(translation_region)                                                  \
   {                                                                           \
     case TRANSLATION_REGION_RAM:                                              \
+      /* a block that runs over the end of one copy into the next marks       \
+         the whole RAM */                                                     \
       if(pc >= 0x3000000)                                                     \
       {                                                                       \
-        if((pc > iwram_code_max) || (iwram_code_max == 0xFFFFFFFF))           \
-          iwram_code_max = pc;                                                \
+        if((pc & 0x7FFF) < (block_start_pc & 0x7FFF))                         \
+        {                                                                     \
+          iwram_code_min = 0;                                                 \
+          iwram_code_max = 0x7FFF;                                            \
+        }                                                                     \
+        else                                                                  \
+        if((iwram_code_max == 0xFFFFFFFF) || ((pc & 0x7FFF) > iwram_code_max))\
+          iwram_code_max = pc & 0x7FFF;                                       \
       }                                                                       \
       else                                                                    \
                                                                               \
       if(pc >= 0x2000000)                                                     \
       {                                                                       \
-        if((pc > ewram_code_max) || (ewram_code_max == 0xFFFFFFFF))           \
-          ewram_code_max = pc;                                                \
+        if((pc & 0x3FFFF) < (block_start_pc & 0x3FFFF))                       \
+        {                                                                     \
+          ewram_code_min = 0;                                                 \
+          ewram_code_max = 0x3FFFF;                                           \
+        }                                                                     \
+        else                                                                  \
+        if((ewram_code_max == 0xFFFFFFFF) || ((pc & 0x3FFFF) > ewram_code_max))\
+          ewram_code_max = pc & 0x3FFFF;                                      \
       }                                                                       \
                                                                               \
       ram_translation_ptr = translation_ptr;                                  \
@@ -3514,10 +3595,24 @@ void flush_translation_cache_ram()
   ram_translation_ptr = ram_translation_cache;
   ram_block_tag_top = 0x0101;
 
+  if(ram_mirror_used)
+  {
+    memset(ram_mirror_hash, 0, sizeof(ram_mirror_hash));
+    ram_mirror_used = 0;
+  }
+
+  /* both ranges are offsets into one copy (see translate_block). A flush
+     inside the first block comes before its end is known: clear to the end
+     of the copy. */
+  if((iwram_code_min != 0xFFFFFFFF) &&
+   ((iwram_code_max == 0xFFFFFFFF) || (iwram_code_max < iwram_code_min)))
+    iwram_code_max = 0x7FFF;
+  if((ewram_code_min != 0xFFFFFFFF) &&
+   ((ewram_code_max == 0xFFFFFFFF) || (ewram_code_max < ewram_code_min)))
+    ewram_code_max = 0x3FFFF;
+
   if(iwram_code_min != 0xFFFFFFFF)
   { // iwram cache was in use
-    iwram_code_min &= 0x7FFF;
-    iwram_code_max &= 0x7FFF;
     memset(iwram + iwram_code_min, 0, iwram_code_max - iwram_code_min + 1);
   }
 
@@ -3528,9 +3623,6 @@ void flush_translation_cache_ram()
     u32 ewram_code_min_offset;
     u32 ewram_code_max_offset;
     u32 i;
-
-    ewram_code_min &= 0x3FFFF;
-    ewram_code_max &= 0x3FFFF;
 
     ewram_code_min_page = ewram_code_min >> 15;
     ewram_code_max_page = ewram_code_max >> 15;
@@ -3545,7 +3637,10 @@ void flush_translation_cache_ram()
     }
     else
     {
-      memset(ewram + (ewram_code_min_page * 0x10000) + ewram_code_min_offset, 0, 0x8000);
+      /* the tags of a page are its first 0x8000 bytes, its data the next:
+         clear only to the end of the tags */
+      memset(ewram + (ewram_code_min_page * 0x10000) + ewram_code_min_offset,
+       0, 0x8000 - ewram_code_min_offset);
       for(i = ewram_code_min_page + 1; i < ewram_code_max_page; i++)
         memset(ewram + (i * 0x10000), 0, 0x8000);
 
