@@ -13,6 +13,7 @@
 #include "../common.h"
 #include "ui.h"
 #include "ui_cover.h"
+#include "../game_name.h"
 
 #define MAX_GAMES   1024
 #define MAX_DIRS    128
@@ -251,67 +252,10 @@ static void scan_dir(const char *path, int depth, int parent)
   sceIoDclose(d);
 }
 
-/* The name shown for a file: its name without the extension, cleaned up
- * so a downloaded library reads well (#14): bracketed tags such as
- * "(USA, Europe)", "[!]" or "(Rev 1)" go, so does a leading release number
- * ("1986 - Golden Sun"), and underscores become spaces. The cover is drawn
- * from this name, so these rules must not change once released. */
-static int clean_name(const char *name, int n, char *out)
-{
-  int i = 0, o = 0, depth = 0;
-
-  if(n > 255)
-    n = 255;
-  /* a leading release number: digits, then " - " */
-  while((i < n) && (name[i] >= '0') && (name[i] <= '9'))
-    i++;
-  if(i > 0)
-  {
-    int j = i;
-    while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
-      j++;
-    if((j < n) && (name[j] == '-'))
-    {
-      j++;
-      while((j < n) && ((name[j] == ' ') || (name[j] == '_')))
-        j++;
-      i = j;
-    }
-    else
-      i = 0;
-  }
-  for(; i < n; i++)
-  {
-    char c = name[i];
-    if((c == '(') || (c == '['))
-      depth++;
-    else if(((c == ')') || (c == ']')) && depth)
-      depth--;
-    else if(depth == 0)
-    {
-      if(c == '_')
-        c = ' ';
-      /* one space between words, none at the start */
-      if((c == ' ') && ((o == 0) || (out[o - 1] == ' ')))
-        continue;
-      out[o++] = c;
-    }
-  }
-  while((o > 0) && ((out[o - 1] == ' ') || (out[o - 1] == '-')))
-    o--;
-  if(o == 0)
-  {
-    memcpy(out, name, n);  /* nothing left: the plain name */
-    o = n;
-  }
-  out[o] = 0;
-  return o;
-}
-
 static const char *display_name(const char *name, int n)
 {
   char out[256];
-  int o = clean_name(name, n, out);
+  int o = game_name_clean(name, n, out);
   return arena_str(out, o);
 }
 
@@ -426,7 +370,7 @@ void ui_display_name(const char *file, char *out)
     strcpy(out, launched_title);
     return;
   }
-  clean_name(file, n, out);
+  game_name_clean(file, n, out);
 }
 
 /* recent.txt (written on leaving a game): full paths, newest first */
@@ -1786,43 +1730,14 @@ static void card_read_tiles(void)
   L.tile_count = n;
 }
 
-/* How many cheats a game's .cht file holds (as add_cheats() counts them). */
-static int cht_count(int game)
-{
-  static const char *kinds[] = { "gameshark_v1", "gameshark_v2", "gameshark_v3", "PAR_v1",
-   "PAR_v2", "PAR_v3", "direct_v1", "direct_v2", "direct_v3", NULL };
-  char name[MAX_FILE], path[MAX_PATH], line[256];
-  FILE *f;
-  int n = 0, k;
-
-  change_ext((char *)L.games[game].name, name, ".cht");
-  path_printf(path, sizeof(path), "%s/%s", g_default_cheat_dir, name);
-  f = fopen(path, "rb");
-  if(f == NULL)
-    return 0;
-  while(fgets(line, sizeof(line), f) && (n < MAX_CHEATS))
-  {
-    char *sp = strchr(line, ' ');
-    if(sp)
-      *sp = 0;
-    for(k = 0; kinds[k]; k++)
-      if(!strcasecmp(line, kinds[k]))
-      {
-        n++;
-        break;
-      }
-  }
-  fclose(f);
-  return n;
-}
-
 /* The card's facts line: "Cheats: 2 / 8  ·  Settings: 5 saved for this
  * game", from the running game's config or the game's .cfg. */
 static void card_facts(int game)
 {
   const game_t *g = &L.games[game];
   const game_config_t *cfg = NULL;
-  int total = cht_count(game), on = 0, saved = 0, i;
+  u32 on = 0, total = cheat_engine_peek(g->name, &on);
+  int saved = 0;
   u32 mark = ui_pool_mark();
   char ch[32], st[48];
 
@@ -1847,13 +1762,9 @@ static void card_facts(int game)
     }
   }
   if(cfg)
-  {
-    for(i = 0; i < total; i++)
-      on += (cfg->cheats_flag[i].cheat_active == 1);
     saved = ui_settings_saved_for_game(cfg);
-  }
   if(total)
-    snprintf(ch, sizeof(ch), "Cheats: %d / %d", on, total);
+    snprintf(ch, sizeof(ch), "Cheats: %u / %u", (unsigned)on, (unsigned)total);
   else
     snprintf(ch, sizeof(ch), "Cheats: none");
   if(saved)
