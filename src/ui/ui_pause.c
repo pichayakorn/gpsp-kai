@@ -1502,7 +1502,7 @@ static struct
 } perf_log[PERF_MAX];
 static int perf_phase, perf_f, perf_n, perf_on, perf_done;
 
-static u32 perf_script(void)
+static u32 __attribute__((unused)) perf_script(void)  /* unused in the Settings run */
 {
   if(!perf_on || (perf_phase >= PERF_PHASES))
     return 0;
@@ -1650,11 +1650,13 @@ u32 ui_pause(u16 *game_picture)
 #ifdef UI_PERF
   /* the script runs on the first pause only; later pauses take the pad,
      so the game can still be left with Exit */
+#ifndef UI_PERF_SETTINGS  /* the Settings run measures Settings only */
   if(!perf_done)
   {
     perf_phase = perf_f = perf_n = perf_on = 0;
     ui_input_script = perf_script;
   }
+#endif
 #endif
 
   while(leave == LEAVE_NONE)
