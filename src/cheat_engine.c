@@ -68,6 +68,7 @@
  * reordering or rewrapping the file keeps the choice. L: locked on.
  */
 
+#include <ctype.h>
 #include "common.h"
 #include "cheat_engine.h"
 #include "game_name.h"
