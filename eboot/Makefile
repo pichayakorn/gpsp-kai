@@ -88,9 +88,13 @@ CFLAGS          += -DSIM_PSP1000
 endif
 
 # make UI4=1 PERF=1: the pause screen runs a fixed input script and writes
-# its frame times to perf_pause.csv (a measuring build, never released)
+# its frame times to perf_pause.csv; PERF=settings does the same for the
+# Settings screen, into perf_settings.csv (measuring builds, never released)
 ifeq ($(PERF), 1)
 CFLAGS          += -DUI_PERF
+endif
+ifeq ($(PERF), settings)
+CFLAGS          += -DUI_PERF -DUI_PERF_SETTINGS
 endif
 
 ifeq ($(PSP_LARGE_MEMORY), 0)
