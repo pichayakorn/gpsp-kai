@@ -14,6 +14,7 @@
 #include "ui.h"
 #include "ui_cover.h"
 #include "../game_name.h"
+#include "../unicode.h"
 
 #define MAX_GAMES   1024
 #define MAX_DIRS    128
@@ -97,6 +98,7 @@ static struct
   int *order;         /* the games in view order (the tab's games) */
   int n;              /* how many: every game on All, the hearted on Favourites */
   const char **dirs;
+  const char **dir_shown;  /* a folder's own name, as UTF-8 */
   int dir_count;
   char *arena;
   int arena_used;
@@ -192,6 +194,16 @@ static int jump_here(void);
 static int list_banner(void);
 static void draw_banner_at(int y);
 
+/* The PSP hands file names over in Shift_JIS; the UI's text is UTF-8.
+   A byte of it becomes at most 3 of UTF-8. */
+static void name_utf8(const char *name, char *out)
+{
+  char sjis[256];
+
+  snprintf(sjis, sizeof(sjis), "%s", name);
+  sjis_to_utf8(sjis, out);
+}
+
 static int is_game_file(const char *name)
 {
   const char *dot = strrchr(name, '.');
@@ -213,6 +225,14 @@ static void scan_dir(const char *path, int depth, int parent)
     return;
   dir = L.dir_count++;
   L.dirs[dir] = dir_path;
+  {
+    const char *s = strrchr(path, '/');
+    char shown[256 * 3];
+    name_utf8(s ? s + 1 : path, shown);
+    L.dir_shown[dir] = arena_str(shown, strlen(shown));
+    if(L.dir_shown[dir] == NULL)
+      L.dir_shown[dir] = s ? dir_path + (s + 1 - path) : dir_path;
+  }
   L.dir_parent[dir] = parent;
 
   d = sceIoDopen(path);
@@ -247,12 +267,15 @@ static void scan_dir(const char *path, int depth, int parent)
     else if(is_game_file(e.d_name))
     {
       game_t *g = &L.games[L.count];
-      const char *dot = strrchr(e.d_name, '.');
+      char shown[256 * 3];
+      const char *dot;
       /* the pool isn't cleared: every field starts known (a stray byte in
          fav made every game a favourite that △ couldn't clear) */
       memset(g, 0, sizeof(*g));
       g->name = arena_str(e.d_name, strlen(e.d_name));
-      g->title = g->name ? display_name(e.d_name, dot - e.d_name) : NULL;
+      name_utf8(e.d_name, shown);
+      dot = strrchr(shown, '.');
+      g->title = g->name ? display_name(shown, dot - shown) : NULL;
       if(g->title == NULL)
         break;  /* out of room: the list ends here */
       g->size = (u32)e.d_stat.st_size;
@@ -452,12 +475,13 @@ static int load_games(void)
   L.games = ui_pool_alloc(MAX_GAMES * sizeof(game_t));
   L.order = ui_pool_alloc(MAX_GAMES * sizeof(int));
   L.dirs = ui_pool_alloc(MAX_DIRS * sizeof(char *));
+  L.dir_shown = ui_pool_alloc(MAX_DIRS * sizeof(char *));
   L.arena = ui_pool_alloc(ARENA_SIZE);
   L.ys = ui_pool_alloc(MAX_GAMES * sizeof(int));
   L.play = ui_pool_alloc(MAX_GAMES * sizeof(*L.play));
   if(L.play)
     memset(L.play, 0, MAX_GAMES * sizeof(*L.play));
-  if(!L.games || !L.order || !L.dirs || !L.arena || !L.ys)
+  if(!L.games || !L.order || !L.dirs || !L.dir_shown || !L.arena || !L.ys)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0, -1);
@@ -2668,8 +2692,7 @@ static void fold_fill(void)
 
 static const char *dir_name(int dir)
 {
-  const char *s = strrchr(L.dirs[dir], '/');
-  return s ? s + 1 : L.dirs[dir];
+  return L.dir_shown[dir];
 }
 
 static void fold_go(int dir, int focus_dir)
