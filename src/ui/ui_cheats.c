@@ -75,6 +75,7 @@ static struct
   int n_cant;                  /* cheats under the fold */
   int marks, mark_row[MARKS];  /* the jump rail; 0: none */
   char mark_text[MARKS][12];
+  int dots;                    /* the marks aren't in order: plain dots, no tile */
   int jump_f, jump_mark;       /* the big tile; -1: none */
   int marq_f;                  /* frames the cursor has rested (the marquee) */
   int label_x, label_w;        /* the selected row's name, for the marquee */
@@ -525,7 +526,7 @@ static void draw_rail(void)
     int y = RAIL_Y + 2 + j * MARK_PITCH, w = ui_print_width(c.mark_text[j], UI_FONT_SMALL, 0);
     if(j == cur)
       ui_round_fill(RAIL_X, y + 1, 16, 14, 2, UI_COL_TANGERINE);
-    ui_print((w > 16) ? UI_SCREEN_W - 1 - w : RAIL_X + 8 - w / 2, y + 1, c.mark_text[j], (j == cur) ? UI_COL_PLUM : UI_COL_MUTE,
+    ui_print(RAIL_X + 8 - w / 2, y + 1, c.mark_text[j], (j == cur) ? UI_COL_PLUM : UI_COL_MUTE,
      UI_FONT_SMALL, 0);
   }
 }
@@ -838,26 +839,43 @@ static void show_toast(const char *text, int undo)
 
 /* the part of a name after the start every name shares, cut back to a
    word; its first word, as much as the rail's 16 px holds */
-static void mark_text(const char *name, int skip, char *out)
+/* A mark's label, at most 3 characters so it fits the rail; *num is the
+   number it was made from, or -1 for a word. A number drops its leading
+   zeros down to 3 digits ("001"); a bigger one is cut down, never rounded
+   up: 1500 "1k", 999999 ".9M", 2000000 "2M". */
+static void mark_text(const char *name, int skip, char *out, long long *num)
 {
   int k = 0, w;
 
+  *num = -1;
   name += skip;
   while(*name == ' ')
     name++;
-  /* a number is never cut short: its leading zeros go first, and a long
-     one keeps every digit */
   for(k = 0; (k < 11) && isdigit((unsigned char)name[k]); k++)
     ;
   if(k && (!name[k] || (name[k] == ' ')))
   {
-    while((*name == '0') && isdigit((unsigned char)name[1]) && (k > 3))
+    long long v = 0;
+    int i;
+    for(i = 0; i < k; i++)
+      v = v * 10 + (name[i] - '0');
+    *num = v;
+    if(v < 1000)
     {
-      name++;
-      k--;
+      while((*name == '0') && isdigit((unsigned char)name[1]) && (k > 3))
+      {
+        name++;
+        k--;
+      }
+      memcpy(out, name, k);
+      out[k] = 0;
     }
-    memcpy(out, name, k);
-    out[k] = 0;
+    else if(v < 100000)
+      snprintf(out, 12, "%dk", (int)(v / 1000));
+    else if(v < 1000000)
+      snprintf(out, 12, ".%dM", (int)(v / 100000));
+    else
+      snprintf(out, 12, "%dM", (v / 1000000 > 99) ? 99 : (int)(v / 1000000));
     return;
   }
   k = 0;
@@ -883,9 +901,11 @@ static void mark_text(const char *name, int skip, char *out)
 static void build_marks(void)
 {
   static u16 at[CE_MAX_CHEATS + 1];
+  long long num[MARKS];
   int r, n = 0, j, skip = -1;
 
   c.marks = 0;
+  c.dots = 0;
   if(on_list() || (c.n <= ROWS_SEEN))
     return;
   for(r = 0; r < c.n; r++)
@@ -911,7 +931,29 @@ static void build_marks(void)
   for(j = 0; j < c.marks; j++)
   {
     c.mark_row[j] = at[j * (n - 1) / (c.marks - 1)];
-    mark_text(cheat_name(cheat_at(c.mark_row[j])), skip, c.mark_text[j]);
+    mark_text(cheat_name(cheat_at(c.mark_row[j])), skip, c.mark_text[j], &num[j]);
+  }
+  /* labels only help when they run one way: numbers all up or all down,
+     words A to Z; otherwise plain dots */
+  {
+    int up = 1, down = 1, words = 1;
+    for(j = 0; j < c.marks; j++)
+      if((num[j] < 0) != (num[0] < 0))
+        up = down = words = 0;
+    for(j = 1; j < c.marks; j++)
+    {
+      if(num[0] >= 0)
+      {
+        up &= num[j] >= num[j - 1];
+        down &= num[j] <= num[j - 1];
+      }
+      else
+        words &= strcasecmp(c.mark_text[j - 1], c.mark_text[j]) <= 0;
+    }
+    c.dots = (num[0] >= 0) ? !(up || down) : !words;
+    if(c.dots)
+      for(j = 0; j < c.marks; j++)
+        snprintf(c.mark_text[j], 12, "\xC2\xB7");
   }
 }
 
@@ -1055,7 +1097,7 @@ static void jump(int dir)
     return;
   select_row(c.mark_row[j]);
   c.jump_mark = j;
-  c.jump_f = 0;
+  c.jump_f = c.dots ? -1 : 0;  /* dots have no label for the tile */
   c.dirty = 1;
 }
 
