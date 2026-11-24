@@ -210,6 +210,7 @@ extern u64 dbg_time_2;
 #include "sound.h"
 #include "main.h"
 #include "cheats.h"
+#include "cheat_engine.h"
 #include "zip.h"
 #include "fbm_print.h"
 #include "message.h"

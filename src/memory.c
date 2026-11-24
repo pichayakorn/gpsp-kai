@@ -2660,6 +2660,9 @@ s32 load_gamepak(char *name)
 
     change_ext(gamepak_filename, cheats_filename, ".cht");
     add_cheats(cheats_filename);
+#ifdef UI4
+    cheat_engine_load(gamepak_filename);  /* the 4.0 engine runs the cheats */
+#endif
     update_progress();
 
     show_progress(msg[MSG_LOAD_ROM_OK]);
@@ -3424,6 +3427,9 @@ u8 *load_gamepak_page(u32 physical_index)
 
   FILE_SEEK(gamepak_file_large, physical_index * (32 * 1024), SEEK_SET);
   FILE_READ(gamepak_file_large, swap_location, (32 * 1024));
+#ifdef UI4
+  cheat_engine_page_loaded(physical_index, swap_location);  /* its ROM patches */
+#endif
 
 //  FILE_CLOSE(gamepak_file_large);
 
