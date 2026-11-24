@@ -2989,14 +2989,71 @@ u32 translation_flush_count = 0;
   return block_address;                                                       \
 }                                                                             \
 
-u8 *block_lookup_address_arm(u32 pc)
+static u8 *block_lookup_slow_arm(u32 pc)
 block_lookup_address_body(arm);
 
-u8 *block_lookup_address_thumb(u32 pc)
+static u8 *block_lookup_slow_thumb(u32 pc)
 block_lookup_address_body(thumb);
 
-u8 *block_lookup_address_dual(u32 pc)
+static u8 *block_lookup_slow_dual(u32 pc)
 block_lookup_address_body(dual);
+
+/* The dispatch cache (#148): every indirect jump (BX, POP {pc}, MOV pc, ...)
+ * used to save the GBA registers and call the C lookup above. mips_stub.S
+ * now first looks the GBA pc up in a small table per instruction set, 512
+ * entries of { pc | 1, host address } picked by the pc's low bits, and
+ * jumps straight there on a match. The C lookup fills the table; any
+ * translation cache flush (RAM, ROM, BIOS: self-modifying code, a full
+ * cache, a savestate load, a cheat's ROM patch) empties it, so it never
+ * points at code that is gone. BIOS code isn't kept: entering it also
+ * opens the BIOS for reading, which only the C lookup does. The key has
+ * bit 0 set, so an empty entry (0) never matches. */
+#define DISPATCH_ENTRIES 512
+u32 dispatch_arm[DISPATCH_ENTRIES * 2] __attribute__((aligned(64)));
+u32 dispatch_thumb[DISPATCH_ENTRIES * 2] __attribute__((aligned(64)));
+
+static void dispatch_clear(void)
+{
+  memset(dispatch_arm, 0, sizeof(dispatch_arm));
+  memset(dispatch_thumb, 0, sizeof(dispatch_thumb));
+}
+
+static void dispatch_fill(u32 *table, u32 pc, u32 shift, u8 *host)
+{
+  u32 region = pc >> 24, i;
+
+  if(translation_recursion_level || (host == NULL) || (host == (u8 *)(-1)))
+    return;
+  if((region != 0x2) && (region != 0x3) && ((region < 0x8) || (region > 0xD)))
+    return;
+  i = ((pc >> shift) & (DISPATCH_ENTRIES - 1)) * 2;
+  table[i] = pc | 1;
+  table[i + 1] = (u32)host;
+}
+
+u8 *block_lookup_address_arm(u32 pc)
+{
+  u8 *host = block_lookup_slow_arm(pc);
+  dispatch_fill(dispatch_arm, pc & ~0x03, 2, host);
+  return host;
+}
+
+u8 *block_lookup_address_thumb(u32 pc)
+{
+  u8 *host = block_lookup_slow_thumb(pc);
+  dispatch_fill(dispatch_thumb, pc & ~0x01, 1, host);
+  return host;
+}
+
+u8 *block_lookup_address_dual(u32 pc)
+{
+  u8 *host = block_lookup_slow_dual(pc);
+  if(pc & 0x01)
+    dispatch_fill(dispatch_thumb, pc & ~0x01, 1, host);
+  else
+    dispatch_fill(dispatch_arm, pc & ~0x03, 2, host);
+  return host;
+}
 
 // Potential exit point: If the rd field is pc for instructions is 0x0F,
 // the instruction is b/bl/bx, or the instruction is ldm with PC in the
@@ -3596,6 +3653,7 @@ translate_block_builder(thumb);
 
 void flush_translation_cache_ram()
 {
+  dispatch_clear();
   invalidate_icache_region(ram_translation_cache,
    (ram_translation_ptr - ram_translation_cache) + 0x100);
 
@@ -3664,6 +3722,7 @@ void flush_translation_cache_ram()
 
 void flush_translation_cache_rom()
 {
+  dispatch_clear();
   invalidate_icache_region(rom_translation_cache,
    rom_translation_ptr - rom_translation_cache + 0x100);
 
@@ -3673,6 +3732,7 @@ void flush_translation_cache_rom()
 
 void flush_translation_cache_bios()
 {
+  dispatch_clear();
   invalidate_icache_region(bios_translation_cache,
    bios_translation_ptr - bios_translation_cache + 0x100);
 
