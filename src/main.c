@@ -883,7 +883,8 @@ static void bench_write(u32 total)
   fd = sceIoOpen(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_APPEND, 0777);
   if(fd < 0)
     return;
-  sprintf(line, "%s,%s,%d MHz,frames %d,total_us %u,fps_x100 %u,lookups %u,chunks_us",
+  /* the game's name in quotes: it may hold commas ("(USA, Europe)") */
+  sprintf(line, "%s,\"%s\",%d MHz,frames %d,total_us %u,fps_x100 %u,lookups %u,chunks_us",
    BENCH_TAG, gamepak_filename, scePowerGetCpuClockFrequency(), BENCH_FRAMES, (unsigned)total,
    (unsigned)((u64)BENCH_FRAMES * 100000000ULL / (total ? total : 1)),
    (unsigned)(game_bench_lookups - bench_lookups0));
