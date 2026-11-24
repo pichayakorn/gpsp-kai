@@ -49,7 +49,7 @@
 #define POP_H  (LIBRARY_GRID ? 98 : 64)
 
 enum { VIEW_GRID, VIEW_LIST };
-enum { TAB_RECENT, TAB_ALL };
+enum { TAB_RECENT, TAB_ALL, TAB_FAV };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
 typedef struct
@@ -59,6 +59,7 @@ typedef struct
   u32 size;           /* bytes */
   u16 dir;            /* index into dirs */
   s16 recent;         /* place in recent.txt, -1: not there */
+  u8 fav;             /* hearted: on Favourites */
 } game_t;
 
 typedef struct
@@ -67,13 +68,14 @@ typedef struct
   u32 used;           /* frame it was last drawn */
   u16 *px;            /* COVER x COVER */
 } cover_t;
-#define MAX_COVERS 24
+#define MAX_COVERS 24  /* the grid's; without it, the Recent row's five and spares: 8 */
 
 static struct
 {
   game_t *games;
   int count;
-  int *order;         /* the games in view order */
+  int *order;         /* the games in view order (the tab's games) */
+  int n;              /* how many: every game on All, the hearted on Favourites */
   const char **dirs;
   int dir_count;
   char *arena;
@@ -97,6 +99,22 @@ static struct
   int pic_ok, cont_slot;      /* it was read; the slot Continue resumes (-1 none) */
   u64 cont_time;              /* that slot's save time */
   int chosen_game, chosen_slot;
+
+  int sorts[2], tab_cur[4];   /* All and Favourites: the sort; every tab: its cursor */
+  int card, card_f, card_out, card_game;  /* the game card, its motion, its game */
+  u32 card_mark;              /* pool mark: the card's memory goes when it closes */
+  u16 *thumbs, *card_cover;   /* the tiles' 60 x 40 pictures; the 96 px cover */
+  int tile_slot[12], tile_pic[12], tile_count;  /* -1 Start fresh, else the slot */
+  u64 tile_time[12];
+  int card_cur, card_from, card_cf;            /* the focused tile, its frame's flight */
+  int card_first, card_first_from, card_first_f;  /* the first tile in view, scroll */
+  int fav_flash, fav_changed, card_changed;
+  ui_hold_t hold;             /* SELECT held: delete */
+  char toast[64];
+  u16 toast_edge;
+  int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
+  int name_mode;              /* the card's name: NAME_* */
+  char name_l1[256], name_l2[256];  /* its two 2x lines */
   int dirty;
   u32 frame;
 
@@ -124,6 +142,11 @@ static char *arena_str(const char *s, int n)
 }
 
 static const char *display_name(const char *name, int n);
+static const u16 icon_heart[11];
+static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
+static void read_favourites(void);
+static void cover_heart(int x, int y, int game);
+static void view_reset(void);
 
 static int is_game_file(const char *name)
 {
@@ -180,6 +203,9 @@ static void scan_dir(const char *path, int depth)
     {
       game_t *g = &L.games[L.count];
       const char *dot = strrchr(e.d_name, '.');
+      /* the pool isn't cleared: every field starts known (a stray byte in
+         fav made every game a favourite that △ couldn't clear) */
+      memset(g, 0, sizeof(*g));
       g->name = arena_str(e.d_name, strlen(e.d_name));
       g->title = g->name ? display_name(e.d_name, dot - e.d_name) : NULL;
       if(g->title == NULL)
@@ -298,11 +324,11 @@ static int compare_games(const void *a, const void *b)
 
 static void sort_games(void)
 {
-  int i, keep = (L.count > 0) ? L.order[L.cur] : 0;
+  int i, keep = (L.n > 0) ? L.order[L.cur] : 0;
 
-  qsort(L.order, L.count, sizeof(int), compare_games);
+  qsort(L.order, L.n, sizeof(int), compare_games);
   /* the cursor stays on its game */
-  for(i = 0; i < L.count; i++)
+  for(i = 0; i < L.n; i++)
     if(L.order[i] == keep)
       L.cur = L.cur_from = i;
 }
@@ -321,8 +347,10 @@ static int load_games(void)
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0);
   read_recent();
+  read_favourites();
   for(i = 0; i < L.count; i++)
     L.order[i] = i;
+  L.n = L.count;
   sort_games();
   L.cur = L.cur_from = 0;  /* a fresh list opens on its first game */
   return 1;
@@ -335,10 +363,11 @@ static void covers_init(void)
   int i;
 
   L.cover_count = 0;
-  for(i = 0; i < MAX_COVERS; i++)
+  for(i = 0; i < (LIBRARY_GRID ? MAX_COVERS : 8); i++)
   {
-    /* only what the pool can spare; with none, covers are drawn each time */
-    if(ui_pool_free() < 64 * 1024 + COVER * COVER * 2)
+    /* only what the pool can spare, keeping room for the game card; with
+       none, covers are drawn each time */
+    if(ui_pool_free() < 160 * 1024 + COVER * COVER * 2)
       break;
     L.covers[i].px = ui_pool_alloc(COVER * COVER * 2);
     if(L.covers[i].px == NULL)
@@ -495,7 +524,7 @@ static void grid_marquee(int x, int y, int game)
 
 static int grid_rows(void)
 {
-  return (L.count + GRID_COLS - 1) / GRID_COLS;
+  return (L.n + GRID_COLS - 1) / GRID_COLS;
 }
 
 static int grid_off(void)
@@ -527,7 +556,7 @@ static void grid_ground(void)
 {
   int i, off = grid_off(), rows = grid_rows();
 
-  for(i = 0; i < L.count; i++)
+  for(i = 0; i < L.n; i++)
   {
     int x, y;
     grid_item_xy(i, off, &x, &y);
@@ -551,7 +580,7 @@ static void grid_selection(void)
 {
   int off = grid_off(), x, y, fx, fy, x0, y0, x1, y1;
 
-  if(L.count == 0)
+  if(L.n == 0)
     return;
   grid_item_xy(L.cur, off, &x, &y);
   if((y >= VIEW_T) && (y + COVER <= VIEW_B))
@@ -614,17 +643,17 @@ static void list_layout(int pos)
 {
   int lo = pos >> 8, fr = pos & 0xFF, i, d = 0, bottom;
 
-  if(lo >= L.count - 1)
+  if(lo >= L.n - 1)
   {
-    lo = L.count - 1;
+    lo = L.n - 1;
     fr = 0;
   }
   L.ys[lo] = LIST_FY - fr * (list_h(lo) + list_gap(lo + 1)) / 256;
-  for(i = lo + 1; i < L.count; i++)
+  for(i = lo + 1; i < L.n; i++)
     L.ys[i] = L.ys[i - 1] + list_h(i - 1) + list_gap(i);
   for(i = lo - 1; i >= 0; i--)
     L.ys[i] = L.ys[i + 1] - list_h(i) - list_gap(i + 1);
-  bottom = L.ys[L.count - 1] + list_h(L.count - 1);
+  bottom = L.ys[L.n - 1] + list_h(L.n - 1);
   if(L.ys[0] > LIST_FIRST)
     d = LIST_FIRST - L.ys[0];
   else if(bottom < LIST_LAST)
@@ -633,7 +662,7 @@ static void list_layout(int pos)
     if(d > LIST_FIRST - L.ys[0])
       d = LIST_FIRST - L.ys[0];
   }
-  for(i = 0; i < L.count; i++)
+  for(i = 0; i < L.n; i++)
     L.ys[i] += d;
 }
 
@@ -700,6 +729,8 @@ static void list_slim_contents(const game_t *g, int y, int lift, int on_card)
   draw_cover_any(23 - lift, y + 3 - lift, 16, g->title, 0);
   ui_print_fit(46 - lift, y + 3 - lift, g->title, on_card ? UI_COL_PLUM : UI_COL_CREAM,
    UI_FONT_BODY, on_card ? UI_TEXT_BOLD : 0, 330);
+  if(g->fav)
+    draw_icon11(400 - lift, y + 5 - lift, icon_heart, on_card ? UI_COL_PLUM : UI_COL_PINK, 1);
   size_text(g->size, size, sizeof(size));
   ui_print(452 - lift - ui_print_width(size, UI_FONT_SMALL, 0), y + 4 - lift, size,
    on_card ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
@@ -740,7 +771,7 @@ static void list_ground(void)
 
   list_layout(pos);
   ui_clip_set(0, VIEW_T - 2, UI_SCREEN_W, VIEW_B - VIEW_T + 2);
-  for(i = 0; i < L.count; i++)
+  for(i = 0; i < L.n; i++)
   {
     int y = L.ys[i], h = list_h(i), o = list_open_p(i);
     if((y + h < VIEW_T - 2) || (y > VIEW_B))
@@ -757,9 +788,9 @@ static void list_ground(void)
       ui_door(20, y, 440, h);
   }
   ui_clip_reset();
-  if(L.count > 1)
+  if(L.n > 1)
   {
-    int ty = 176 * pos / ((L.count - 1) * 256);
+    int ty = 176 * pos / ((L.n - 1) * 256);
     ui_round_fill(468, 42, 4, 196, 1, UI_COL_CARD);
     ui_round_fill(468, 42 + ty, 4, 20, 1, UI_COL_MUTE);
   }
@@ -771,15 +802,15 @@ static void list_selection(void)
 {
   int pos = list_pos(), lo = pos >> 8, hi, fr = pos & 0xFF, y0, y1, h0, h1;
 
-  if(L.count == 0)
+  if(L.n == 0)
     return;
   list_layout(pos);
-  if(lo >= L.count - 1)
+  if(lo >= L.n - 1)
   {
-    lo = L.count - 1;
+    lo = L.n - 1;
     fr = 0;
   }
-  hi = (lo + 1 < L.count) ? lo + 1 : lo;
+  hi = (lo + 1 < L.n) ? lo + 1 : lo;
   y0 = L.ys[lo] - 2;
   y1 = L.ys[hi] - 2;
   h0 = list_h(lo);
@@ -1138,7 +1169,10 @@ static void recent_ground(void)
   draw_continue(L.rec_row == 0);
   ui_print(20, 146, "Recent", UI_COL_MUTE, UI_FONT_SMALL, 0);
   for(i = 0; i < n; i++)
+  {
     draw_cover(GRID_X + i * GRID_PX, RECENT_Y, L.recent[i]);
+    cover_heart(GRID_X + i * GRID_PX, RECENT_Y, L.recent[i]);
+  }
 }
 
 static void recent_selection(void)
@@ -1151,6 +1185,7 @@ static void recent_selection(void)
     ui_fill(x + 1, RECENT_Y + 1, COVER, COVER, UI_COL_SHADE);
     draw_cover(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
     grid_marquee(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
+    cover_heart(x - UI_LIFT, RECENT_Y - UI_LIFT, L.recent[L.rec_cur]);
   }
   /* the focused Continue card: a long name's second line runs sideways */
   if((L.rec_row == 0) && (L.rec_f >= UI_F_CURSOR))
@@ -1191,6 +1226,563 @@ static void recent_move(void)
     L.marq_f = 0;
     L.dirty = 1;  /* the Continue card's look changes with the row */
   }
+}
+
+/* ---- Favourites ------------------------------------------------------------------------
+ * The hearted games, kept in CFG/favourites.txt (one full path per line);
+ * △ on the game card turns a game's heart on or off. */
+
+static const u16 icon_heart[11] =
+ { 0x000, 0x38E, 0x7DF, 0x7FF, 0x7FF, 0x3FE, 0x1FC, 0x0F8, 0x070, 0x020, 0x000 };
+
+static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
+{
+  int r, c;
+
+  for(r = 0; r < 11; r++)
+    for(c = 0; c < 11; c++)
+      if(bits[r] & (1 << (10 - c)))
+        ui_fill(x + c * scale, y + r * scale, scale, scale, color);
+}
+
+static void read_favourites(void)
+{
+  char path[MAX_PATH], line[MAX_PATH];
+  FILE *f;
+
+  path_printf(path, sizeof(path), "%s/favourites.txt", g_default_cfg_dir);
+  f = fopen(path, "r");
+  if(f == NULL)
+    return;
+  while(fgets(line, sizeof(line), f))
+  {
+    char *slash;
+    int i;
+    line[strcspn(line, "\r\n")] = 0;
+    slash = strrchr(line, '/');
+    if(slash == NULL)
+      continue;
+    *slash = 0;
+    for(i = 0; i < L.count; i++)
+      if(!strcasecmp(L.games[i].name, slash + 1) && !strcasecmp(L.dirs[L.games[i].dir], line))
+        L.games[i].fav = 1;
+  }
+  fclose(f);
+}
+
+static void write_favourites(void)
+{
+  char path[MAX_PATH];
+  FILE *f;
+  int i;
+
+  path_printf(path, sizeof(path), "%s/favourites.txt", g_default_cfg_dir);
+  f = fopen(path, "w");
+  if(f == NULL)
+    return;
+  for(i = 0; i < L.count; i++)
+    if(L.games[i].fav)
+      fprintf(f, "%s/%s\n", L.dirs[L.games[i].dir], L.games[i].name);
+  fclose(f);
+}
+
+/* the heart corner on a 64 px cover */
+static void cover_heart(int x, int y, int game)
+{
+  if(L.games[game].fav)
+    draw_icon11(x + 52, y + 2, icon_heart, UI_COL_PINK, 1);
+}
+
+/* Favourites with nothing hearted yet: the empty folder's layout with a
+   pink heart */
+static void draw_no_favourites(void)
+{
+  static const char t[] = "No favourites yet";
+  static const char b[] = "\xE2\x96\xB3 on a game, then \xE2\x96\xB3 again, to add it here";
+
+  ui_round_fill(208, 82, 64, 52, 3, UI_COL_CARD);
+  draw_icon11(224, 92, icon_heart, UI_COL_PINK, 3);
+  ui_print(240 - ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) / 2, 146, t, UI_COL_CREAM,
+   UI_FONT_BODY, UI_TEXT_BOLD);
+  ui_print(240 - ui_print_width(b, UI_FONT_SMALL, 0) / 2, 166, b, UI_COL_MUTE, UI_FONT_SMALL, 0);
+}
+
+/* ---- the game card (spec section 4, Game card; r4 card, r5 card_delete) -------------------
+ * △ on any game: a card over the library with the game's cover, facts and
+ * its savestates as tiles (Start fresh first, then every used slot newest
+ * first, the newest focused). × plays from the focused tile, △ hearts the
+ * game, SELECT held deletes the focused savestate (Undo on the toast), ○
+ * drops the card away. */
+
+#define CARD_X      14
+#define CARD_Y      22
+#define CARD_W      452
+#define CARD_H      222
+#define TILE_W      68
+#define TILE_H      76
+#define TILE_PITCH  72
+#define TILES_SEEN  6
+#define THUMB_W     60
+#define THUMB_H     40
+#define CARD_COVER  96
+
+/* the pause tiles' 20 x 20 play icon (design icons20.py), as Start fresh's
+   picture: per row ink then fill, bit 19 the left pixel; a 1 px plum
+   shadow down-right, plum ink, lime fill */
+static const u32 play20[2][20] =
+{
+  { 0x00000, 0x00000, 0x00000, 0x0C000, 0x0B000, 0x08C00, 0x08300, 0x080C0, 0x08030, 0x0800C,
+    0x0800C, 0x08030, 0x080C0, 0x08300, 0x08C00, 0x0B000, 0x0C000, 0x00000, 0x00000, 0x00000 },
+  { 0x00000, 0x00000, 0x00000, 0x00000, 0x04000, 0x07000, 0x07C00, 0x07F00, 0x07FC0, 0x07FF0,
+    0x07FF0, 0x07FC0, 0x07F00, 0x07C00, 0x07000, 0x04000, 0x00000, 0x00000, 0x00000, 0x00000 }
+};
+
+static void draw_play20(int x, int y)
+{
+  int r, c;
+
+  for(r = 0; r < 20; r++)
+    for(c = 0; c < 20; c++)
+      if((play20[0][r] | play20[1][r]) & (0x80000 >> c))
+        ui_fill(x + c + 1, y + r + 1, 1, 1, UI_COL_PLUM);
+  for(r = 0; r < 20; r++)
+    for(c = 0; c < 20; c++)
+    {
+      if(play20[0][r] & (0x80000 >> c))
+        ui_fill(x + c, y + r, 1, 1, UI_COL_PLUM);
+      else if(play20[1][r] & (0x80000 >> c))
+        ui_fill(x + c, y + r, 1, 1, UI_COL_LIME);
+    }
+}
+
+/* the card's tiles: -1 Start fresh, else the slot, newest first */
+static void card_read_tiles(void)
+{
+  char path[MAX_PATH];
+  int slot, i, n = 1;
+  u64 t;
+
+  L.tile_slot[0] = -1;
+  L.tile_pic[0] = 0;
+  for(slot = 0; slot <= 10; slot++)
+  {
+    u32 got;
+    state_path(L.card_game, slot, path);
+    got = read_thumbnail_for(path, L.thumbs + n * THUMB_W * THUMB_H, &t);
+    if(!got)
+      continue;
+    L.tile_slot[n] = slot;
+    L.tile_time[n] = t;
+    L.tile_pic[n] = (got == 2);
+    /* newest first: move it up past older ones */
+    for(i = n; (i > 1) && (L.tile_time[i] > L.tile_time[i - 1]); i--)
+    {
+      int s = L.tile_slot[i], p = L.tile_pic[i];
+      u64 tt = L.tile_time[i];
+      u16 tmp[THUMB_W * THUMB_H];
+      L.tile_slot[i] = L.tile_slot[i - 1];
+      L.tile_time[i] = L.tile_time[i - 1];
+      L.tile_pic[i] = L.tile_pic[i - 1];
+      L.tile_slot[i - 1] = s;
+      L.tile_time[i - 1] = tt;
+      L.tile_pic[i - 1] = p;
+      memcpy(tmp, L.thumbs + i * THUMB_W * THUMB_H, sizeof(tmp));
+      memcpy(L.thumbs + i * THUMB_W * THUMB_H, L.thumbs + (i - 1) * THUMB_W * THUMB_H, sizeof(tmp));
+      memcpy(L.thumbs + (i - 1) * THUMB_W * THUMB_H, tmp, sizeof(tmp));
+    }
+    n++;
+  }
+  L.tile_count = n;
+}
+
+/* ---- the game card's name ("B balanced", maintainer, 2026-11-20) ----------------------
+ * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
+ * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
+ * their full-width forms; the mark stays on line 1), else at the break
+ * that makes the two lines closest in width; then the file name line is
+ * left out. Too long for that: 1x on one line (the rest moves up 12 px),
+ * or the headline rule (big_title) on two. */
+enum { NAME_2X, NAME_2X_TWO, NAME_1X, NAME_BIG };
+
+static int cjk_cp(u32 c)
+{
+  return ((c >= 0x3000) && (c <= 0x9FFF)) || ((c >= 0xFF00) && (c <= 0xFFEF));
+}
+
+static u32 utf8_at(const char *s, int *len)
+{
+  const u8 *u = (const u8 *)s;
+  if(u[0] < 0x80) { *len = 1; return u[0]; }
+  if((u[0] & 0xE0) == 0xC0) { *len = 2; return ((u[0] & 0x1F) << 6) | (u[1] & 0x3F); }
+  if((u[0] & 0xF0) == 0xE0)
+  {
+    *len = 3;
+    return ((u[0] & 0x0F) << 12) | ((u[1] & 0x3F) << 6) | (u[2] & 0x3F);
+  }
+  *len = 4;
+  return 0xFFFD;
+}
+
+static int ends_with(const char *a, int n, const char *mark)
+{
+  int m = strlen(mark);
+  return (n >= m) && !memcmp(a + n - m, mark, m);
+}
+
+/* The two lines for t (each at most w at 1x bold), or 0. */
+static int name_lines2(const char *t, int w, char *l1, char *l2, int size)
+{
+  int best_rank = 3, best_diff = 0, i = 0, prev_cjk = 0, len;
+
+  while(t[i])
+  {
+    u32 c = utf8_at(t + i, &len);
+    if((i > 0) && ((c == ' ') || prev_cjk))
+    {
+      char a[256], b[256];
+      int na = i, wa, wb, rank, diff;
+      const char *bs = t + i;
+      while((na > 0) && (t[na - 1] == ' '))
+        na--;
+      while(*bs == ' ')
+        bs++;
+      if((na > 0) && *bs && (na < (int)sizeof(a)) && (strlen(bs) < sizeof(b)))
+      {
+        memcpy(a, t, na);
+        a[na] = 0;
+        snprintf(b, sizeof(b), "%s", bs);
+        wa = ui_print_width(a, UI_FONT_BODY, UI_TEXT_BOLD);
+        wb = ui_print_width(b, UI_FONT_BODY, UI_TEXT_BOLD);
+        if((wa <= w) && (wb <= w))
+        {
+          rank = (ends_with(a, na, " -") || ends_with(a, na, ":") || ends_with(a, na, "~") ||
+           ends_with(a, na, "\xEF\xBC\x9A") || ends_with(a, na, "\xEF\xBD\x9E")) ? 0 : 1;
+          diff = (wa > wb) ? wa - wb : wb - wa;
+          if((rank < best_rank) || ((rank == best_rank) && (diff < best_diff)))
+          {
+            best_rank = rank;
+            best_diff = diff;
+            snprintf(l1, size, "%s", a);
+            snprintf(l2, size, "%s", b);
+          }
+        }
+      }
+    }
+    prev_cjk = cjk_cp(c);
+    i += len;
+  }
+  return best_rank < 3;
+}
+
+static void card_name_layout(const char *t)
+{
+  if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) <= 316)
+    L.name_mode = NAME_2X;
+  else if(name_lines2(t, 158, L.name_l1, L.name_l2, sizeof(L.name_l1)))
+    L.name_mode = NAME_2X_TWO;
+  else if(ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) <= 316)
+    L.name_mode = NAME_1X;
+  else
+    L.name_mode = NAME_BIG;
+}
+
+static int card_open(int game)
+{
+  L.card_mark = ui_pool_mark();
+  L.thumbs = ui_pool_alloc(12 * THUMB_W * THUMB_H * 2);
+  L.card_cover = ui_pool_alloc(CARD_COVER * CARD_COVER * 2);
+  if(!L.thumbs || !L.card_cover)
+  {
+    ui_pool_release(L.card_mark);
+    return 0;
+  }
+  L.card_game = game;
+  card_name_layout(L.games[game].title);
+  card_read_tiles();
+  /* the art alone: the name is beside it */
+  ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
+  L.card = 1;
+  L.card_f = 0;
+  L.card_out = 0;
+  L.card_cur = L.card_from = (L.tile_count > 1) ? 1 : 0;  /* the newest */
+  L.card_cf = UI_F_CURSOR;
+  L.card_first = 0;
+  L.card_first_from = 0;
+  L.card_first_f = UI_F_SCROLL;
+  L.fav_flash = UI_F_FLASH;
+  L.card_changed = 0;
+  L.marq_f = 0;  /* a long name waits again before it runs */
+  memset(&L.hold, 0, sizeof(L.hold));
+  L.toast_f = -1;
+  L.dirty = 1;
+  return 1;
+}
+
+static void card_close_now(void)
+{
+  L.card = 0;
+  ui_pool_release(L.card_mark);
+  L.thumbs = NULL;
+  L.card_cover = NULL;
+  if(L.card_changed && (L.recent_count > 0))
+  {
+    /* a savestate went or came back: Continue may resume another one */
+    L.cont_slot = resume_slot(L.recent[0], &L.cont_time);
+    L.pic_ok = load_resume_picture(L.recent[0], L.cont_slot);
+  }
+  L.dirty = 1;
+}
+
+static int card_y(void)
+{
+  if(L.card_out)
+    return CARD_Y + ui_ease_in_cubic(0, 250, L.card_f, UI_F_POPUP_OUT);
+  return CARD_Y + 250 - ui_ease_out_back(0, 250, L.card_f, UI_F_POPUP_IN);
+}
+
+static int card_first_px(void)
+{
+  return ui_ease_out_back(L.card_first_from, L.card_first * TILE_PITCH, L.card_first_f,
+   UI_F_SCROLL);
+}
+
+static void slot_label(int slot, char *out, int n)
+{
+  if(slot < 0)
+    snprintf(out, n, "Start fresh");
+  else if(slot == 10)
+    snprintf(out, n, "Last");
+  else
+    snprintf(out, n, "Slot %d", slot);
+}
+
+/* "21:46" today, else "11/13" */
+static void tile_when(u64 tick, char *out, int n)
+{
+  when_text(tick, out, n);
+  if(!strncmp(out, "today ", 6))
+    memmove(out, out + 6, strlen(out + 6) + 1);
+}
+
+static void draw_card(void)
+{
+  const game_t *g = &L.games[L.card_game];
+  int x = CARD_X, y = card_y(), i, cx, first = card_first_px(), dy;
+  char chip[48], size[16], played[32];
+
+  ui_round_fill(x + 3, y + 3, CARD_W, CARD_H, 3, UI_COL_SHADE);
+  ui_round_fill(x, y, CARD_W, CARD_H, 3, UI_COL_CARD);
+  ui_fill(x + 4, y, CARD_W - 8, 4, UI_COL_TANGERINE);
+  ui_fill(x + 12, y + 14, 100, 100, UI_COL_PLUM);
+  ui_blit(L.card_cover, CARD_COVER, x + 14, y + 16, CARD_COVER, CARD_COVER);
+  /* the name (card_name_layout); dy moves what follows it */
+  switch(L.name_mode)
+  {
+    case NAME_2X:
+      ui_print(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      dy = 0;
+      break;
+    case NAME_2X_TWO:
+      ui_print(x + 124, y + 10, L.name_l1, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      ui_print(x + 124, y + 38, L.name_l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+      dy = 28;
+      break;
+    case NAME_1X:
+      ui_print(x + 124, y + 12, g->title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+      dy = -12;
+      break;
+    default:
+      /* the card is focused: a cut second line runs sideways */
+      big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
+       (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
+      dy = 0;
+      break;
+  }
+
+  /* chips: size, play time, the heart (△ flashes it) */
+  cx = x + 124;
+  size_text(g->size, size, sizeof(size));
+  snprintf(chip, sizeof(chip), "GBA \xC2\xB7 %s", size);
+  ui_round_fill(cx, y + 46 + dy, ui_print_width(chip, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
+  ui_print(cx + 6, y + 47 + dy, chip, UI_COL_TANGERINE, UI_FONT_SMALL, 0);
+  cx += ui_print_width(chip, UI_FONT_SMALL, 0) + 18;
+  played_text(game_played(L.card_game), played, sizeof(played));
+  ui_round_fill(cx, y + 46 + dy, ui_print_width(played, UI_FONT_SMALL, 0) + 12, 16, 2, UI_COL_PLUM);
+  ui_print(cx + 6, y + 47 + dy, played, UI_COL_SKY, UI_FONT_SMALL, 0);
+  cx += ui_print_width(played, UI_FONT_SMALL, 0) + 18;
+  {
+    int w = 11 + 4 + ui_print_width("Favourite", UI_FONT_SMALL, 0) + 12;
+    u16 ink = g->fav ? UI_COL_PINK : UI_COL_MUTE;
+    u16 fill = (L.fav_flash < UI_F_FLASH) ? ((L.fav_flash < UI_F_FLASH / 2) ? UI_COL_CREAM :
+     COLOR16(18, 16, 16)) : UI_COL_PLUM;
+    ui_round_fill(cx, y + 46 + dy, w, 16, 2, fill);
+    draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
+    ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
+  }
+  if(L.name_mode != NAME_2X_TWO)  /* two 2x lines leave the file name out */
+    ui_print_fit(x + 124, y + 70 + dy, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
+
+  /* the savestates */
+  ui_print(x + 12, y + 118, "Savestates", UI_COL_MUTE, UI_FONT_SMALL, 0);
+  ui_clip_set(x + 8, y + 130, CARD_W - 16, 90);
+  for(i = 0; i < L.tile_count; i++)
+  {
+    int sx = x + 12 + i * TILE_PITCH - first, sy = y + 138, sel = (i == L.card_cur);
+    int lift = sel ? UI_LIFT : 0;
+    char label[24], when[24];
+    if((sx + TILE_W < x) || (sx > x + CARD_W))
+      continue;
+    if(sel)
+      ui_round_fill(sx + 1, sy + 1, TILE_W, TILE_H, 2, UI_COL_SHADE);
+    ui_round_fill(sx - lift, sy - lift, TILE_W, TILE_H, 2,
+     sel ? ((L.tile_slot[i] < 0) ? UI_COL_TANGERINE : UI_COL_SKY) : UI_COL_PLUM_2);
+    sx -= lift;
+    sy -= lift;
+    ui_fill(sx + 4, sy + 3, THUMB_W, THUMB_H, UI_COL_PLUM);
+    if(L.tile_slot[i] < 0)
+      draw_play20(sx + 24, sy + 13);
+    else if(L.tile_pic[i])
+      ui_blit(L.thumbs + i * THUMB_W * THUMB_H, THUMB_W, sx + 4, sy + 3, THUMB_W, THUMB_H);
+    slot_label(L.tile_slot[i], label, sizeof(label));
+    ui_print_fit(sx + 4, sy + 47, label, sel ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, 62);
+    if(L.tile_slot[i] >= 0)
+    {
+      tile_when(L.tile_time[i], when, sizeof(when));
+      ui_print(sx + 4, sy + 60, when, sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+    }
+  }
+  /* the cursor frame flies along the strip */
+  {
+    int fx = ui_ease_out_back(L.card_from * TILE_PITCH, L.card_cur * TILE_PITCH, L.card_cf,
+     UI_F_CURSOR);
+    ui_cursor_frame(x + 12 + fx - first - UI_LIFT, y + 136, TILE_W, TILE_H);
+  }
+  ui_clip_reset();
+
+  /* SELECT held on a savestate: the pause screen's hold card over its picture */
+  if(L.hold.shown && (L.tile_slot[L.card_cur] >= 0))
+  {
+    static const char verb[] = "Delete (hold)";
+    int sx = x + 12 + L.card_cur * TILE_PITCH - first - UI_LIFT, sy = y + 138 - UI_LIFT;
+    int cw = ui_print_width(verb, UI_FONT_SMALL, 0) + 20, c0, c1;
+    if(cw < 96)
+      cw = 96;
+    ui_checker(sx + 4, sy + 3, THUMB_W, THUMB_H, UI_COL_SHADE);
+    c0 = sx + 34 - cw / 2;
+    if(c0 < x + 8) c0 = x + 8;
+    if(c0 > x + CARD_W - 8 - cw) c0 = x + CARD_W - 8 - cw;
+    c1 = sy + 3 + 3;
+    ui_round_fill(c0 + 3, c1 + 3, cw, 34, 2, UI_COL_SHADE);
+    ui_round_fill(c0, c1, cw, 34, 2, UI_COL_CARD);
+    ui_print(c0 + (cw - ui_print_width(verb, UI_FONT_SMALL, 0)) / 2, c1 + 3, verb,
+     UI_COL_CREAM, UI_FONT_SMALL, 0);
+    ui_fill(c0 + 8, c1 + 22, cw - 16, 6, UI_COL_PLUM_2);
+    ui_fill(c0 + 8, c1 + 22, (cw - 16) * L.hold.p / 256, 6, UI_COL_PINK);
+  }
+}
+
+static void card_select(int i)
+{
+  if((i < 0) || (i >= L.tile_count) || (i == L.card_cur))
+    return;
+  L.card_from = L.card_cur;
+  L.card_cur = i;
+  L.card_cf = 0;
+  L.dirty = 1;  /* SELECT Hold: delete shows on a savestate only */
+  if((i < L.card_first) || (i >= L.card_first + TILES_SEEN))
+  {
+    L.card_first_from = card_first_px();
+    L.card_first = (i < L.card_first) ? i : i - TILES_SEEN + 1;
+    L.card_first_f = 0;
+  }
+  memset(&L.hold, 0, sizeof(L.hold));
+}
+
+static void card_toast(const char *text, u16 edge, int undo_slot)
+{
+  snprintf(L.toast, sizeof(L.toast), "%s", text);
+  L.toast_edge = edge;
+  L.toast_undo = undo_slot;
+  L.toast_f = 0;
+  L.dirty = 1;  /* SELECT reads Undo while it is up */
+}
+
+/* returns 1 when × chose a tile to play */
+static int card_input(void)
+{
+  if(L.card_out)
+    return 0;
+  if(ui_pressed(ui_key_back))
+  {
+    L.card_out = 1;
+    L.card_f = 0;
+    return 0;
+  }
+  if(ui_pressed(PSP_CTRL_TRIANGLE))
+  {
+    L.games[L.card_game].fav ^= 1;
+    write_favourites();
+    L.fav_flash = 0;
+    L.fav_changed = 1;
+    return 0;
+  }
+  /* while the toast offers Undo, SELECT is Undo */
+  if((L.toast_f >= 0) && (L.toast_undo >= 0) && ui_pressed(PSP_CTRL_SELECT))
+  {
+    char path[MAX_PATH];
+    int slot = L.toast_undo, i;
+    state_path(L.card_game, slot, path);
+    undo_state_files(path);
+    card_read_tiles();
+    for(i = 0; i < L.tile_count; i++)
+      if(L.tile_slot[i] == slot)
+        card_select(i);
+    L.card_changed = 1;
+    card_toast("The savestate is back", UI_COL_SKY, -1);
+    memset(&L.hold, 0, sizeof(L.hold));
+    return 0;
+  }
+  if(L.tile_slot[L.card_cur] >= 0)
+  {
+    ui_hold_step(&L.hold, PSP_CTRL_SELECT);
+    if(L.hold.done)
+    {
+      char path[MAX_PATH], text[48], label[24];
+      int slot = L.tile_slot[L.card_cur];
+      state_path(L.card_game, slot, path);
+      delete_state_files(path);
+      card_read_tiles();
+      if(L.card_cur >= L.tile_count)
+        L.card_cur = L.card_from = L.tile_count - 1;
+      L.card_changed = 1;
+      slot_label(slot, label, sizeof(label));
+      snprintf(text, sizeof(text), "%s deleted", label);
+      card_toast(text, UI_COL_PINK, slot);
+      return 0;
+    }
+  }
+  card_select(ui_step(L.card_cur, L.tile_count, PSP_CTRL_LEFT, PSP_CTRL_RIGHT));
+  if(ui_pressed(ui_key_confirm) && !L.hold.shown)
+  {
+    L.chosen_game = L.card_game;
+    L.chosen_slot = L.tile_slot[L.card_cur];
+    return 1;
+  }
+  return 0;
+}
+
+static void card_step(void)
+{
+  if(L.card_f < (L.card_out ? UI_F_POPUP_OUT : UI_F_POPUP_IN))
+    L.card_f++;
+  else if(L.card_out)
+  {
+    card_close_now();
+    return;
+  }
+  if(L.card_cf < UI_F_CURSOR) L.card_cf++;
+  if(L.card_first_f < UI_F_SCROLL) L.card_first_f++;
+  if(L.fav_flash < UI_F_FLASH) L.fav_flash++;
 }
 
 /* ---- View & sort ------------------------------------------------------------------- */
@@ -1241,7 +1833,31 @@ static void draw_popup(void)
 
 /* ---- hints, the empty library, the ground --------------------------------------------- */
 
-static const char *tab_names[2] = { "Recent", "All" };
+static const char *tab_names[3] = { "Recent", "All", "\xE2\x98\x85 Favourites" };
+
+static int tab_is(int id)
+{
+  return L.tab_ids[L.tab] == id;
+}
+
+/* the games of a list tab, in its sort: every game on All, the hearted on
+   Favourites; the cursor goes back where it was on that tab */
+static void fill_order(void)
+{
+  int i, fav = tab_is(TAB_FAV);
+
+  L.n = 0;
+  for(i = 0; i < L.count; i++)
+    if(!fav || L.games[i].fav)
+      L.order[L.n++] = i;
+  L.sort = L.sorts[fav];
+  L.cur = 0;
+  sort_games();
+  L.cur = L.tab_cur[L.tab];
+  if(L.cur >= L.n)
+    L.cur = (L.n > 0) ? L.n - 1 : 0;
+  L.cur_from = L.cur;
+}
 
 static void tabs_init(void)
 {
@@ -1249,22 +1865,56 @@ static void tabs_init(void)
   if(L.recent_count > 0)
     L.tab_ids[L.tab_count++] = TAB_RECENT;
   L.tab_ids[L.tab_count++] = TAB_ALL;
+  L.tab_ids[L.tab_count++] = TAB_FAV;
   L.tab = 0;  /* Recent when there is one, else All */
   L.tab_prev = 0;
   L.tab_f = UI_F_TAB;
+  memset(L.tab_cur, 0, sizeof(L.tab_cur));
+  if(!tab_is(TAB_RECENT))
+  {
+    fill_order();
+    view_reset();
+  }
 }
 
-static int tab_is(int id)
+/* L or R: tabs never wrap */
+static void turn_tab(int d)
 {
-  return L.tab_ids[L.tab] == id;
+  L.tab_cur[L.tab] = L.cur;
+  L.tab_prev = L.tab;
+  L.tab += d;
+  L.tab_f = 0;
+  L.marq_f = 0;
+  if(!tab_is(TAB_RECENT))
+  {
+    fill_order();
+    view_reset();
+  }
+  L.dirty = 1;
 }
 
 static void draw_hints(void)
 {
-  ui_hint_t h[4];
+  ui_hint_t h[5];
   int n = 0;
 
-  if(L.pop && !L.pop_out)
+  if(L.card && !L.card_out)
+  {
+    /* ○ Back · △ Favourite never change; SELECT comes and goes (Start
+       fresh is not a savestate; Undo while the toast offers it) */
+    h[n].keys = ui_key_back;        h[n++].verb = "Back";
+    h[n].keys = PSP_CTRL_TRIANGLE;  h[n++].verb = "Favourite";
+    if((L.toast_f >= 0) && (L.toast_undo >= 0))
+    {
+      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = "Undo";
+    }
+    else if(L.tile_slot[L.card_cur] >= 0)
+    {
+      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = "Hold: delete";
+    }
+    h[n].keys = ui_key_confirm;     h[n++].verb = "Play";
+  }
+  else if(L.pop && !L.pop_out)
   {
     if(LIBRARY_GRID)
     {
@@ -1281,11 +1931,18 @@ static void draw_hints(void)
   else if(tab_is(TAB_RECENT))
   {
     /* × reads Continue on the Continue card */
+    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? "Play" : "Continue";
   }
+  else if(L.n == 0)  /* Favourites, nothing hearted: nothing to play */
+  {
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+  }
   else
   {
+    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
     h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
@@ -1320,6 +1977,16 @@ static void draw_empty(void)
   }
 }
 
+static void draw_tab_bar(void)
+{
+  const char *labels[4];
+  int i;
+
+  for(i = 0; i < L.tab_count; i++)
+    labels[i] = tab_names[L.tab_ids[i]];
+  ui_tabs(UI_MARGIN, labels, L.tab_count, L.tab, L.tab_prev, L.tab_f);
+}
+
 static void build_ground(void)
 {
   L.dirty = 0;
@@ -1329,10 +1996,20 @@ static void build_ground(void)
     draw_empty();
   else if(tab_is(TAB_RECENT))
     recent_ground();
+  else if(L.n == 0)
+    draw_no_favourites();
   else if(L.view == VIEW_GRID)
     grid_ground();
   else
     list_ground();
+  /* the game card: the library, its tabs and chip stay behind the screen
+     door (they are drawn here, not each frame, while it is up) */
+  if(L.card)
+  {
+    draw_tab_bar();
+    ui_status_chip();
+    ui_door(0, 0, UI_SCREEN_W, UI_STRIP_Y);
+  }
   draw_hints();
   ui_layer_end();
 }
@@ -1341,7 +2018,7 @@ static void build_ground(void)
 
 static void select_game(int i)
 {
-  if((i < 0) || (i >= L.count) || (i == L.cur))
+  if((i < 0) || (i >= L.n) || (i == L.cur))
     return;
   L.cur_from = L.cur;
   L.cur = i;
@@ -1428,24 +2105,24 @@ static void view_reset(void)
 
 static void move(void)
 {
-  if(L.count == 0)
+  if(L.n == 0)
     return;
   if(L.view == VIEW_GRID)
   {
     if(ui_repeat(PSP_CTRL_LEFT) && (L.cur > 0))
       select_game(L.cur - 1);
-    else if(ui_repeat(PSP_CTRL_RIGHT) && (L.cur + 1 < L.count))
+    else if(ui_repeat(PSP_CTRL_RIGHT) && (L.cur + 1 < L.n))
       select_game(L.cur + 1);
     else if(ui_repeat(PSP_CTRL_UP) && (L.cur >= GRID_COLS))
       select_game(L.cur - GRID_COLS);
     else if(ui_repeat(PSP_CTRL_DOWN) && (L.cur / GRID_COLS + 1 < grid_rows()))
     {
       int next = L.cur + GRID_COLS;
-      select_game((next < L.count) ? next : L.count - 1);
+      select_game((next < L.n) ? next : L.n - 1);
     }
   }
   else
-    select_game(ui_step(L.cur, L.count, PSP_CTRL_UP, PSP_CTRL_DOWN));
+    select_game(ui_step(L.cur, L.n, PSP_CTRL_UP, PSP_CTRL_DOWN));
 }
 
 static void popup_input(void)
@@ -1457,8 +2134,9 @@ static void popup_input(void)
     L.pop_out = 1;
     L.pop_f = 0;
     /* written when the popup closes (spec section 7) */
+    L.sorts[tab_is(TAB_FAV)] = L.sort;  /* the sort is kept per tab */
     g_gpsp_config.library_view = (LIBRARY_GRID ? (L.view & 1) :
-     (g_gpsp_config.library_view & 1)) | ((L.sort & 3) << 1);
+     (g_gpsp_config.library_view & 1)) | ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3);
     save_config_file();
     return;
   }
@@ -1589,9 +2267,13 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   memset(&L, 0, sizeof(L));
   L.played_game = -1;
   L.view = LIBRARY_GRID ? (g_gpsp_config.library_view & 1) : VIEW_LIST;
-  L.sort = (g_gpsp_config.library_view >> 1) & 3;
-  if(L.sort >= SORTS)
-    L.sort = SORT_NAME;
+  L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
+  L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;  /* Favourites */
+  if(L.sorts[0] >= SORTS)
+    L.sorts[0] = SORT_NAME;
+  if(L.sorts[1] >= SORTS)
+    L.sorts[1] = SORT_NAME;
+  L.sort = L.sorts[0];
   if(!load_games())
   {
     ui_pool_release(mark);
@@ -1632,20 +2314,21 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       else if(ui_pressed(PSP_CTRL_START))
         open_settings();
     }
-    else if((ui_repeat(PSP_CTRL_LTRIGGER) && (L.tab > 0)) ||
-     (ui_repeat(PSP_CTRL_RTRIGGER) && (L.tab + 1 < L.tab_count)))
+    else if(L.card)
     {
-      /* tabs never wrap */
-      L.tab_prev = L.tab;
-      L.tab += ui_down(PSP_CTRL_LTRIGGER) ? -1 : 1;
-      L.tab_f = 0;
-      L.marq_f = 0;
-      L.dirty = 1;
+      if(card_input())
+        chosen = 1;
     }
+    else if(ui_repeat(PSP_CTRL_LTRIGGER) && (L.tab > 0))
+      turn_tab(-1);
+    else if(ui_repeat(PSP_CTRL_RTRIGGER) && (L.tab + 1 < L.tab_count))
+      turn_tab(1);
     else if(tab_is(TAB_RECENT))
     {
       recent_move();
-      if(ui_pressed(PSP_CTRL_START))
+      if(ui_pressed(PSP_CTRL_TRIANGLE))
+        card_open(L.rec_row ? L.recent[L.rec_cur] : L.recent[0]);
+      else if(ui_pressed(PSP_CTRL_START))
         open_settings();
       else if(ui_pressed(ui_key_confirm))
       {
@@ -1658,7 +2341,9 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     else
     {
       move();
-      if(ui_pressed(PSP_CTRL_SELECT))
+      if((L.n > 0) && ui_pressed(PSP_CTRL_TRIANGLE))
+        card_open(L.order[L.cur]);
+      else if(ui_pressed(PSP_CTRL_SELECT))
       {
         L.pop = 1;
         L.pop_f = 0;
@@ -1669,7 +2354,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       }
       else if(ui_pressed(PSP_CTRL_START))
         open_settings();
-      else if(ui_pressed(ui_key_confirm))
+      else if((L.n > 0) && ui_pressed(ui_key_confirm))
       {
         u64 t;
         /* × Play resumes from Last, else the newest savestate, else the
@@ -1683,6 +2368,19 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
     if(L.tab_f < UI_F_TAB) L.tab_f++;
     if(L.rec_f < UI_F_CURSOR) L.rec_f++;
+    if(L.card)
+    {
+      int was = L.card;
+      card_step();
+      if(!L.card && was && L.fav_changed && tab_is(TAB_FAV))
+      {
+        /* a game left or joined Favourites */
+        fill_order();
+        view_reset();
+      }
+      if(!L.card)
+        L.fav_changed = 0;
+    }
     if(L.top_f < UI_F_SCROLL) { L.top_f++; L.dirty = 1; }
     if(L.view == VIEW_LIST)
       list_step();
@@ -1693,15 +2391,27 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
     ui_frame_begin();
     ui_ground();
+    if(!L.card)
     {
-      const char *labels[4];
-      int i;
-      for(i = 0; i < L.tab_count; i++)
-        labels[i] = tab_names[L.tab_ids[i]];
-      ui_tabs(UI_MARGIN, labels, L.tab_count, L.tab, L.tab_prev, L.tab_f);
+      draw_tab_bar();
+      ui_status_chip();
     }
-    ui_status_chip();
-    if(L.count > 0)
+    if(L.card)
+    {
+      draw_card();
+      if(L.toast_f >= 0)
+      {
+        if(!ui_toast_at(L.toast, L.toast_edge, (L.toast_undo >= 0) ? "Undo" : NULL,
+         L.toast_f, 6))
+        {
+          L.toast_f = -1;
+          L.dirty = 1;  /* the hint goes back to Hold: delete */
+        }
+        else
+          L.toast_f++;
+      }
+    }
+    else if(L.count > 0)
     {
       if(tab_is(TAB_RECENT))
         recent_selection();
