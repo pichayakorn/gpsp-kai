@@ -1551,7 +1551,7 @@ static void perf_write(void)
 }
 #endif
 
-enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_QUIT };
+enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_QUIT };
 
 /* Sleep (spec: Sleep): the power callback holds the suspend off while a
  * game runs with the save on; the pause screen writes Last and lets the
@@ -1767,7 +1767,7 @@ u32 ui_pause(u16 *game_picture)
               break;
             case TILE_LIBRARY:
               action_library();
-              leave = LEAVE_OLD_MENU;  /* the old menu until the library lands */
+              leave = LEAVE_LIBRARY;
               break;
             case TILE_SHOT:
               shot_wait();
@@ -1830,6 +1830,13 @@ u32 ui_pause(u16 *game_picture)
 
   if(leave == LEAVE_QUIT)
     quit(0);
+  if(leave == LEAVE_LIBRARY)
+  {
+    if(ui_library_switch())
+      return 1;
+    /* no pool memory for the library: the old menu's file list */
+    leave = LEAVE_OLD_MENU;
+  }
   if(leave == LEAVE_OLD_MENU)
     return menu(p.game) | p.changed;
 

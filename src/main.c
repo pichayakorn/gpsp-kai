@@ -427,6 +427,7 @@ int main(int argc, char *argv[])
 #ifdef UI4
   // Before the game buffer, which takes all the RAM left on a PSP-1000
   ui_pool_init();
+  ui_layer_init();
   ui_font_init(g_gpsp_config.language);
 #endif
   init_gamepak_buffer();
@@ -523,6 +524,20 @@ int main(int argc, char *argv[])
     s32 loaded = -1;
 
     // On a failed load, the error has been shown; pick another file
+#ifdef UI4
+    {
+      char dir[MAX_PATH];
+
+      while(ui_library(dir, sizeof(dir), load_filename, sizeof(load_filename)))
+      {
+        loaded = ui_library_load(dir, load_filename);
+        if(loaded != -1)
+          break;
+      }
+    }
+    // without pool memory for the library, the old file list
+    if(loaded == -1)
+#endif
     while(load_file(file_ext, load_filename, g_default_rom_dir) != -1)
     {
       loaded = load_gamepak(load_filename);
