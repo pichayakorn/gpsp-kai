@@ -59,7 +59,8 @@
  * cheats can run (maintainer, 2026-11-19: kai tells the kind itself).
  * Master codes ("(M) Must Be On") only mattered to a cheat device: they
  * are skipped, neither kept nor counted. A game keeps its first 1024
- * cheats; cheat_total() says how many its files hold.
+ * cheats; cheat_total() says how many its files hold. One cheat's code
+ * may be up to 32 KB of text; a longer one can't run, never cut short.
  * Ported from another GPL-2.0 PSP GBA emulator; the
  * cipher tables in cheats_gs_cipher.h keep their own MPL-2.0 notice.
  *
@@ -79,7 +80,10 @@ extern u32 gamepak_size;
 #define CE_PATCHES      4096   /* ROM patch halfwords of every cheat */
 #define CE_FRAME_MAX    8192   /* worst-case RAM reads and writes a frame */
 #define CE_SLIDE_MAX    4096u
-#define CE_CODE_TEXT    4096   /* one cheat's code text while it is read */
+#define CE_CODE_TEXT    32768  /* one cheat's code text while it is read: about
+                                  1800 lines, so a whole table patch (FireRed's
+                                  1384-line Japanese names) is one cheat */
+#define CE_LINE_TEXT    4096   /* one line of a file */
 #define CE_DB_TEXT      (64 * 1024)  /* a database file's descriptions and codes */
 
 typedef struct
@@ -1356,7 +1360,7 @@ static int db_line(char *line, int cut)
 
 static void read_file(FILE *f)
 {
-  static char line[CE_CODE_TEXT + 64], name[CE_NAME_LENGTH];
+  static char line[CE_LINE_TEXT + 64], name[CE_NAME_LENGTH];
   int kind = K_NONE, closed = 0, is_db = 0, cut;
   u32 i;
 
