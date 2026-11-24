@@ -3747,6 +3747,7 @@ static char *savestate_rom_name(u8 *state_data, u32 ver)
    state_error_text for the UI to show instead of the old dialog. */
 u32 state_no_question = 0;
 char *state_error_text = NULL;
+char state_error_game[MAX_FILE];  // the ROM a savestate of another game was made with
 
 static void savestate_error(char *text)
 {
@@ -3884,6 +3885,9 @@ u32 load_state(char *savestate_filename, u32 slot_num)
     {
       // Slot 10 shares this buffer, which now holds the other game's state.
       mem_save_flag = 0;
+      // the game it belongs to, for the 4.0 pause screen's error card
+      strncpy(state_error_game, state_rom_name, MAX_FILE - 1);
+      state_error_game[MAX_FILE - 1] = 0;
       savestate_error(msg[MSG_LOAD_STATE_OTHER_GAME]);
       return 0;
     }

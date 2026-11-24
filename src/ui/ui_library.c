@@ -46,10 +46,22 @@
    the grid is postponed and will be reworked. Its code stays behind this
    switch; with it on, SELECT opens View & sort with a View row. */
 #define LIBRARY_GRID 0
-#define POP_FIRST_ROW (LIBRARY_GRID ? 0 : 1)
-#define POP_H  (LIBRARY_GRID ? 98 : 64)
+#define POP_FIRST_ROW (has_view_row() ? 0 : 1)
+#define POP_H  (has_view_row() ? 98 : 64)
 
-enum { VIEW_GRID, VIEW_LIST };
+/* The list in two styles (maintainer, 2026-11-20): Panel, the default, a
+   fixed panel on the left with rows that never change size; Shelf, the
+   list whose selected row opens into a card. */
+enum { VIEW_GRID, VIEW_LIST, VIEW_PANEL };
+#define VIEW_SHELF VIEW_LIST
+
+/* Panel: rows at x 184-460, 20 px on a 26 px pitch from y 42 (66 under the
+   No BIOS notice), eight in view (seven); the panel at x 20, 152 wide */
+#define PANEL_LX   184
+#define PANEL_LW   276
+#define PANEL_PX   20
+#define PANEL_PW   152
+#define PANEL_ART  116
 enum { TAB_RECENT, TAB_ALL, TAB_FAV, TAB_FOLDERS };
 enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
@@ -83,6 +95,11 @@ static struct
   int arena_used;
 
   int view, sort;
+  int views[2];               /* All, Favourites: VIEW_PANEL or VIEW_SHELF */
+  int ptop, ptop_from, ptop_f;  /* Panel: the first row in view, sliding from px */
+  int rest_f;                 /* Shelf: frames the list has rested, d-pad up */
+  int art_game;               /* Panel: the game drawn in art (-1 none) */
+  u16 art[(PANEL_ART - 4) * (PANEL_ART - 4)];
   int cur, cur_from, cur_f;   /* selection (in view order) and its move */
   int top, off_from, top_f;   /* grid: first row in view, sliding from off_from px */
   int pos, pos_from, pos_f;   /* list: selection in 1/256, eased (list_scroll) */
@@ -120,6 +137,7 @@ static struct
   u16 toast_edge;
   int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
   char facts[96];             /* the card's cheats and settings line */
+  int help, help_f, help_out; /* the No BIOS help card */
   int name_mode;              /* the card's name: NAME_* */
   char name_l1[256], name_l2[256];  /* its two 2x lines */
   int dirty;
@@ -128,6 +146,7 @@ static struct
   int pop, pop_f, pop_out, pop_row, pop_flash;  /* View & sort */
   int played_game;            /* the game whose play time is read */
   u32 played;                 /* its seconds */
+  u32 last_played;            /* when it was last left, Unix time (0: never) */
 
   cover_t covers[MAX_COVERS];
   int cover_count;
@@ -149,6 +168,7 @@ static char *arena_str(const char *s, int n)
 }
 
 static const char *display_name(const char *name, int n);
+static void tell_apart(void);
 static const u16 icon_heart[11];
 static const u16 icon_folder[11];
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale);
@@ -236,9 +256,8 @@ static void scan_dir(const char *path, int depth, int parent)
  * "(USA, Europe)", "[!]" or "(Rev 1)" go, so does a leading release number
  * ("1986 - Golden Sun"), and underscores become spaces. The cover is drawn
  * from this name, so these rules must not change once released. */
-static const char *display_name(const char *name, int n)
+static int clean_name(const char *name, int n, char *out)
 {
-  char out[256];
   int i = 0, o = 0, depth = 0;
 
   if(n > 255)
@@ -281,8 +300,133 @@ static const char *display_name(const char *name, int n)
   while((o > 0) && ((out[o - 1] == ' ') || (out[o - 1] == '-')))
     o--;
   if(o == 0)
-    return arena_str(name, n);  /* nothing left: the plain name */
+  {
+    memcpy(out, name, n);  /* nothing left: the plain name */
+    o = n;
+  }
+  out[o] = 0;
+  return o;
+}
+
+static const char *display_name(const char *name, int n)
+{
+  char out[256];
+  int o = clean_name(name, n, out);
   return arena_str(out, o);
+}
+
+/* The i-th (...) or [...] part of a file name, brackets included.
+   Returns 0 when there are fewer parts. */
+static int name_part(const char *file, int i, const char **at, int *len)
+{
+  const char *dot = strrchr(file, '.');
+  int n = dot ? dot - file : (int)strlen(file), k, start = -1, depth = 0;
+
+  for(k = 0; k < n; k++)
+  {
+    char c = file[k];
+    if((c == '(') || (c == '['))
+    {
+      if(depth++ == 0)
+        start = k;
+    }
+    else if(((c == ')') || (c == ']')) && depth && (--depth == 0))
+    {
+      if(i-- == 0)
+      {
+        *at = file + start;
+        *len = k + 1 - start;
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+static int has_part(const char *file, const char *part, int len)
+{
+  const char *at;
+  int i, n;
+
+  for(i = 0; name_part(file, i, &at, &n); i++)
+    if((n == len) && !strncasecmp(at, part, len))
+      return 1;
+  return 0;
+}
+
+static int title_order(const void *a, const void *b)
+{
+  return strcasecmp(L.games[*(const int *)a].title, L.games[*(const int *)b].title);
+}
+
+/* Same-named games (spec section 4, #14): when two games would show the
+ * same name, each keeps the parts of its file name that tell them apart,
+ * e.g. "Pokemon - FireRed Version (Rev 1)". When no part does, the whole
+ * file name (without its extension) is shown. */
+static void tell_apart(void)
+{
+  u32 mark = ui_pool_mark();
+  int *idx = ui_pool_alloc(L.count * sizeof(int)), i, j, k, m;
+
+  if(idx == NULL)
+    return;
+  for(i = 0; i < L.count; i++)
+    idx[i] = i;
+  qsort(idx, L.count, sizeof(int), title_order);
+  for(i = 0; i < L.count; i = j)
+  {
+    for(j = i + 1; (j < L.count) && !title_order(&idx[i], &idx[j]); j++)
+      ;
+    if(j - i < 2)
+      continue;
+    for(k = i; k < j; k++)
+    {
+      game_t *g = &L.games[idx[k]];
+      char out[256];
+      const char *at;
+      int o = snprintf(out, sizeof(out), "%s", g->title), p, n;
+      for(p = 0; name_part(g->name, p, &at, &n); p++)
+      {
+        int shared = 1;
+        for(m = i; m < j; m++)
+          if(!has_part(L.games[idx[m]].name, at, n))
+            shared = 0;
+        if(!shared && (o + 1 + n < (int)sizeof(out)))
+          o += snprintf(out + o, sizeof(out) - o, " %.*s", n, at);
+      }
+      g->title = arena_str(out, o);
+      if(g->title == NULL)
+        g->title = g->name;
+    }
+    /* still the same: the file names */
+    for(k = i; k < j; k++)
+      for(m = i; m < j; m++)
+        if((m != k) && !strcasecmp(L.games[idx[k]].title, L.games[idx[m]].title))
+        {
+          game_t *g = &L.games[idx[k]];
+          const char *dot = strrchr(g->name, '.');
+          const char *t = arena_str(g->name, dot ? dot - g->name : (int)strlen(g->name));
+          g->title = t ? t : g->name;
+          break;
+        }
+  }
+  ui_pool_release(mark);
+}
+
+/* The game started from the library and the name it showed there */
+static char launched_file[MAX_FILE], launched_title[256];
+
+/* The name the library shows for a file (for the pause screen's chip). */
+void ui_display_name(const char *file, char *out)
+{
+  const char *dot = strrchr(file, '.');
+  int n = dot ? dot - file : (int)strlen(file);
+  if(launched_file[0] && !strcmp(file, launched_file))
+  {
+    strcpy(out, launched_title);
+    return;
+  }
+  clean_name(file, n, out);
 }
 
 /* recent.txt (written on leaving a game): full paths, newest first */
@@ -357,6 +501,7 @@ static int load_games(void)
     return 0;
   L.count = L.dir_count = L.arena_used = 0;
   scan_dir(g_default_rom_dir, 0, -1);
+  tell_apart();
   /* every folder's games, its subfolders' included */
   memset(L.dir_games, 0, sizeof(L.dir_games));
   for(i = 0; i < L.count; i++)
@@ -715,6 +860,7 @@ static u32 game_played(int game)
     return L.played;
   L.played_game = game;
   L.played = 0;
+  L.last_played = 0;
   snprintf(name, sizeof(name), "%s", L.games[game].name);
   dot = strrchr(name, '.');
   if(dot)
@@ -730,6 +876,8 @@ static u32 game_played(int game)
     n = fread(&cfg, 1, sizeof(cfg), f);
     if(n >= offsetof(game_config_t, play_seconds) + sizeof(u32))
       L.played = cfg.play_seconds;
+    if(n >= offsetof(game_config_t, last_played) + sizeof(u32))
+      L.last_played = cfg.last_played;
   }
   fclose(f);
   return L.played;
@@ -857,6 +1005,215 @@ static void list_selection(void)
       ui_print(110 - shift, y + 6, t, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD);
       ui_clip_reset();
     }
+  }
+}
+
+/* ---- the list, Panel style (spec section 4, Panel; maintainer, 2026-11-20) ------------
+ * A fixed panel on the left shows the selected game; the rows on the right
+ * never change size, so only the cursor and the list move (list_scroll),
+ * by whole rows, keeping the cursor two rows from either edge. The panel
+ * swaps at once when the cursor lands. */
+
+static int bold_line(const char *t, int n, int w, char *out, int size);
+
+/* days since 0001-01-01 of a date */
+static int day_number(int y, int m, int d)
+{
+  if(m < 3)
+  {
+    y--;
+    m += 12;
+  }
+  return 365 * y + y / 4 - y / 100 + y / 400 + (153 * (m - 3) + 2) / 5 + d;
+}
+
+/* "Today 21:46", "Yesterday 19:02" or "3 days ago", from Unix time; ""
+   for never */
+static void last_text(u32 unix_time, char *out, int n)
+{
+  u64 utc, local;
+  ScePspDateTime t, now;
+  int days;
+
+  out[0] = 0;
+  if(unix_time == 0)
+    return;
+  utc = (u64)unix_time * 1000000ULL + 62135596800000000ULL;  /* ticks from year 1 */
+  if((sceRtcConvertUtcToLocalTime(&utc, &local) < 0) || (sceRtcSetTick(&t, &local) < 0))
+    return;
+  sceRtcGetCurrentClockLocalTime(&now);
+  days = day_number(now.year, now.month, now.day) - day_number(t.year, t.month, t.day);
+  if(days <= 0)
+    snprintf(out, n, "Today %02d:%02d", t.hour, t.minute);
+  else if(days == 1)
+    snprintf(out, n, "Yesterday %02d:%02d", t.hour, t.minute);
+  else
+    snprintf(out, n, "%d days ago", days);
+}
+
+static int panel_y0(void)
+{
+  return list_banner() ? 66 : 42;  /* the No BIOS notice spans both columns at y 40 */
+}
+
+static int panel_rows(void)
+{
+  return list_banner() ? 7 : 8;
+}
+
+/* the first row in view that keeps row cur two rows from either edge */
+static int panel_top_for(int cur)
+{
+  int view = panel_rows(), top = L.ptop;
+
+  if(cur < top + 2)
+    top = cur - 2;
+  if(cur > top + view - 3)
+    top = cur - view + 3;
+  if(top > L.n - view)
+    top = L.n - view;
+  if(top < 0)
+    top = 0;
+  return top;
+}
+
+/* how far the list has slid, in px */
+static int panel_top_px(void)
+{
+  return ui_ease_out_cubic(L.ptop_from, L.ptop * UI_ROW_PITCH, L.ptop_f, UI_F_LIST_SCROLL);
+}
+
+static void panel_row(int i, int y, int sel)
+{
+  const game_t *g = &L.games[L.order[i]];
+  int l2 = sel ? UI_LIFT : 0, x = PANEL_LX - l2, yy = y - l2;
+  char size[16];
+
+  if(sel)
+    ui_round_fill(PANEL_LX + 1, y + 1, PANEL_LW, UI_ROW_H, 2, UI_COL_SHADE);
+  ui_round_fill(x, yy, PANEL_LW, UI_ROW_H, 2, sel ? UI_COL_TANGERINE : UI_COL_CARD);
+  draw_cover_any(x + 3, yy + 2, 16, g->title, 0);
+  ui_print_fit(x + 26, yy + 2, g->title, sel ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_BODY, 0,
+   PANEL_LW - 82);
+  if(g->fav)
+    draw_icon11(x + PANEL_LW - 58, yy + 4, icon_heart, sel ? UI_COL_PLUM : UI_COL_PINK, 1);
+  size_text(g->size, size, sizeof(size));
+  ui_print(x + PANEL_LW - 8 - ui_print_width(size, UI_FONT_SMALL, 0), yy + 3, size,
+   sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+}
+
+/* the panel: the art (full square, no plate) in a plum box, the name in
+   12 px bold on up to two lines, the size chip at the bottom */
+static void panel_card(void)
+{
+  const game_t *g = &L.games[L.order[L.cur]];
+  int py = panel_y0(), ph = 244 - py, art = ph - 86, ax, ny, w = PANEL_PW - 16;
+  char l1[256], l2[256], when[32], played[32];
+  u32 seconds;
+
+  if(art > PANEL_ART)
+    art = PANEL_ART;
+  ax = PANEL_PX + (PANEL_PW - art) / 2;
+  ui_round_fill(PANEL_PX + 3, py + 3, PANEL_PW, ph, 3, UI_COL_SHADE);
+  ui_round_fill(PANEL_PX, py, PANEL_PW, ph, 3, UI_COL_CARD);
+  ui_fill(PANEL_PX + 4, py, PANEL_PW - 8, 4, UI_COL_TANGERINE);
+  ui_fill(ax, py + 10, art, art, UI_COL_PLUM);
+  if(L.art_game != L.order[L.cur])
+  {
+    /* drawn once per game, not on every frame of a slide */
+    ui_cover_art(L.art, art - 4, art - 4, g->title);
+    L.art_game = L.order[L.cur];
+  }
+  ui_blit(L.art, art - 4, ax + 2, py + 12, art - 4, art - 4);
+  if(g->fav)
+    draw_icon11(ax + art - 16, py + 14, icon_heart, UI_COL_PINK, 1);
+  /* the name: always one size, so it never jumps as the cursor moves; a
+     name longer than two lines cuts the second with "…" */
+  ny = py + 10 + art + 8;
+  if(bold_line(g->title, 0, w, l1, sizeof(l1)))
+  {
+    ui_print(PANEL_PX + 8, ny, l1, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+    if(bold_line(g->title, 1, w, l2, sizeof(l2)))
+    {
+      if(bold_line(g->title, 2, w, l2, sizeof(l2)))
+      {
+        /* the rest of the name after the first line, cut to fit */
+        const char *rest = strstr(g->title, l1);
+        rest = rest ? rest + strlen(l1) : g->title;
+        while(*rest == ' ')
+          rest++;
+        snprintf(l2, sizeof(l2), "%s", rest);
+      }
+      ui_print_fit(PANEL_PX + 8, ny + 16, l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, w);
+    }
+  }
+  /* the foot: when it was last played (cream), its play time (mute); the
+     size stays on the rows and the game card (maintainer, 2026-11-20) */
+  seconds = game_played(L.order[L.cur]);
+  last_text(L.last_played, when, sizeof(when));
+  if(!when[0] && !seconds)
+    ui_print(PANEL_PX + 8, py + ph - 34, "Not played yet", UI_COL_CREAM, UI_FONT_SMALL, 0);
+  else
+  {
+    if(when[0])
+      ui_print(PANEL_PX + 8, py + ph - 34, when, UI_COL_CREAM, UI_FONT_SMALL, 0);
+    played_text(seconds, played, sizeof(played));
+    ui_print(PANEL_PX + 8, py + ph - 20, played, UI_COL_MUTE, UI_FONT_SMALL, 0);
+  }
+}
+
+static void panel_ground(void)
+{
+  int i, y0 = panel_y0(), top = panel_top_px(), view = panel_rows();
+
+  if(list_banner())
+    draw_banner_at(40);
+  ui_clip_set(0, y0 - 4, UI_SCREEN_W, VIEW_B - (y0 - 4));
+  for(i = 0; i < L.n; i++)
+  {
+    int y = y0 + i * UI_ROW_PITCH - top;
+    if((y + UI_ROW_H < y0 - 4) || (y > VIEW_B))
+      continue;
+    panel_row(i, y, 0);
+  }
+  ui_clip_reset();
+  panel_card();
+  if(L.n > view)
+  {
+    int th = 196 * view / L.n, ty;
+    if(th < 12)
+      th = 12;
+    ty = (196 - th) * top / ((L.n - view) * UI_ROW_PITCH);
+    ui_round_fill(468, 42, 4, 196, 1, UI_COL_CARD);
+    ui_round_fill(468, 42 + ty, 4, th, 1, UI_COL_MUTE);
+  }
+}
+
+/* the selected row, lifted, and the cursor frame gliding to it */
+static void panel_selection(void)
+{
+  int y0 = panel_y0(), top = panel_top_px();
+
+  if(L.n == 0)
+    return;
+  ui_clip_set(0, y0 - 4, UI_SCREEN_W, VIEW_B - (y0 - 4));
+  panel_row(L.cur, y0 + L.cur * UI_ROW_PITCH - top, 1);
+  ui_cursor_frame(PANEL_LX - UI_LIFT, y0 + list_pos() * UI_ROW_PITCH / 256 - top - UI_LIFT,
+   PANEL_LW, UI_ROW_H);
+  ui_clip_reset();
+}
+
+static void panel_step(void)
+{
+  if(L.pos_f < UI_F_LIST_SCROLL)
+  {
+    L.pos_f++;
+    L.dirty = 1;
+  }
+  if(L.ptop_f < UI_F_LIST_SCROLL)
+  {
+    L.ptop_f++;
+    L.dirty = 1;
   }
 }
 
@@ -1511,9 +1868,9 @@ static void card_facts(int game)
  * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
  * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
  * their full-width forms; the mark stays on line 1), else at the break
- * that makes the two lines closest in width; then the file name line is
- * left out. Too long for that: 1x on one line (the rest moves up 12 px),
- * or the headline rule (big_title) on two. */
+ * that makes the two lines closest in width. Too long for that: 1x on one
+ * line (the rest moves up 12 px), or the headline rule (big_title) on two.
+ * No file name line: the facts sit 22 px under the chips. */
 enum { NAME_2X, NAME_2X_TWO, NAME_1X, NAME_BIG };
 
 static int cjk_cp(u32 c)
@@ -1732,11 +2089,8 @@ static void draw_card(void)
     draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
     ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
   }
-  if(L.name_mode != NAME_2X_TWO)  /* two 2x lines leave the file name out */
-    ui_print_fit(x + 124, y + 70 + dy, g->name, UI_COL_MUTE, UI_FONT_SMALL, 0, CARD_W - 136);
-  /* the facts line: under the file name, or at +96 when two 2x lines
-     leave the file name out */
-  ui_print_fit(x + 124, (L.name_mode == NAME_2X_TWO) ? y + 96 : y + 86 + dy, L.facts,
+  /* the facts line, 22 px under the chips */
+  ui_print_fit(x + 124, y + 68 + dy, L.facts,
    UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
   /* the savestates */
@@ -2142,6 +2496,18 @@ static int banner_up(void)
   return ui_no_bios && !banner_gone && g_gpsp_config.bios_note;
 }
 
+/* is any of the notice on screen (□ Help works then)? */
+static int notice_in_view(void)
+{
+  if(!banner_up() || (L.count == 0))
+    return 0;
+  if(L.tab_ids[L.tab] == TAB_RECENT)
+    return 1;
+  if(L.view == VIEW_PANEL)
+    return list_banner();  /* it stays at the top */
+  return list_banner() && (L.ys[0] - 24 + 16 > VIEW_T);
+}
+
 /* before the first game (no Recent tab) it is the top item of the All
    list instead, so it hides no game (design session, 2026-11-19) */
 static int list_banner(void)
@@ -2167,8 +2533,15 @@ static void draw_banner_at(int y)
 
 /* ---- View & sort ------------------------------------------------------------------- */
 
-static const char *view_labels[2] = { "Grid", "List" };
+static int tab_is(int id);
+static const char *view_labels[2] = { "Panel", "Shelf" };
 static const char *sort_labels[SORTS] = { "Name", "Recently played", "Size" };
+
+/* All and Favourites choose their list style; Folders keeps its own rows */
+static int has_view_row(void)
+{
+  return !tab_is(TAB_FOLDERS);
+}
 
 static int popup_y(void)
 {
@@ -2184,12 +2557,12 @@ static void draw_popup(void)
   ui_round_fill(x + 3, y + 3, POP_W, POP_H, 3, UI_COL_SHADE);
   ui_round_fill(x, y, POP_W, POP_H, 3, UI_COL_CREAM);
   ui_fill(x, y + 4, 6, POP_H - 8, UI_COL_SKY);
-  ui_print(x + 16, y + 6, LIBRARY_GRID ? "View & sort" : "Sort", UI_COL_PLUM,
+  ui_print(x + 16, y + 6, has_view_row() ? "View & sort" : "Sort", UI_COL_PLUM,
    UI_FONT_BODY, UI_TEXT_BOLD);
   for(j = POP_FIRST_ROW; j < 2; j++)
   {
     int ry = y + 32 + (j - POP_FIRST_ROW) * 34, sx = x + 16 + 64, i, n = j ? SORTS : 2;
-    int k = j ? L.sort : L.view;
+    int k = j ? L.sort : (L.view == VIEW_SHELF);
     const char **labels = j ? sort_labels : view_labels;
     if(j == L.pop_row)
       ui_round_fill(x + 10, ry - 4, POP_W - 20, 28, 2, COLOR16(21, 26, 27));
@@ -2231,6 +2604,7 @@ static void fill_order(void)
     if(!fav || L.games[i].fav)
       L.order[L.n++] = i;
   L.sort = L.sorts[fav];
+  L.view = L.views[fav];
   L.cur = 0;
   sort_games();
   L.cur = L.tab_cur[L.tab];
@@ -2307,7 +2681,7 @@ static void draw_hints(void)
   }
   else if(L.pop && !L.pop_out)
   {
-    if(LIBRARY_GRID)
+    if(has_view_row())
     {
       h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;  h[n++].verb = "Move";
     }
@@ -2339,7 +2713,7 @@ static void draw_hints(void)
     }
     if(!empty)
     {
-      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     }
     h[n].keys = PSP_CTRL_START;    h[n++].verb = "Settings";
     if(!empty)
@@ -2350,13 +2724,13 @@ static void draw_hints(void)
   }
   else if(L.n == 0)  /* Favourites, nothing hearted: nothing to play */
   {
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
   }
   else
   {
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = LIBRARY_GRID ? "View" : "Sort";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
   }
@@ -2415,6 +2789,8 @@ static void build_ground(void)
     draw_no_favourites();
   else if(L.view == VIEW_GRID)
     grid_ground();
+  else if(L.view == VIEW_PANEL)
+    panel_ground();
   else
     list_ground();
   /* on Recent in the Recent label's line; before any game, in the All list */
@@ -2457,25 +2833,41 @@ static void select_game(int i)
   }
   else
   {
-    /* the open card closes as the move starts (from however open it is);
-       the list slides with every row slim; the new card opens later */
+    /* the open card closes as the move starts; one not yet fully open
+       goes at once (maintainer, 2026-11-20); the list slides with every
+       row slim; the new card opens later */
     if(L.open_row >= 0)
     {
-      L.close_from = list_open_p(L.open_row);
-      L.close_row = L.open_row;
-      L.close_f = 0;
+      if(L.open_f >= UI_F_LIST_OPEN)
+      {
+        L.close_from = list_open_p(L.open_row);
+        L.close_row = L.open_row;
+        L.close_f = 0;
+      }
       L.open_row = -1;
     }
     L.pos_from = list_pos();
     L.pos = i * 256;
     L.pos_f = 0;
+    L.rest_f = 0;
+    if(L.view == VIEW_PANEL)
+    {
+      int top = panel_top_for(i);
+      if(top != L.ptop)
+      {
+        L.ptop_from = panel_top_px();  /* re-targeted from where it is now */
+        L.ptop = top;
+        L.ptop_f = 0;
+      }
+    }
   }
   L.marq_f = 0;
   L.dirty = 1;
 }
 
-/* list_open: once the d-pad is up and the slide has stopped, the selected
-   row grows into the card */
+/* list_open: once the slide has stopped and the list has rested list_rest
+   with the d-pad up, the selected row grows into the card (a single tap
+   opens it about 18 f after the press; quick taps never start it) */
 static void list_step(void)
 {
   if(L.pos_f < UI_F_LIST_SCROLL)
@@ -2489,8 +2881,14 @@ static void list_step(void)
       L.close_row = -1;
     L.dirty = 1;
   }
-  if((L.open_row < 0) && (L.pos_f >= UI_F_LIST_SCROLL) &&
-   !ui_down(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  if((L.pos_f >= UI_F_LIST_SCROLL) && !ui_down(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  {
+    if(L.rest_f < UI_F_LIST_REST)
+      L.rest_f++;
+  }
+  else
+    L.rest_f = 0;
+  if((L.open_row < 0) && (L.rest_f >= UI_F_LIST_REST))
   {
     L.open_row = L.cur;
     L.open_f = 0;
@@ -2512,6 +2910,11 @@ static void view_reset(void)
   L.top_f = UI_F_SCROLL;
   L.pos = L.pos_from = L.cur * 256;
   L.pos_f = UI_F_LIST_SCROLL;
+  L.ptop = 0;
+  L.ptop = panel_top_for(L.cur);
+  L.ptop_from = L.ptop * UI_ROW_PITCH;
+  L.ptop_f = UI_F_LIST_SCROLL;
+  L.rest_f = UI_F_LIST_REST;
   L.open_row = L.cur;  /* the list opens at rest, its card open */
   L.open_f = UI_F_LIST_OPEN;
   L.close_row = -1;
@@ -2554,23 +2957,25 @@ static void popup_input(void)
     /* written when the popup closes (spec section 7) */
     /* the sort is kept per tab */
     L.sorts[tab_is(TAB_FOLDERS) ? 2 : tab_is(TAB_FAV) ? 1 : 0] = L.sort;
-    g_gpsp_config.library_view = (LIBRARY_GRID ? (L.view & 1) :
-     (g_gpsp_config.library_view & 1)) | ((L.sorts[0] & 3) << 1) |
-     ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5);
+    /* bits 7 and 8: All and Favourites in Shelf style (0: Panel) */
+    g_gpsp_config.library_view = (g_gpsp_config.library_view & 1) |
+     ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5) |
+     ((L.views[0] == VIEW_SHELF) << 7) | ((L.views[1] == VIEW_SHELF) << 8);
     save_config_file();
     return;
   }
-  if(LIBRARY_GRID && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
+  if(has_view_row() && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     L.pop_row ^= 1;
   if(ui_repeat(PSP_CTRL_LEFT) || ui_repeat(PSP_CTRL_RIGHT))
   {
     int d = ui_down(PSP_CTRL_LEFT) ? -1 : 1;
     if(L.pop_row == 0)
     {
-      int v = L.view + d;
-      if((v >= 0) && (v < 2))
+      int k = (L.view == VIEW_SHELF) + d;
+      if((k >= 0) && (k < 2))
       {
-        L.view = v;
+        L.view = k ? VIEW_SHELF : VIEW_PANEL;
+        L.views[tab_is(TAB_FAV)] = L.view;
         view_reset();
         L.pop_flash = 0;
       }
@@ -2645,31 +3050,8 @@ s32 ui_library_load(const char *dir, char *name)
   loaded = load_gamepak(name);
   progress_hook = NULL;
   if(loaded == -1)
-  {
-    /* spec err_rom: one button, OK; × OK and ○ both go back to the
-       library. Drawn into both buffers over the library, then held until a
-       key (the error step adds its motion). */
-    static const char *ok[1] = { "OK" };
-    ui_hint_t h[2];
-    int i;
-    h[0].keys = ui_key_confirm; h[0].verb = "OK";
-    h[1].keys = ui_key_back;    h[1].verb = "Close";
-    for(i = 0; i < 2; i++)
-    {
-      ui_frame_begin();
-      ui_dialog("This game won't open", "The file is damaged, or it is not a GBA game.",
-       ok, 1, 0, UI_COL_PINK, UI_F_DIALOG_IN, 0);
-      ui_hint_packed(h, 2, 14);
-      ui_frame_end();
-    }
-    ui_input_init();
-    do
-    {
-      sceDisplayWaitVblankStart();
-      ui_input_update();
-    }
-    while(!ui_pressed(ui_key_confirm) && !ui_pressed(ui_key_back));
-  }
+    ui_error_card("This game won't open", "The file is damaged, or it is not a GBA game.",
+     "OK", NULL, UI_COL_PINK);
   return loaded;
 }
 
@@ -2679,12 +3061,16 @@ s32 ui_library_load(const char *dir, char *name)
    again on the library */
 static void open_settings(void)
 {
-  if(ui_settings(0, 0))
+  int r = ui_settings(0, 0);
+
+  if(r == 1)
   {
     int tab, row;
     ui_settings_where(&tab, &row);
     ui_restart_now(tab, row, NULL);
   }
+  else if(r == 2)
+    quit(0);  /* Quit kai: no game runs here, nothing to save but kai's own */
   ui_status_read();
   ui_input_init();
   L.dirty = 1;
@@ -2699,7 +3085,10 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
   memset(&L, 0, sizeof(L));
   L.played_game = -1;
-  L.view = LIBRARY_GRID ? (g_gpsp_config.library_view & 1) : VIEW_LIST;
+  L.views[0] = ((g_gpsp_config.library_view >> 7) & 1) ? VIEW_SHELF : VIEW_PANEL;
+  L.views[1] = ((g_gpsp_config.library_view >> 8) & 1) ? VIEW_SHELF : VIEW_PANEL;
+  L.view = L.views[0];
+  L.art_game = -1;
   L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
   L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;  /* Favourites */
   L.sorts[2] = (g_gpsp_config.library_view >> 5) & 3;  /* Folders */
@@ -2731,7 +3120,23 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     L.frame++;
     ui_input_update();
 
-    if(L.pop)
+    if(L.help)
+    {
+      /* □ or ○ closes it */
+      if(!L.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
+      {
+        L.help_out = 1;
+        L.help_f = 0;
+      }
+    }
+    else if(notice_in_view() && !L.card && !L.pop && ui_pressed(PSP_CTRL_SQUARE))
+    {
+      /* □ Help on the No BIOS notice */
+      L.help = 1;
+      L.help_out = 0;
+      L.help_f = 0;
+    }
+    else if(L.pop)
       popup_input();
     else if(L.count == 0)
     {
@@ -2863,6 +3268,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     if(L.top_f < UI_F_SCROLL) { L.top_f++; L.dirty = 1; }
     if(L.view == VIEW_LIST)
       list_step();
+    else if(L.view == VIEW_PANEL)
+      panel_step();
     if(L.cur_f < UI_F_CURSOR) L.cur_f++;
     L.marq_f++;
     if(L.dirty)
@@ -2898,6 +3305,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
         fold_selection();
       else if(L.view == VIEW_GRID)
         grid_selection();
+      else if(L.view == VIEW_PANEL)
+        panel_selection();
       else
         list_selection();
     }
@@ -2917,6 +3326,18 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       if(L.pop_f == 1)
         L.dirty = 1;  /* the hints change with it */
     }
+    if(L.help)
+    {
+      ui_help_card("Add a GBA BIOS", "Copy gba_bios.bin into kai's folder, then restart kai.",
+       UI_COL_TANGERINE, L.help_f, L.help_out);
+      if(L.help_f < (L.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
+        L.help_f++;
+      else if(L.help_out)
+      {
+        L.help = 0;
+        L.dirty = 1;
+      }
+    }
     if(chosen)
     {
       draw_loading(0, 0);
@@ -2927,6 +3348,8 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
   {
     const game_t *g = &L.games[L.chosen_game];
+    snprintf(launched_file, sizeof(launched_file), "%s", g->name);
+    snprintf(launched_title, sizeof(launched_title), "%s", g->title);
     snprintf(dir, dir_size, "%s", L.dirs[g->dir]);
     snprintf(name, name_size, "%s", g->name);
     *slot = L.chosen_slot;
@@ -2934,6 +3357,105 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   sceImposeSetHomePopup(g_gpsp_config.enable_home);
   ui_layer_reset();
   ui_pool_release(mark);
+  return 1;
+}
+
+static void no_progress(int current, int total);
+
+/* Find a ROM file by name under the ROM folder (four levels, as the
+   library scans). */
+static int find_rom(const char *path, const char *name, int depth, char *dir, int size)
+{
+  SceUID d = sceIoDopen(path);
+  SceIoDirent e;
+  int found = 0;
+
+  if(d < 0)
+    return 0;
+  memset(&e, 0, sizeof(e));
+  while(!found && (sceIoDread(d, &e) > 0))
+  {
+    if(e.d_name[0] == '.')
+      continue;
+    if(FIO_S_ISDIR(e.d_stat.st_mode))
+    {
+      if(depth < SCAN_DEPTH)
+      {
+        char sub[MAX_PATH];
+        path_printf(sub, sizeof(sub), "%s/%s", path, e.d_name);
+        sceIoDclose(d);
+        found = find_rom(sub, name, depth + 1, dir, size);
+        if(found)
+          return 1;
+        /* reopen and skip back to where this folder was */
+        {
+          char seen[256];
+          snprintf(seen, sizeof(seen), "%s", e.d_name);
+          d = sceIoDopen(path);
+          if(d < 0)
+            return 0;
+          while(sceIoDread(d, &e) > 0)
+            if(!strcmp(e.d_name, seen))
+              break;
+        }
+      }
+    }
+    else if(!strcasecmp(e.d_name, name))
+    {
+      snprintf(dir, size, "%s", path);
+      found = 1;
+    }
+    memset(&e, 0, sizeof(e));
+  }
+  sceIoDclose(d);
+  return found;
+}
+
+/* Is a ROM file of that name under the ROM folder? */
+int ui_library_has_rom(const char *rom_name)
+{
+  char dir[MAX_PATH];
+  return find_rom(g_default_rom_dir, rom_name, 0, dir, sizeof(dir));
+}
+
+/* The err_state card's way on: leave the running game (as the Library tile
+ * does) for the game a savestate was made with, then load that savestate
+ * file into it. Returns 0 when that game is not in the ROM folder. */
+u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
+{
+  char dir[MAX_PATH], name[MAX_FILE], file[MAX_FILE];
+
+  if(!find_rom(g_default_rom_dir, rom_name, 0, dir, sizeof(dir)))
+    return 0;
+  snprintf(name, sizeof(name), "%s", rom_name);
+  snprintf(file, sizeof(file), "%s", state_file);
+  save_config_file();
+  update_backup_force();
+  note_game_left();
+  save_game_config_file();
+  if(ui_library_load(dir, name) == -1)
+  {
+    gamepak_filename[0] = 0;
+    return 0;
+  }
+  reset_gba();
+  state_no_question = 1;
+  progress_hook = no_progress;
+  /* from the file, even for Last: slot 10 would load the new game's own
+     Last from memory instead (the number only names the slot) */
+  load_state(file, (slot == MEM_STATE_NUM) ? 0 : slot);
+  progress_hook = NULL;
+  state_no_question = 0;
+  reg[CHANGED_PC_STATUS] = 1;
+  clear_screen(0);
+  flip_screen();
+  clear_screen(0);
+  flip_screen();
+  video_resolution(FRAME_GAME);
+  set_cpu_clock(g_game_config.clock_speed_number);
+  pause_sound(0);
+  real_frame_count = 0;
+  virtual_frame_count = 0;
   return 1;
 }
 
@@ -3003,37 +3525,71 @@ u32 ui_library_switch(void)
   return 0;
 }
 
-/* ---- start-up (spec section 4, Start-up; r4 startup) --------------------------------------
+/* ---- start-up (spec section 4, Start-up; r4 startup, a9db06f) --------------------------
  * While kai starts (about a second), its start-up steps call this instead
- * of drawing the old dialog: the plum ground from the first step; once the
- * 4.0 fonts are in, "gpSP kai" at 2x and the version under it; past 30 f,
- * the Loading card's three dots under them (squares, no font needed). The
- * library then cuts in. */
-void ui_startup_hook(int current, int total)
+ * of drawing the old dialog: the plum ground from the first step. No fixed
+ * wait: ready within 20 f, the library follows the ground straight away and
+ * the name is never drawn (no flash). Past 20 f, once the 4.0 fonts are in,
+ * "gpSP kai" at 2x and the version under it, kept at least 20 f once shown
+ * (ui_startup_end) so they never blink; past 30 f, the Loading card's three
+ * dots under them (squares, no font needed). The library then cuts in. */
+#define STARTUP_NAME_AFTER  20
+#define STARTUP_NAME_HOLD   20
+#define STARTUP_DOTS_AFTER  30
+
+static u32 startup_t0, startup_name_at;  /* name_at: its first frame + 1 */
+
+static u32 startup_frames(void)
 {
-  static u32 t0 = 0;
-  u32 now = sceKernelGetSystemTimeLow(), f;
+  return (sceKernelGetSystemTimeLow() - startup_t0) / 16667;
+}
+
+static void startup_draw(void)
+{
+  u32 f = startup_frames();
   char ver[16];
   int i;
 
-  (void)total;
-  if((current == 0) && (t0 == 0))
-    t0 = now ? now : 1;
-  f = (now - t0) / 16667;  /* frames since the first */
   ui_frame_begin();
   ui_ground();
-  if(ui_font_loaded())
+  if((f >= STARTUP_NAME_AFTER) && ui_font_loaded())
   {
     static const char name[] = "gpSP kai";
+    if(startup_name_at == 0)
+      startup_name_at = f + 1;
     snprintf(ver, sizeof(ver), "%d.%d", VERSION_MAJOR, VERSION_MINOR);
     ui_print(240 - ui_print_width(name, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) / 2, 104,
      name, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
     ui_print(240 - ui_print_width(ver, UI_FONT_SMALL, 0) / 2, 140, ver, UI_COL_MUTE,
      UI_FONT_SMALL, 0);
   }
-  if(f >= 30)
+  if(f >= STARTUP_DOTS_AFTER)
     for(i = 0; i < 3; i++)
       ui_fill(230 + i * 8, 168 - ((i == (f / UI_F_LOADING) % 3) ? 3 : 0), 4, 4,
        UI_COL_TANGERINE);
   ui_frame_end_now();
+}
+
+void ui_startup_hook(int current, int total)
+{
+  (void)total;
+  if((current == 0) && (startup_t0 == 0))
+  {
+    startup_t0 = sceKernelGetSystemTimeLow();
+    if(startup_t0 == 0)
+      startup_t0 = 1;
+  }
+  startup_draw();
+}
+
+/* Start-up is over: once the name has shown, it stays its 20 frames. */
+void ui_startup_end(void)
+{
+  if(startup_t0 == 0)
+    return;
+  while(startup_name_at && (startup_frames() + 1 < startup_name_at + STARTUP_NAME_HOLD))
+  {
+    sceDisplayWaitVblankStart();
+    startup_draw();
+  }
 }

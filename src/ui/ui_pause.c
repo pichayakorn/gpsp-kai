@@ -23,21 +23,16 @@
                                  steps of both filters (4 for the .thm, 5 for 5:3) */
 #define CHUNKS (160 / CHUNK_ROWS)
 #define STRIP_CX  240
-#define TILE_W    60
+#define TILE_W    70
 #define TILE_H    62
+#define TILE_PITCH 74         /* 4 px apart */
+#define TILE_X(i) (18 + (i) * TILE_PITCH)  /* the last one ends at 458 */
 #define TILE_Y    176         /* 10 px above the hint strip */
 #define F_OPEN    UI_F_PAUSE_OPEN
 #define F_CLOSE   UI_F_PAUSE_CLOSE
 
 /* 20 x 20 two-tone tile icons, from gpsp-kai-design app-ui/scripts/icons20.py:
  * per row, ink then fill, bit 19 the left pixel. */
-static const u32 icon20_play[2][20] =
-{
-  { 0x00000, 0x00000, 0x00000, 0x0C000, 0x0B000, 0x08C00, 0x08300, 0x080C0, 0x08030, 0x0800C,
-    0x0800C, 0x08030, 0x080C0, 0x08300, 0x08C00, 0x0B000, 0x0C000, 0x00000, 0x00000, 0x00000 },
-  { 0x00000, 0x00000, 0x00000, 0x00000, 0x04000, 0x07000, 0x07C00, 0x07F00, 0x07FC0, 0x07FF0,
-    0x07FF0, 0x07FC0, 0x07F00, 0x07C00, 0x07000, 0x04000, 0x00000, 0x00000, 0x00000, 0x00000 }
-};
 static const u32 icon20_gear[2][20] =
 {
   { 0x00600, 0x00900, 0x08910, 0x14928, 0x230C4, 0x10008, 0x08610, 0x08910, 0x7108E, 0x82081,
@@ -81,8 +76,10 @@ static const u32 icon20_exit[2][20] =
     0x10008, 0x10008, 0x10008, 0x18018, 0x0C030, 0x0E070, 0x079E0, 0x01F80, 0x00000, 0x00000 }
 };
 
-enum { TILE_RESUME, TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY,
-       TILE_EXIT, TILE_COUNT };
+/* No Resume tile (maintainer, 2026-11-20): △, HOME and ○ resume, as the
+   hint strip says */
+enum { TILE_SETTINGS, TILE_CHEATS, TILE_SHOT, TILE_RESTART, TILE_LIBRARY, TILE_EXIT,
+       TILE_COUNT };
 
 typedef struct
 {
@@ -93,7 +90,6 @@ typedef struct
 
 static const tile_t tiles[TILE_COUNT] =
 {
-  { "Resume",     icon20_play,    UI_COL_LIME },
   { "Settings",   icon20_gear,    UI_COL_LIME },
   { "Cheats",     icon20_cheats,  UI_COL_LIME },
   { "Screenshot", icon20_camera,  UI_COL_SKY },
@@ -121,6 +117,8 @@ static struct
   char toast[64];
   u16 toast_edge;
   int toast_f, toast_undo;
+  int title_f;      /* frames since the screen opened: the name's marquee */
+  int switch_slot;  /* a savestate of another game: play that game from it */
   int undo_ended;            /* the cursor moved: the toast leaves, no Undo */
   int undo, undo_slot;
   ui_hold_t hold;
@@ -622,22 +620,63 @@ static void build_layer(int full)
   p.layer_full = full;
 }
 
+/* The header chip: the game's name (as the library shows it) and "Paused".
+ * It ends by x 380, clear of the clock and battery chip: a longer name is
+ * cut with "…", and once the screen has rested 40 f it runs sideways
+ * inside its width (shift > 0; spec section 4, Long game names). */
+static int header_width(const char *title, int *full)
+{
+  int pw = ui_text_width("Paused"), maxw = 380 - 14 - 34 - pw;
+
+  *full = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD);
+  return (*full < maxw) ? *full : maxw;
+}
+
+static void draw_header_shift(int hy, int shift)
+{
+  char title[256];
+  int full, tw;
+
+  ui_display_name(gamepak_filename, title);
+  tw = header_width(title, &full);
+  ui_round_fill(14, hy, tw + ui_text_width("Paused") + 34, 24, 3, UI_COL_PLUM);
+  if((shift <= 0) || (full <= tw))
+    ui_print_fit(22, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, tw);
+  else
+  {
+    ui_clip_set(22, hy + 4, tw, 16);
+    ui_print(22 - shift, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+    ui_clip_reset();
+  }
+  ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
+}
+
 static void draw_header(int hy)
 {
-  char title[MAX_FILE];
-  char *dot;
-  int tw, pw = ui_text_width("Paused");
+  draw_header_shift(hy, 0);
+}
 
-  strcpy(title, gamepak_filename);
-  dot = strrchr(title, '.');
-  if(dot)
-    *dot = 0;
-  tw = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD);
-  if(tw > 300)
-    tw = 300;
-  ui_round_fill(14, hy, tw + pw + 34, 24, 3, UI_COL_PLUM);
-  ui_print_fit(22, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, 300);
-  ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
+/* the marquee: 40 f at rest, then 1 px a frame to the end, a wait as
+   long, and again */
+static void header_marquee(void)
+{
+  char title[256];
+  int full, tw, over, t, cycle;
+
+  ui_display_name(gamepak_filename, title);
+  tw = header_width(title, &full);
+  over = full - tw;
+  t = p.title_f - UI_MARQUEE_DELAY;
+  if((over <= 0) || (t <= 0))
+    return;
+  cycle = over + 2 * UI_MARQUEE_DELAY;
+  t %= cycle;
+  t = (t < over) ? t : (t < over + UI_MARQUEE_DELAY) ? over : 0;
+  if(t > 0)
+  {
+    ui_fill(22, 6 + 4, tw, 16, UI_COL_PLUM);
+    draw_header_shift(6, t);
+  }
 }
 
 
@@ -735,7 +774,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
 
 static void draw_tile(int i, int ty, int selected)
 {
-  int tx = 18 + i * 64, lift = selected ? UI_LIFT : 0, j, lines = 0;
+  int tx = TILE_X(i), lift = selected ? UI_LIFT : 0, j, lines = 0;
   char line[2][64];
 
   /* lifted straight up, so with 4 px between tiles the cursor frame keeps
@@ -746,13 +785,13 @@ static void draw_tile(int i, int ty, int selected)
   ty -= lift;
   /* centred in the tile: 10 px above the icon box, about 11 under the
      label (design repo 4aff042) */
-  ui_round_fill(tx + 16, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
-  draw_icon20(tx + 19, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
+  ui_round_fill(tx + 21, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
+  draw_icon20(tx + 24, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
   for(j = 0; j < 2; j++)
-    if(ui_wrap_line(tiles[i].label, j, 56, UI_FONT_SMALL, line[j], sizeof(line[j])))
+    if(ui_wrap_line(tiles[i].label, j, 66, UI_FONT_SMALL, line[j], sizeof(line[j])))
       lines++;
   for(j = 0; j < lines; j++)
-    ui_text(tx + 30 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
+    ui_text(tx + TILE_W / 2 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
      line[j], selected ? UI_COL_PLUM : UI_COL_CREAM);
 }
 
@@ -912,6 +951,9 @@ static void draw_screen(int bar_fill)
   motion(&hy, &dy, tile_dy, &done);
   if(!p.layer_full)
     draw_header(hy);
+  else if(done && !p.closing)
+    header_marquee();
+  p.title_f++;
   if(done && !p.closing && !ui_toast_up(p.toast_f))
     ui_status_chip_at(10);
   PERF_SECTION(1);
@@ -970,7 +1012,7 @@ static void draw_screen(int bar_fill)
   if((p.row == 1) && done && !p.closing && !p.bar_text)
   {
     int tx = (p.tile_f < UI_F_CURSOR) ?
-     ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
+     ui_ease_out_back(p.tile_from, TILE_X(p.tile), p.tile_f, UI_F_CURSOR) : TILE_X(p.tile);
     ui_cursor_frame(tx, TILE_Y - 2, TILE_W, TILE_H);
   }
   PERF_SECTION(4);
@@ -1193,6 +1235,36 @@ static int action_load(int slot)
 
   if(!ok)
   {
+    if((state_error_text == msg[MSG_LOAD_STATE_OTHER_GAME]) && state_error_game[0])
+    {
+      /* spec err_state: say which game it belongs to and offer to play
+         it (PROTOTYPE: without the slot's picture on the card) */
+      char who[256], body[400], play[300];
+      ui_display_name(state_error_game, who);
+      snprintf(body, sizeof(body),
+       "This savestate file was made while playing %s. It only loads in that game.", who);
+      snprintf(play, sizeof(play), "Play %s", who);
+      if(ui_error_card("Made by another game", body, play, "Cancel", UI_COL_SKY))
+      {
+        if(ui_library_has_rom(state_error_game))
+        {
+          p.switch_slot = slot;
+          return -1;  /* the caller leaves for that game */
+        }
+        /* that game is not there: the player stays in this one */
+        build_layer(1);
+        ui_input_init();
+        {
+          char t[64];  /* a toast's text: a long name is cut */
+          snprintf(t, sizeof(t), "%.36s isn't in your games folder", who);
+          show_toast(t, UI_COL_PINK, UNDO_NONE, 0);
+        }
+        return 0;
+      }
+      build_layer(1);
+      ui_input_init();
+      return 0;
+    }
     show_toast(state_error_text ? state_error_text : "Loading failed", UI_COL_PINK, UNDO_NONE, 0);
     return 0;
   }
@@ -1287,6 +1359,15 @@ static void action_library(void)
   end_bar();
 }
 
+/* Quit kai (System, a pink hold): save like Exit, then close kai and go
+ * back to the PSP's home menu. Does not return. */
+static void quit_kai(void)
+{
+  build_layer(1);  /* the pause screen behind the card */
+  action_exit();
+  quit(0);
+}
+
 /* Restart kai (spec "Restart kai"): save like Exit, show the sky card and
  * start kai again; the note brings the player back to this Settings row.
  * Does not return. */
@@ -1331,8 +1412,11 @@ static void restart_return(void)
   }
   end_bar();
   ui_settings_game = p.game;
-  if(ui_settings(tab, row))
-    restart_kai();
+  switch(ui_settings(tab, row))
+  {
+    case 1: restart_kai(); break;  /* do not return */
+    case 2: quit_kai(); break;
+  }
   build_layer(0);  /* Settings used the layer */
   ui_status_read();
   ui_input_init();
@@ -1382,7 +1466,7 @@ static void move_tile(int to)
     return;
   end_undo();
   p.tile_from = (p.tile_f < UI_F_CURSOR) ?
-   ui_ease_out_back(p.tile_from, 18 + p.tile * 64, p.tile_f, UI_F_CURSOR) : 18 + p.tile * 64;
+   ui_ease_out_back(p.tile_from, TILE_X(p.tile), p.tile_f, UI_F_CURSOR) : TILE_X(p.tile);
   p.tile = to;
   p.tile_f = 0;
   memset(&p.exit_hold, 0, sizeof(p.exit_hold));
@@ -1481,7 +1565,7 @@ static void perf_write(void)
 }
 #endif
 
-enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_QUIT };
+enum { LEAVE_NONE, LEAVE_RESUME, LEAVE_OLD_MENU, LEAVE_LIBRARY, LEAVE_SWITCH, LEAVE_QUIT };
 
 /* Sleep (spec: Sleep): the power callback holds the suspend off while a
  * game runs with the save on; the pause screen writes Last and lets the
@@ -1597,7 +1681,8 @@ u32 ui_pause(u16 *game_picture)
           {
             p.load_hold.p = 0;
             p.load_hold.shown = 0;
-            action_load(cur_slot());
+            if(action_load(cur_slot()) < 0)
+              leave = LEAVE_SWITCH;
           }
         }
         else
@@ -1607,7 +1692,10 @@ u32 ui_pause(u16 *game_picture)
           if(ui_pressed(ui_key_confirm))
           {
             if(p.has[cur_slot()])
-              action_load(cur_slot());
+            {
+              if(action_load(cur_slot()) < 0)
+                leave = LEAVE_SWITCH;
+            }
             else
               action_save(cur_slot());
           }
@@ -1676,16 +1764,16 @@ u32 ui_pause(u16 *game_picture)
         {
           switch(p.tile)
           {
-            case TILE_RESUME:
-              p.closing = 1;
-              break;
             case TILE_SETTINGS:
               /* Settings draws its own ground; the pause screen's comes
                  back after it */
               shot_wait();
               ui_settings_game = p.game;
-              if(ui_settings(0, 0))
-                restart_kai();  /* does not return */
+              switch(ui_settings(0, 0))
+              {
+                case 1: restart_kai(); break;  /* do not return */
+                case 2: quit_kai(); break;
+              }
               build_layer(1);
               ui_status_read();
               ui_input_init();
@@ -1763,6 +1851,18 @@ u32 ui_pause(u16 *game_picture)
 
   if(leave == LEAVE_QUIT)
     quit(0);
+  if(leave == LEAVE_SWITCH)
+  {
+    char name[MAX_FILE];
+    get_savestate_filename_noshot(p.switch_slot, name);
+    if(ui_library_switch_to(state_error_game, name, p.switch_slot))
+      return 1;
+    /* that game is not in the ROM folder: back to this one */
+    video_resolution_keep(FRAME_GAME);
+    set_cpu_clock(g_game_config.clock_speed_number);
+    pause_sound(0);
+    return p.changed;
+  }
   if(leave == LEAVE_LIBRARY)
   {
     if(ui_library_switch())

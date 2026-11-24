@@ -240,6 +240,7 @@ extern void delete_state_files(const char *savestate_path);
 extern u32 has_state_backup(const char *savestate_path);
 extern u32 undo_state_files(const char *savestate_path);
 extern u32 read_thumbnail_for(const char *savestate_path, u16 *pixels, u64 *time);
+extern char state_error_game[MAX_FILE];
 extern u32 state_no_question;
 extern char *state_error_text;
 extern void get_state_slot_path(u32 slot, char *savestate_path);

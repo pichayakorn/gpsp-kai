@@ -18,6 +18,8 @@
  * files. */
 #include "../common.h"
 #include "ui.h"
+#include "ui_help_pics.h"
+#include "ui_lang_masks.h"
 
 enum { K_SEG, K_SWITCH, K_BLOCKS, K_CYCLE, K_SCREEN, K_ACTION, K_OFF };
 
@@ -38,7 +40,7 @@ typedef struct
 } row_t;
 
 #define TABS 5
-#define MAX_ROWS 8
+#define MAX_ROWS 9
 #define ROWS_Y 62
 #define VIEW_T 60
 #define VIEW_B 226
@@ -47,13 +49,18 @@ typedef struct
 #define SCREEN_ROW_H 40
 
 /* K_ACTION rows keep their action in def */
-enum { ACT_RESET_ALL, ACT_RESTART };
+enum { ACT_RESET_ALL, ACT_RESTART, ACT_QUIT };
 #define LANG_TAB 4  /* System: the Language row is its first */
 #define PAD_TAB 2   /* Controls */
 
 static const u8 map_frameskip[3] = { no_frameskip, auto_frameskip, manual_frameskip };
 static const u8 map_ff[2] = { FF_HOLD, FF_TOGGLE };
 static const u8 map_clock[3] = { 10, 7, 9 };  /* 222, 266, 333 MHz */
+/* Sensitivity runs the intuitive way: a higher level reacts to a lighter
+   push. The stored value keeps kai's old scale (threshold 92 - 4 x level,
+   higher needed a bigger push), so old .cfg files keep their feel: level
+   L shows the old value 10 - L (maintainer, 2026-11-20). */
+static const u8 map_sens[10] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 };
 
 static const char *language_names[12] =
 {
@@ -88,8 +95,8 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Use the stick", "The stick works like the d-pad, or does what you pick for each direction.",
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
     { "Sensitivity", "The ring shows where a push starts to count.",
-      K_BLOCKS, 0, 10, { NULL }, &g_gpsp_config.analog_sensitivity_level, NULL, 4, 0, 0, "%d" },
-    { "Tilt sensor", "For games made for a tilt cartridge: tilt the PSP to play.",
+      K_BLOCKS, 0, 10, { NULL }, &g_gpsp_config.analog_sensitivity_level, map_sens, 4, 0, 0, "%d" },
+    { "Tilt sensor", "For tilt-cartridge games: the stick stands in for tilting.",
       K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
   { /* Play */
@@ -118,7 +125,9 @@ static row_t rows[TABS][MAX_ROWS] =
       K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
     { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
-    { "Reset all settings", "Puts every setting back to its default, for every game.",
+    { "Quit kai", "Saves like Exit, then closes kai.",
+      K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_QUIT },
+    { "Reset all settings", "Puts kai's and this game's settings back to their defaults.",
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESET_ALL },
   },
 };
@@ -200,6 +209,7 @@ static struct
   int dir;                        /* the selected stick chip, or -1 on the rows */
   int pick_map;                   /* the map entry the picker edits */
   int pick, pick_f, pick_out;     /* the action picker: open, its motion */
+  int help, help_f, help_out;     /* the □ help card: open, its motion */
   int pcur, pcur_from, pcur_f;    /* the picker's cursor */
   u32 undo_map[MAX_GAMEPAD_CONFIG_MAP];
   u32 undo_map_default;
@@ -379,6 +389,13 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       ui_row_blocks(vx, vy, r->count, k, text, selected ? f : UI_F_VALUE, selected, g);
       break;
     case K_CYCLE:
+      if(r->names == language_names)
+      {
+        /* each language in its own script, from its pre-drawn mask */
+        const ui_lang_mask_t *m = &ui_lang_masks[(k >= 0) && (k < 12) ? k : 1];
+        ui_row_cycle_mask(vx, vy, m->bits, m->w, selected, g, selected ? f : UI_F_VALUE);
+        break;
+      }
       if(r->names)
         snprintf(text, sizeof(text), "%s", r->names[(k >= 0) && (k < r->count) ? k : 0]);
       else
@@ -434,9 +451,39 @@ static const chip_t chips[12] =
   { 11, PSP_CTRL_START,    248, 188, PAD_BX + 137,         PAD_BY + 99 },
 };
 
+/* The picker's 20 choices with their 4.0 labels (maintainer, 2026-11-20):
+   Volume up and down are dropped (they do nothing in kai), so a map that
+   still holds one reads as None. pick_ids[] turns a picker cell into an
+   action id. */
+#define PICKS 20
+static const u8 pick_ids[PICKS] =
+{
+  BUTTON_ID_UP, BUTTON_ID_DOWN, BUTTON_ID_LEFT, BUTTON_ID_RIGHT, BUTTON_ID_A, BUTTON_ID_B,
+  BUTTON_ID_L, BUTTON_ID_R, BUTTON_ID_START, BUTTON_ID_SELECT, BUTTON_ID_MENU,
+  BUTTON_ID_FASTFORWARD, BUTTON_ID_LOADSTATE, BUTTON_ID_SAVESTATE, BUTTON_ID_RAPIDFIRE_A,
+  BUTTON_ID_RAPIDFIRE_B, BUTTON_ID_RAPIDFIRE_L, BUTTON_ID_RAPIDFIRE_R, BUTTON_ID_FPS,
+  BUTTON_ID_NONE
+};
+
 static const char *action_name(u32 id)
 {
-  return msg[MSG_PAD_MENU_CFG_0 + ((id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1)];
+  static const char *names[PAD_ACTIONS] =
+  {
+    "Up", "Down", "Left", "Right", "A", "B", "L", "R", "START", "SELECT", "Pause screen",
+    "Fast forward", "Quick load", "Quick save", "Rapid A", "Rapid B", "Rapid L", "Rapid R",
+    "None", "None", "Show FPS", "None"
+  };
+  return names[(id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1];
+}
+
+/* the picker cell of an action (a dropped one is None's) */
+static int pick_cell(u32 id)
+{
+  int i;
+  for(i = 0; i < PICKS; i++)
+    if(pick_ids[i] == id)
+      return i;
+  return PICKS - 1;
 }
 
 static int chip_remapped(int i)
@@ -549,7 +596,7 @@ static int chip_step(int i, u32 dir)
 /* ---- Controls: the action picker ------------------------------------------ */
 
 #define PICK_W 400
-#define PICK_H 176
+#define PICK_H 152  /* 28 + 24 per row of four + 4: five rows */
 #define PICK_X ((UI_SCREEN_W - PICK_W) / 2)
 #define PICK_Y 46
 #define PICK_CW 92
@@ -575,7 +622,7 @@ static void open_picker(int map)
   s.pick = 1;
   s.pick_f = 0;
   s.pick_out = 0;
-  s.pcur = (id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1;
+  s.pcur = pick_cell(id);
   s.pcur_from = s.pcur;
   s.pcur_f = UI_F_CURSOR;
 }
@@ -595,14 +642,14 @@ static void picker_input(void)
   if(ui_pressed(ui_key_confirm))
   {
     int m = s.pick_map;
-    if(!menu_reachable_without(m, s.pcur))
+    if(!menu_reachable_without(m, pick_ids[s.pcur]))
     {
       show_toast("One button has to open the menu", 0, UI_COL_PINK);
       return;
     }
-    if(gamepad_config_map[m] != (u32)s.pcur)
+    if(gamepad_config_map[m] != pick_ids[s.pcur])
     {
-      gamepad_config_map[m] = s.pcur;
+      gamepad_config_map[m] = pick_ids[s.pcur];
       g_game_config.use_default_gamepad_map = NO;  /* the game keeps its own map */
       s.dirty = 1;
     }
@@ -611,9 +658,9 @@ static void picker_input(void)
     return;
   }
   if(ui_repeat(PSP_CTRL_LEFT) && (to % 4 > 0)) to--;
-  if(ui_repeat(PSP_CTRL_RIGHT) && (to % 4 < 3) && (to + 1 < PAD_ACTIONS)) to++;
+  if(ui_repeat(PSP_CTRL_RIGHT) && (to % 4 < 3) && (to + 1 < PICKS)) to++;
   if(ui_repeat(PSP_CTRL_UP) && (to >= 4)) to -= 4;
-  if(ui_repeat(PSP_CTRL_DOWN) && (to + 4 < PAD_ACTIONS)) to += 4;
+  if(ui_repeat(PSP_CTRL_DOWN) && (to + 4 < PICKS)) to += 4;
   if(to != s.pcur)
   {
     s.pcur_from = ui_ease_out_back(s.pcur_from, s.pcur, s.pcur_f, UI_F_CURSOR);
@@ -656,7 +703,7 @@ static int draw_picker(void)
   ui_fill(PICK_X, top + 4, 6, PICK_H - 8, UI_COL_LIME);
   n = ui_print(PICK_X + 16, top + 6, "Button action \xC2\xB7 ", UI_COL_PLUM, UI_FONT_BODY, 0);
   ui_glyph(n, top + 8, ui_key_confirm);
-  for(i = 0; i < PAD_ACTIONS; i++)
+  for(i = 0; i < PICKS; i++)
   {
     int x, y;
     picker_cell(i, &x, &y, top);
@@ -664,12 +711,12 @@ static int draw_picker(void)
     {
       ui_round_fill(x + 1, y + 1, PICK_CW - 2, PICK_CH, 2, UI_COL_SHADE);
       ui_round_fill(x - 1, y - 1, PICK_CW - 2, PICK_CH, 2, UI_COL_LIME);
-      ui_print_fit(x + 5, y + 2, action_name(i), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
+      ui_print_fit(x + 5, y + 2, action_name(pick_ids[i]), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
     }
     else
     {
       ui_round_frame(x, y, PICK_CW - 2, PICK_CH, 2, UI_COL_MUTE);
-      ui_print_fit(x + 6, y + 3, action_name(i), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
+      ui_print_fit(x + 6, y + 3, action_name(pick_ids[i]), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
     }
   }
   /* the cursor frame glides between cells */
@@ -789,12 +836,136 @@ static void pad_undo(void)
 }
 
 /* Steady hints first, then the row's own (spec: Hint strip). */
+/* ---- help (the square key) -------------------------------------------------------------------------
+ * The selected row's help card. Written help: Smoothing and Frameskip
+ * (spec, help_smooth / help_skip); every other row shows its tip as the
+ * text until its own help copy is written (PROTOTYPE: help copy uses the
+ * tip). Smoothing's three pictures are not drawn yet: their captions stand
+ * in as text. Returns 0 when the selection has no help. */
+/* the help text of each row, by its label (spec section 4, Help copy;
+   maintainer, 2026-11-20) */
+static const char *const help_copy[][2] =
+{
+  { "Screen size", "Original shows the GBA's pixels at their own size. Fit fills the height and keeps the shape. Full stretches to the whole screen." },
+  { "Smoothing", "How the GBA picture is drawn when it is scaled up to the PSP screen." },
+  { "Side bars", "What fills the space beside the picture in Original and Fit: plain black, kai's pattern, or colours taken from the game." },
+  { "Frameskip", "When the PSP can't draw every frame, skipping some keeps the game at full speed. Auto skips only when the game would slow down; Fixed always skips the number set in Skip up to." },
+  { "Skip up to", "The most frames in a row that Auto may skip; Fixed always skips this many. Lower looks smoother, higher keeps the speed." },
+  { "Picture scale", "Shrinks the picture inside its screen size, for a TV that cuts off the edges of the picture." },
+  { "TV output", "Only with a TV cable on a PSP-2000 or later. Sets the picture's shape on the TV; interlacing follows the cable." },
+  { "Sound", "Off mutes the game. With no sound to make, the PSP has a little more time for the picture." },
+  { "Sound delay", "If the sound crackles in a busy game, add a block. If the sound feels late, take one away." },
+  { "Use the stick", "On: the stick works like the d-pad, or does what you pick for each direction. Off: the stick does nothing." },
+  { "Sensitivity", "How light a push counts. Higher reacts to a lighter push; lower ignores small wobbles." },
+  { "Tilt sensor", "For games made for a tilt cartridge: the stick stands in for tilting, with the centre as level. Use the stick must be on." },
+  { "Save when leaving a game", "On: leaving a game saves to Last, so Continue picks up exactly where you were. Off: Last stays as it was." },
+  { "Fast forward", "Hold: the game runs fast while you hold the button. Toggle: one press turns it on, the next turns it off." },
+  { "Fast forward speed", "2\xC3\x97 and 3\xC3\x97 are steady. Max runs as fast as the PSP can, so its speed changes with each game." },
+  { "Sound while fast", "Off keeps fast forward quiet. On plays the game's sound, sped up." },
+  { "Rapid-fire speed", "How fast a rapid-fire button presses while you hold it. Choose which buttons fire rapidly in Controls." },
+  { "Show FPS", "Shows the frames per second in the top-left corner. 60 is full speed." },
+  { "Language", "The language comes from your PSP until you pick one here. A new language applies after a restart." },
+  { "CPU speed", "333 MHz runs every game at full speed. 222 and 266 save battery, but some games slow down." },
+  { "Write game saves", "Right away writes the game's own save as soon as the game saves. On exit waits until you leave the game." },
+  { "Start games with", "GBA BIOS shows the GBA's start-up logo first, as on a real GBA. Game Cart skips it and works without a BIOS." },
+  { "No-BIOS notice", "Off hides the No GBA BIOS line in the library, for when you play without a BIOS." },
+  { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models. Or choose one here." },
+  { "Restart kai", "Saves like Exit, then starts kai again and brings you back here." },
+  { "Quit kai", "Saves like Exit, then closes kai and goes back to the PSP's home menu." },
+  { "Reset all settings", "Puts kai's settings and this game's own settings back to their defaults. Savestates, game saves and other games' settings stay." },
+  { NULL, NULL }
+};
+
+#define HELP_PAD "Pick what this button does in this game: a GBA button, rapid fire, fast forward, quick save or load, the pause screen, or Show FPS."
+
+/* The selected item's help card: its label and its help text (the Buttons
+ * page and the stick's direction chips share the button help). Smoothing's
+ * card shows its three samples (draw_smooth_help). Returns 0 when the
+ * selection has no help. */
+static int help_topic(const char **title, const char **body)
+{
+  const row_t *r;
+  const char *t, *b = NULL;
+  int i;
+
+  if((s.tab == PAD_TAB) && (s.page == 0))
+  {
+    t = "Buttons";
+    b = HELP_PAD;
+  }
+  else if((s.tab == PAD_TAB) && (s.dir >= 0))
+  {
+    t = "Stick";
+    b = HELP_PAD;
+  }
+  else
+  {
+    r = &rows[s.tab][s.cur];
+    if(!r->label)
+      return 0;
+    t = r->label;
+    for(i = 0; help_copy[i][0]; i++)
+      if(!strcmp(help_copy[i][0], t))
+        b = help_copy[i][1];
+    if(!b)
+      return 0;
+  }
+  if(title)
+    *title = t;
+  if(body)
+    *body = b;
+  return 1;
+}
+
+/* Smoothing's help: the card with the three samples, each shown at exactly
+   3x in a 3 px frame (Sharp's lime, the default), its name and its line
+   (spec section 4, Help; r5 help5) */
+static void draw_smooth_help(int f, int closing)
+{
+  static const char *names[3] = { "Off", "Smooth", "Sharp" };
+  static const char *lines[3] = { "Pixels stay hard but uneven.", "Soft, a little blurry.",
+   "Crisp and even. Best for most games." };
+  int w = 440, h = 214, x = (UI_SCREEN_W - w) / 2, y, i, j, r, c;
+  ui_hint_t hh[2];
+  char line[96];
+
+  if(closing)
+    y = 26 + ui_ease_in_cubic(0, UI_SCREEN_H - 26, f, UI_F_HELP_OUT);
+  else
+    y = 26 + 30 - ui_ease_out_back(0, 30, f, UI_F_HELP_IN);
+  if(!(closing && (f >= UI_F_HELP_OUT)))
+    ui_door(0, 0, UI_SCREEN_W, UI_STRIP_Y);
+  ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
+  ui_round_fill(x, y, w, h, 3, UI_COL_CREAM);
+  ui_fill(x, y + 4, 6, h - 8, UI_COL_LIME);
+  ui_print(x + 18, y + 4, "Smoothing", UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+  ui_print_fit(x + 18, y + 38, help_copy[1][1], UI_COL_PLUM, UI_FONT_SMALL, 0, w - 36);
+  for(i = 0; i < 3; i++)
+  {
+    int px = x + 27 + i * 134, py = y + 60, on = (i == 2);
+    ui_fill(px - 3, py - 3, 123 + 6, 81 + 6, on ? UI_COL_LIME : COLOR16(23, 21, 19));
+    for(r = 0; r < HELP_PIC_H; r++)
+      for(c = 0; c < HELP_PIC_W; c++)
+        ui_fill(px + c * 3, py + r * 3, 3, 3, help_smooth_pics[i][r * HELP_PIC_W + c]);
+    ui_print(px, py + 88, names[i], UI_COL_PLUM, UI_FONT_BODY, on ? UI_TEXT_BOLD : 0);
+    for(j = 0; (j < 3) && ui_wrap_line(lines[i], j, 123, UI_FONT_SMALL, line, sizeof(line)); j++)
+      ui_print(px, py + 106 + j * 13, line, UI_COL_PLUM, UI_FONT_SMALL, 0);
+  }
+  hh[0].keys = PSP_CTRL_SQUARE; hh[0].verb = "";
+  hh[1].keys = ui_key_back;     hh[1].verb = "Close";
+  ui_hint_packed(hh, 2, 14);
+}
+
 static void draw_hints(void)
 {
-  ui_hint_t hints[5];
+  ui_hint_t hints[6];
   int n = 0;
 
   hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
+  if(help_topic(NULL, NULL))
+  {
+    hints[n].keys = PSP_CTRL_SQUARE; hints[n++].verb = "Help";
+  }
   hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
   if(s.tab == PAD_TAB)
   {
@@ -814,6 +985,10 @@ static void draw_hints(void)
     case ACT_RESTART:
       hints[n].keys = ui_key_confirm;
       hints[n++].verb = "Hold: restart";
+      break;
+    case ACT_QUIT:
+      hints[n].keys = ui_key_confirm;
+      hints[n++].verb = "Hold: quit";
       break;
     default:
       if(rows[s.tab][s.cur].kind == K_SWITCH)
@@ -953,7 +1128,8 @@ static void draw_tip_line(void)
 
   if(tip_hold_bar(&s.reset_hold, UI_COL_TANGERINE))
     return;
-  if(tip_hold_bar(&s.action_hold, (action_of(s.tab, s.cur) == ACT_RESET_ALL) ? UI_COL_PINK : UI_COL_SKY))
+  if(tip_hold_bar(&s.action_hold, ((action_of(s.tab, s.cur) == ACT_RESET_ALL) ||
+   (action_of(s.tab, s.cur) == ACT_QUIT)) ? UI_COL_PINK : UI_COL_SKY))
     return;
   if(s.reset_hold.fired || s.action_hold.fired)
     return;  /* done, key still down: the tip stays away */
@@ -1197,6 +1373,23 @@ int ui_settings(int tab, int row)
       picker_input();  /* the picker takes every key while it is up */
       goto draw;
     }
+    if(s.help)
+    {
+      /* the help card takes every key; □ or ○ closes it */
+      if(!s.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
+      {
+        s.help_out = 1;
+        s.help_f = 0;
+      }
+      goto draw;
+    }
+    if(ui_pressed(PSP_CTRL_SQUARE) && help_topic(NULL, NULL))
+    {
+      s.help = 1;
+      s.help_out = 0;
+      s.help_f = 0;
+      goto draw;
+    }
     if(ui_pressed(ui_key_back))
       break;
 
@@ -1335,6 +1528,18 @@ int ui_settings(int tab, int row)
       }
     }
 
+    /* Quit kai: hold ×, its bar pink like Exit; the caller saves like
+       Exit and closes kai */
+    if(action_of(s.tab, s.cur) == ACT_QUIT)
+    {
+      ui_hold_step(&s.action_hold, ui_key_confirm);
+      if(s.action_hold.done)
+      {
+        s.restart = 2;
+        break;
+      }
+    }
+
     /* hold confirm on Reset all */
     if(action_of(s.tab, s.cur) == ACT_RESET_ALL)
     {
@@ -1377,6 +1582,21 @@ int ui_settings(int tab, int row)
     draw_tip_line();
     if(s.pick && !draw_picker())
       s.dirty = 1;  /* closed: the chip shows its new job */
+    if(s.help)
+    {
+      const char *t, *b;
+      if(help_topic(&t, &b))
+      {
+        if(!strcmp(t, "Smoothing"))
+          draw_smooth_help(s.help_f, s.help_out);
+        else
+          ui_help_card(t, b, UI_COL_LIME, s.help_f, s.help_out);
+      }
+      if(s.help_f < (s.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
+        s.help_f++;
+      else if(s.help_out)
+        s.help = 0;
+    }
     if(s.toast_f >= 0)
     {
       if(!ui_toast(s.toast, s.toast_edge, s.toast_undo ? "Undo" : NULL, s.toast_f))
