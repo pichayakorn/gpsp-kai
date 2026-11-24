@@ -88,12 +88,17 @@ CFLAGS          += -DSIM_PSP1000
 endif
 
 # make UI4=1 PERF=1: the pause screen runs a fixed input script and writes
-# its frame times to perf_pause.csv (a measuring build, never released)
+# its frame times to perf_pause.csv; PERF=settings does the same for the
+# Settings screen, into perf_settings.csv (measuring builds, never released)
 ifeq ($(PERF), 1)
 CFLAGS          += -DUI_PERF
 endif
-# make PERF=game BENCH_TAG=name: after a savestate loads, time 1800 frames
-# run flat out into perf_game.csv, tagged with the build's name (#148)
+ifeq ($(PERF), settings)
+CFLAGS          += -DUI_PERF -DUI_PERF_SETTINGS
+endif
+# make PERF=game BENCH_TAG=name: after a game starts or a savestate loads,
+# time 1800 frames run flat out into perf_game.csv, tagged with the build's
+# name (#148)
 ifeq ($(PERF), game)
 CFLAGS          += -DGAME_BENCH -DBENCH_TAG=\"$(or $(BENCH_TAG),game)\"
 endif

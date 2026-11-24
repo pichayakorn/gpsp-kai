@@ -1336,6 +1336,118 @@ static void change_value(int dir)
 
 /* ---- the screen ---------------------------------------------------------------- */
 
+#ifdef UI_PERF_SETTINGS
+/* Measuring build (make UI4=1 PERF=settings, #152): the first time Settings
+ * opens it drives itself through a fixed script that only moves the cursor,
+ * the tabs and the Controls pages (never ←→ or ×, so nothing changes), logs
+ * every frame, then gives the pad back and writes <kai>/perf_settings.csv. */
+static const struct
+{
+  const char *name;
+  int frames;
+  u32 keys;
+  int tap_every;  /* 0: held the whole phase */
+} perf_phases[] =
+{
+  { "still",       60, 0,                  0 },
+  { "tap_down",   160, PSP_CTRL_DOWN,     20 },  /* the cursor flies row to row */
+  { "hold_down",  120, PSP_CTRL_DOWN,      0 },  /* the list slides */
+  { "hold_up",    120, PSP_CTRL_UP,        0 },
+  { "tabs_right", 120, PSP_CTRL_RTRIGGER, 30 },  /* Sound, Controls, Play, System */
+  { "tabs_left",   60, PSP_CTRL_LTRIGGER, 30 },  /* back to Controls */
+  { "pad_still",   30, 0,                  0 },
+  { "chips_right",120, PSP_CTRL_RIGHT,    20 },  /* Buttons page: chip to chip */
+  { "chips_down",  80, PSP_CTRL_DOWN,     20 },
+  { "to_stick",    30, PSP_CTRL_SELECT,   30 },  /* the Stick page */
+  { "stick_down", 120, PSP_CTRL_DOWN,     20 },
+  { "still_end",   60, 0,                  0 },
+};
+#define PERF_PHASES (int)(sizeof(perf_phases) / sizeof(perf_phases[0]))
+#define PERF_MAX 1100
+
+static struct
+{
+  u8 phase, tab, page;
+  u16 logic, ground, draw;
+  u32 period;
+} perf_log[PERF_MAX];
+static int perf_phase, perf_f, perf_n, perf_on, perf_done;
+
+static u32 perf_script(void)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return 0;
+  if(perf_phases[perf_phase].tap_every)
+    return ((perf_f % perf_phases[perf_phase].tap_every) < 3) ? perf_phases[perf_phase].keys : 0;
+  return perf_phases[perf_phase].keys;
+}
+
+static u16 perf_us(u32 t)
+{
+  return (t > 0xFFFF) ? 0xFFFF : t;
+}
+
+static void perf_step(u32 logic, u32 ground, u32 draw, u32 period)
+{
+  if(!perf_on || (perf_phase >= PERF_PHASES))
+    return;
+  if(perf_n < PERF_MAX)
+  {
+    perf_log[perf_n].phase = perf_phase;
+    perf_log[perf_n].tab = s.tab;
+    perf_log[perf_n].page = s.page;
+    perf_log[perf_n].logic = perf_us(logic);
+    perf_log[perf_n].ground = perf_us(ground);
+    perf_log[perf_n].draw = perf_us(draw);
+    perf_log[perf_n].period = period;
+    perf_n++;
+  }
+  if(++perf_f >= perf_phases[perf_phase].frames)
+  {
+    perf_f = 0;
+    perf_phase++;
+  }
+}
+
+static void perf_write(void)
+{
+  char path[MAX_PATH], line[128];
+  SceUID fd;
+  int i;
+
+  path_printf(path, sizeof(path), "%s/perf_settings.csv", main_path);
+  fd = sceIoOpen(path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+  if(fd < 0)
+    return;
+  sprintf(line, "# cpu %d MHz, bus %d MHz, frames %d\n", scePowerGetCpuClockFrequency(),
+   scePowerGetBusClockFrequency(), perf_n);
+  sceIoWrite(fd, line, strlen(line));
+  strcpy(line, "phase,frame,tab,page,logic_us,ground_us,draw_us,work_us,period_us\n");
+  sceIoWrite(fd, line, strlen(line));
+  for(i = 0; i < perf_n; i++)
+  {
+    sprintf(line, "%s,%d,%d,%d,%u,%u,%u,%u,%u\n", perf_phases[perf_log[i].phase].name, i,
+     perf_log[i].tab, perf_log[i].page, perf_log[i].logic, perf_log[i].ground, perf_log[i].draw,
+     (unsigned)(perf_log[i].logic + perf_log[i].ground + perf_log[i].draw),
+     (unsigned)perf_log[i].period);
+    sceIoWrite(fd, line, strlen(line));
+  }
+  sceIoClose(fd);
+}
+
+/* the script ran its course: the pad comes back and the file is written */
+static void perf_finish(void)
+{
+  ui_input_script = NULL;
+  if(perf_on)
+  {
+    perf_write();
+    perf_on = 0;
+    perf_done = 1;
+  }
+}
+#endif
+
 int ui_settings(int tab, int row)
 {
   u32 mark = ui_pool_mark();
@@ -1368,10 +1480,22 @@ int ui_settings(int tab, int row)
   ui_input_init();
   ui_status_read();
   build_ground();
+#ifdef UI_PERF_SETTINGS
+  if(!perf_done)
+  {
+    perf_phase = perf_f = perf_n = 0;
+    perf_on = 1;
+    ui_input_script = perf_script;
+  }
+#endif
 
   while(1)
   {
     int moved = 0;
+#ifdef UI_PERF_SETTINGS
+    static u32 perf_last;
+    u32 perf_t0 = sceKernelGetSystemTimeLow(), perf_t1, perf_t2;
+#endif
 
     ui_input_update();
     if(s.pick)
@@ -1570,8 +1694,14 @@ int ui_settings(int tab, int row)
       s.top_f++;
       s.dirty = 1;  /* the list slides: its ground follows */
     }
+#ifdef UI_PERF_SETTINGS
+    perf_t1 = sceKernelGetSystemTimeLow();
+#endif
     if(s.dirty)
       build_ground();
+#ifdef UI_PERF_SETTINGS
+    perf_t2 = sceKernelGetSystemTimeLow();
+#endif
 
     /* draw */
     ui_frame_begin();
@@ -1610,9 +1740,21 @@ int ui_settings(int tab, int row)
       else
         s.toast_f++;
     }
+#ifdef UI_PERF_SETTINGS
+    {
+      u32 t3 = sceKernelGetSystemTimeLow();
+      perf_step(perf_t1 - perf_t0, perf_t2 - perf_t1, t3 - perf_t2, perf_n ? perf_t0 - perf_last : 0);
+      perf_last = perf_t0;
+      if(perf_on && (perf_phase >= PERF_PHASES))
+        perf_finish();
+    }
+#endif
     ui_frame_end();
   }
 
+#ifdef UI_PERF_SETTINGS
+  perf_finish();  /* left early: keep what was measured */
+#endif
   /* the screen keeps no memory; the caller rebuilds its own ground */
   ui_pool_release(mark);
   return s.restart;
