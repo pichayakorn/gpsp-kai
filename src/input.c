@@ -537,10 +537,10 @@ int main(int argc, char* argv[])
      osk.size = sizeof(osk);
      osk.language = 2;
      osk.buttonswap = 0;
-     osk.unk_12 = 17; // What
-     osk.unk_16 = 19; // the
-     osk.unk_20 = 18; // fuck
-     osk.unk_24 = 16; // ???
+     osk.unk_12 = 17;  /* undocumented OSK fields */
+     osk.unk_16 = 19;
+     osk.unk_20 = 18;
+     osk.unk_24 = 16;
      osk.unk_48 = 1;
      osk.data = &data;
 

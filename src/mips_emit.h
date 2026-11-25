@@ -801,7 +801,7 @@ u32 arm_to_mips_reg[] =
 // use only the lowest byte of Rs as the amount, s = Rs & 0xFF. A MIPS
 // variable shift uses Rs[4:0], which equals s[4:0], so the no-flags forms
 // only need Rs & 0xE0 to tell s >= 32; ROR by s is ROR by s & 31. The flags
-// forms mask s first. Ported from GBAdhoc (GPL-2.0), mips/mips_emit.h.
+// forms mask s first. Ported from another GPL-2.0 PSP GBA emulator.
 #define generate_shift_reg_lsl_no_flags(_rm, _rs)                             \
   mips_emit_andi(reg_temp, arm_to_mips_reg[_rs], 0xE0);                       \
   mips_emit_sllv(reg_a0, arm_to_mips_reg[_rm], arm_to_mips_reg[_rs]);         \
@@ -850,8 +850,7 @@ u32 arm_to_mips_reg[] =
 
 // With a shift by register, the PC reads as the instruction's address + 12
 // (the register shift takes an extra cycle). Rm = PC maps to reg_a0, so
-// loading PC + 12 there makes every shift form below read it. Follows GBAdhoc
-// (GPL-2.0), mips/mips_emit.h (generate_shift_reg_rm).
+// loading PC + 12 there makes every shift form below read it.
 #define generate_shift_reg(arm_reg, name, flags_op)                           \
   u32 rs = ((opcode >> 8) & 0x0F);                                            \
   if(rm == REG_PC)                                                            \
@@ -1560,7 +1559,6 @@ typedef enum
 // A logical operation with the S bit and a rotated immediate (rotation not
 // 0) sets C to bit 31 of the immediate; with no rotation C is unchanged.
 // Only the logical ops and TST/TEQ use this form, so C is never an input.
-// Follows libretro gpSP (GPL-2.0-or-later), mips/mips_emit.h.
 #define arm_generate_op_imm_flags(name, load_op)                              \
   arm_generate_op_imm(name, load_op);                                         \
   if((opcode >> 8) & 0x0F)                                                    \
@@ -1878,7 +1876,7 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 // LDM with the PC in the list and the S bit ("LDM rn, {..., pc}^") is an
 // exception return: like MOVS pc (check_store_reg_pc_flags) it also copies
 // the SPSR to the CPSR. The target is in reg_a0; execute_spsr_restore returns
-// it with bit 0 set to CPSR.T. Ported from GBAdhoc (GPL-2.0), mips/mips_emit.h.
+// it with bit 0 set to CPSR.T. Ported from another GPL-2.0 PSP GBA emulator.
 #define arm_block_memory_pc_load_yes()                                        \
   generate_function_call(execute_spsr_restore);                               \
   generate_indirect_branch_dual()                                             \
@@ -1948,8 +1946,8 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 // - STM: if the base register is the lowest one in the list, the original
 //   base is stored, so the writeback is deferred until after the stores.
 //   Otherwise the new base is stored, so the writeback is done first.
-// Based on libretro gpSP commit 904eaa2 (GPL-2.0-or-later), which defers
-// the writeback for every STM; here it is deferred only when needed.
+// Based on another GPL-2.0-or-later GBA emulator, which defers the
+// writeback for every STM; here it is deferred only when needed.
 
 #define arm_block_memory_store_base_first()                                   \
   (((reg_list >> rn) & 0x01) && !(reg_list & ((1 << rn) - 1)))               \
@@ -2340,7 +2338,6 @@ u32 execute_store_cpsr_body(u32 _cpsr, u32 store_mask, u32 address)
 // Same base-in-list writeback rules as the ARM block memory ops above:
 // LDMIA keeps the loaded value, STMIA stores the original base only when the
 // base register is the lowest one in the list (otherwise the new base).
-// Follows libretro gpSP's interpreter fix, commit bfdc0d0 (GPL-2.0-or-later).
 
 #define thumb_block_memory_store_base_first(base_reg)                         \
   (((reg_list >> base_reg) & 0x01) && !(reg_list & ((1 << base_reg) - 1)))   \

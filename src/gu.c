@@ -234,8 +234,8 @@ u32 flip_address_temp[2];
 u32 flip_offset_address_temp[2];
 
 // Sharp bilinear (#74): crisp, square pixels at a non-integer scale, without
-// the uneven pixel widths of nearest. Ported from GBAdhoc (GPL-2.0),
-// gpsp/psp/video_psp.c sharp_draw(). The GE has no shaders, so it takes two
+// the uneven pixel widths of nearest. Ported from another GPL-2.0 PSP GBA
+// emulator. The GE has no shaders, so it takes two
 // passes per frame:
 //  1. prescale: draw the GBA frame with nearest at an integer factor kx x ky
 //     (k = the final scale rounded up) into a target in VRAM;

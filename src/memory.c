@@ -2693,8 +2693,7 @@ void load_builtin_bios(void)
 
 // Returns 0 for a known BIOS dump, -2 for an unknown one, and -1 when the
 // file is missing or does not look like a GBA BIOS: its first instruction
-// is the reset vector's branch, so the first byte is 0x18 (as libretro gpSP
-// checks).
+// is the reset vector's branch, so the first byte is 0x18.
 s32 load_bios(char *name)
 {
   u8 md5[16];

@@ -969,7 +969,7 @@ u32 high_frequency_branch_targets = 0;
 // - STM: if the base register is the lowest one in the list, the original
 //   base is stored, so the writeback is done after the stores. Otherwise the
 //   new base is stored, so the writeback is done first.
-// Ported from libretro gpSP commit beb6e4b (GPL-2.0-or-later).
+// Ported from another GPL-2.0-or-later GBA emulator.
 
 #define arm_block_memory_store_base_first()                                   \
   (((reg_list >> rn) & 0x01) && !(reg_list & ((1 << rn) - 1)))               \
@@ -1423,7 +1423,7 @@ u32 high_frequency_branch_targets = 0;
 // STMIA with the base register in the list stores the new base unless the
 // base register is the lowest one in the list (only STMIA can have the base
 // in the list, so the new base is the address after the stores).
-// Ported from libretro gpSP commit bfdc0d0 (GPL-2.0-or-later).
+// Ported from another GPL-2.0-or-later GBA emulator.
 
 #define thumb_block_memory_wb_pre_load(base_reg)                              \
 
