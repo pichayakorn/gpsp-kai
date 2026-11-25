@@ -597,10 +597,14 @@ static void draw_cover(int x, int y, int game)
   ui_blit(c->px, COVER, x, y, COVER, COVER);
 }
 
-/* .art (gpsp-kai-tools docs/art-format.md):
- * "KART", version 1, the number of pictures, 2 bytes 0; then per picture
- * its width, height and 2 bytes 0; then the pictures, rows top to bottom,
- * as kai's 16-bit colours. */
+/* .art, written by kai's companion tools (little-endian):
+ *   0  4    "KART"
+ *   4  1    version, 1
+ *   5  1    n, the number of pictures (1-8)
+ *   6  2    0
+ *   8  4*n  per picture: width, height (1 byte each), then 2 bytes 0
+ *   then the pictures' pixels in the same order, rows top to bottom, each a
+ *   16-bit COLOR16 value. Only square pictures up to 128 px are used. */
 
 static void art_dir(char *out, int size)
 {
