@@ -841,11 +841,10 @@ static void pad_undo(void)
 
 /* Steady hints first, then the row's own (spec: Hint strip). */
 /* ---- help (the square key) -------------------------------------------------------------------------
- * The selected row's help card. Written help: Smoothing and Frameskip
- * (spec, help_smooth / help_skip); every other row shows its tip as the
- * text until its own help copy is written (PROTOTYPE: help copy uses the
- * tip). Smoothing's three pictures are not drawn yet: their captions stand
- * in as text. Returns 0 when the selection has no help. */
+ * The selected row's help card: its text from help_copy below (spec
+ * section 4, Help copy); Smoothing has its own card with a picture for
+ * each choice (draw_smooth_help). Returns 0 when the selection has no
+ * help. */
 /* the help text of each row, by its label (spec section 4, Help copy;
    maintainer, 2026-11-20) */
 static const char *const help_copy[][2] =
