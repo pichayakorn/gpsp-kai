@@ -1,4 +1,3 @@
-/* UI drawing: CPU writes into the 480 x 272 menu buffer. */
 #include "../common.h"
 #include "ui.h"
 
@@ -9,7 +8,7 @@ u32 ui_fb_pitch;
 
 /* The CPU writes the menu buffer through the uncached VRAM address: going
  * through the data cache makes every write miss fill a cache line from
- * VRAM first, which made a plain copy run at about 80 MB/s at 222 MHz. */
+ * VRAM first. */
 #define UNCACHED(p) ((u16 *)((u32)(p) | 0x40000000))
 
 static u32 __attribute__((aligned(16))) ge_list[64];
@@ -26,15 +25,11 @@ void ui_frame_end(void)
   sceDisplayWaitVblankStart();
 }
 
-/* Show the frame without waiting for the vblank: a bar redrawn between
- * chunks of a save must not slow the save down. */
 void ui_frame_end_now(void)
 {
   flip_screen();
 }
 
-/* Drawing stays inside this rectangle (the whole screen unless a screen
- * narrows it, e.g. to a list's area or a moving cursor frame). */
 int ui_clip_x0 = 0, ui_clip_y0 = 0, ui_clip_x1 = UI_SCREEN_W, ui_clip_y1 = UI_SCREEN_H;
 
 void ui_clip_set(int x, int y, int w, int h)
@@ -77,14 +72,8 @@ void ui_fill(int x, int y, int w, int h, u16 color)
   }
 }
 
-/* The ground: plum with an 8 px check in plum-2, kept as a 480 x 272 layer
- * in the UI pool and copied into the frame by the GE, so the CPU spends
- * almost nothing on it. Static parts of a screen can be drawn into the
- * layer once. Without pool memory it is drawn by the CPU from two rows. */
 static u16 *ground_layer = NULL;
 
-/* The bare ground check over one rectangle, e.g. to redraw part of a
- * screen in another state on top of its ground layer. */
 void ui_ground_rect(int x, int y, int w, int h)
 {
   int x0 = x, y0 = y, j;
@@ -134,17 +123,11 @@ static int alloc_ground_layer(void)
   return 1;
 }
 
-/* The layer is reserved once, right after the pool, for the whole run:
- * taken lazily, it landed after a screen's pool mark and the screen's
- * release left it pointing at memory the next screen allocated again. */
 void ui_layer_init(void)
 {
   alloc_ground_layer();
 }
 
-/* Draw into any 16-bit picture (w x h) with the ui_* calls, e.g. a cover
- * kept in a cache with its title; ui_target_end() goes back. Not nested,
- * and not inside ui_layer_begin(). */
 static u16 *target_fb;
 static u32 target_fb_pitch;
 static int target_clip[4];
@@ -175,10 +158,8 @@ void ui_target_end(void)
   ui_clip_y1 = target_clip[3];
 }
 
-/* Draw the static parts of a screen into the ground layer once: between
- * ui_layer_begin() and ui_layer_end() every ui_* drawing goes to the layer.
- * ui_layer_begin() starts from the plain ground and returns 0 without
- * pool memory (then draw them every frame instead). */
+/* Between ui_layer_begin() and ui_layer_end() every ui_* drawing goes to
+ * the layer. ui_layer_begin() returns 0 without pool memory. */
 static u16 *saved_fb;
 static u32 saved_fb_pitch;
 
@@ -206,7 +187,6 @@ int ui_layer_ready(void)
   return ground_layer != NULL;
 }
 
-/* Back to the plain ground, for the next screen. */
 void ui_layer_reset(void)
 {
   if(ground_layer == NULL)
@@ -231,8 +211,6 @@ void ui_ground(void)
   sceGuSync(0, 0);
 }
 
-/* Every other pixel in one colour: the screen door (shade over the game, a
- * dim without alpha) and the checker of an empty savestate. */
 void ui_checker(int x, int y, int w, int h, u16 color)
 {
   int i, j;
@@ -259,7 +237,6 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
 
   if((w <= 0) || (h <= 0) || !clip(&x0, &y0, &cw, &ch))
     return;
-  /* 16.16 steps: no division per pixel (the PSP's divide is slow) */
   {
     u32 sx = ((u32)sw << 16) / w, sy = ((u32)sh << 16) / h;
     u32 u0 = (x0 - x) * sx, v = (y0 - y) * sy;
@@ -276,18 +253,16 @@ void ui_blit_scaled(const u16 *src, int sw, int sh, int x, int y, int w, int h)
   }
 }
 
-/* A picture (sw x sh, pitch sw) shrunk into dst (w x h, w <= 160) by
- * averaging the source pixels each one covers: smooth, unlike the nearest
- * pixel. Up to 4 x 4 source pixels per pixel; no division per pixel. */
+/* A picture (sw x sh, pitch sw) shrunk into dst (w x h, w <= 160). */
 void ui_shrink_box(const u16 *src, int sw, int sh, u16 *dst, int w, int h)
 {
   static u16 x0[161];
-  static u32 recip[17];  /* 65536 / n: no divide per pixel */
+  static u32 recip[17];
   int i, j;
 
   if(!recip[1])
     for(i = 1; i <= 16; i++)
-      recip[i] = (65536 + i - 1) / i;  /* rounded up: 3 x 31 stays 31 */
+      recip[i] = (65536 + i - 1) / i;
 
   if((w <= 0) || (h <= 0) || (w > 160))
     return;
@@ -332,8 +307,8 @@ void ui_blit(const u16 *src, int pitch, int x, int y, int w, int h)
 }
 
 /* A picture (sw x sh, pitch a multiple of 8 pixels, in RAM) stretched to
- * w x h at x, y by the GE with bilinear filtering: smooth, and no CPU per
- * pixel. Texels at the far edges are not sampled (half a texel inset). */
+ * w x h at x, y by the GE with bilinear filtering. Texels at the far edges
+ * are not sampled (half a texel inset). */
 void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, int w, int h)
 {
   struct { float u, v, x, y, z; } *v;
@@ -354,7 +329,6 @@ void ui_stretch_smooth(const u16 *src, int sw, int sh, int pitch, int x, int y, 
   v[0].u = 0.5f;            v[0].v = 0.5f;            v[0].x = x;     v[0].y = y;     v[0].z = 0;
   v[1].u = sw - 0.5f;       v[1].v = sh - 0.5f;       v[1].x = x + w; v[1].y = y + h; v[1].z = 0;
   sceGuDrawArray(GU_SPRITES, GU_TEXTURE_32BITF | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 2, 0, v);
-  /* back to what flip_screen() expects: the display as the target */
   sceGuDrawBufferList(GU_PSM_5551, (void *)0, 768);
   sceGuScissor(current_parameter->view.x, current_parameter->view.y,
    current_parameter->view.width, current_parameter->view.height);
@@ -371,7 +345,6 @@ void ui_rect(int x, int y, int w, int h, int t, u16 color)
   ui_fill(x + w - t, y + t, t, h - t * 2, color);
 }
 
-/* A card; a lifted one moves up-left over a hard shadow. */
 void ui_card(int x, int y, int w, int h, u16 color, int lifted)
 {
   if(lifted)
@@ -383,7 +356,6 @@ void ui_card(int x, int y, int w, int h, u16 color, int lifted)
   ui_fill(x, y, w, h, color);
 }
 
-/* Small text: the UI font when it is loaded, else kai's old font. */
 int ui_text(int x, int y, char *str, u16 color)
 {
   if(ui_font_loaded())
@@ -399,16 +371,14 @@ int ui_text_width(char *str)
   return fbm_getwidth(str);
 }
 
-/* Button glyphs: × ○ △ □ as 13 px cream discs with the symbol in plum;
- * other keys as cream pills with plum text. */
 #define UI_DISC 13
 static const u8 glyph_cross[7]    = { 0x41, 0x22, 0x14, 0x08, 0x14, 0x22, 0x41 };
 static const u8 glyph_circle[7]   = { 0x1C, 0x22, 0x41, 0x41, 0x41, 0x22, 0x1C };
 static const u8 glyph_triangle[7] = { 0x08, 0x08, 0x14, 0x14, 0x22, 0x22, 0x7F };
 static const u8 glyph_square[7]   = { 0x7F, 0x41, 0x41, 0x41, 0x41, 0x41, 0x7F };
 
-/* Top of a small text line centred in a box: the UI font's capitals sit
- * on rows 4-10 of its 14 px cell; kai's old font starts higher. */
+/* The UI font's capitals sit on rows 4-10 of its 14 px cell; kai's old
+ * font starts higher. */
 static int small_text_top(int box_y, int box_h)
 {
   return ui_font_loaded() ? box_y + box_h / 2 - 7 : box_y + 2;
@@ -423,7 +393,6 @@ static char *key_label(u32 key)
     case PSP_CTRL_START:    return "START";
     case PSP_CTRL_SELECT:   return "SELECT";
     case PSP_CTRL_HOME:     return "HOME";
-    /* the d-pad: a pair shares one pill */
     case PSP_CTRL_UP:       return "\xE2\x86\x91";
     case PSP_CTRL_DOWN:     return "\xE2\x86\x93";
     case PSP_CTRL_LEFT:     return "\xE2\x86\x90";
@@ -451,8 +420,6 @@ int ui_glyph_width(u32 key)
   return key_symbol(key) ? UI_DISC : ui_text_width(key_label(key)) + 8;
 }
 
-/* Key colours: a cream key with plum marks; ui_glyph_inverted() swaps
- * them (a plum pill on a cream toast). */
 static u16 glyph_bg = UI_COL_CREAM, glyph_fg = UI_COL_PLUM;
 
 int ui_glyph(int x, int y, u32 key)
@@ -462,7 +429,6 @@ int ui_glyph(int x, int y, u32 key)
 
   if(symbol)
   {
-    /* the disc a row at a time */
     for(j = 0; j < UI_DISC; j++)
     {
       int dy = j * 2 - (UI_DISC - 1), i0 = 0;
@@ -502,8 +468,6 @@ int ui_glyph_inverted(int x, int y, u32 key)
   return r;
 }
 
-/* Hint strip: glyph + verb, 14 px apart; keys that share a verb sit
- * together. */
 void ui_hint_strip(const ui_hint_t *hints, int count)
 {
   int n, x = UI_MARGIN, y = UI_STRIP_Y + (UI_STRIP_H - UI_DISC) / 2;
@@ -529,8 +493,6 @@ void ui_hint_strip(const ui_hint_t *hints, int count)
   }
 }
 
-/* One packed hint: glyphs 4 px apart, the verb 4 px after them and gap px
- * after the verb. */
 static int hint_packed_one(int x, int y, const ui_hint_t *h, int gap)
 {
   static const u32 pairs[2] = { PSP_CTRL_UP | PSP_CTRL_DOWN, PSP_CTRL_LEFT | PSP_CTRL_RIGHT };
@@ -589,7 +551,6 @@ int ui_ease_out_back(int a, int b, int f, int n)
   return ease(out_back_table(n), a, b, f, n);
 }
 
-/* out-cubic, no overshoot: from the token table, or 1 - (1 - t)^3 */
 int ui_ease_out_cubic(int a, int b, int f, int n)
 {
   int u;

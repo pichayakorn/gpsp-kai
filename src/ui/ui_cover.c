@@ -1,23 +1,7 @@
-/* ui_cover.c - preset covers (spec section 5, set B "Abstract")
- *
- * Every game without box art gets a cover drawn from its title, so a game
- * keeps its cover between runs and two games rarely look alike:
- *   seed   = crc32 of the lower-cased UTF-8 title
- *   colour = pair (seed >> 8) % 12, swapped when bit 28 is set
- *   motif  = (seed >> 16) % 12, mirrored when bit 29 is set
- * The name goes on a dark plate at the bottom ("the name is the cover");
- * the caller draws it with the UI font, in ui_cover_plate_color().
- *
- * Plain C over a 16-bit buffer and zlib's crc32, nothing else, so the same
- * file builds on a PC to compare its pictures with the design's.
- */
-
 #include <string.h>
 #include <zlib.h>
 #include "ui_cover.h"
 
-/* bg, figure, the figure at 45 % over bg, bg darkened 45 %, the name plate
-   (bg darkened 60 %); the second twelve are the first swapped */
 static const u16 duos[24][5] =
 {
   { COLOR16(6, 10, 20), COLOR16(28, 20, 8), COLOR16(16, 14, 15), COLOR16(3, 6, 11), COLOR16(2, 4, 8) },
@@ -49,12 +33,9 @@ static const u16 duos[24][5] =
 enum { HORIZON, SLASH, PEAKS, TARGET, SPLIT, DOTS, ARCS, SUNSET, ORBIT,
  BLOCKS, ZIGZAG, TILES };
 
-/* the canvas being drawn: a size x size square */
 static u16 *cv;
 static int cv_pitch, cv_size;
 
-/* v at this size: v * size / 64, rounded half to even as the design's
-   Python does */
 static int px(int v)
 {
   int n = v * cv_size, q, r;
@@ -83,15 +64,12 @@ static void plot_span(int y, int x0, int x1, u16 c)
     row[x0] = c;
 }
 
-/* a filled rectangle, both corners inside */
 static void rect(int x0, int y0, int x1, int y1, u16 c)
 {
   for(; y0 <= y1; y0++)
     plot_span(y0, x0, x1, c);
 }
 
-/* Is pixel (x, y) inside the ellipse in the box x0..x1, y0..y1 (both ends
-   inside)? Tested at the pixel's centre, in doubled coordinates. */
 static int in_ellipse(int x, int y, int x0, int y0, int x1, int y1)
 {
   long long a = x1 - x0 + 1, b = y1 - y0 + 1;
@@ -102,7 +80,6 @@ static int in_ellipse(int x, int y, int x0, int y0, int x1, int y1)
   return dx * dx * b * b + dy * dy * a * a <= a * a * b * b;
 }
 
-/* half: 0 the whole ellipse, 1 only its top half (a sun on the horizon) */
 static void ellipse(int x0, int y0, int x1, int y1, u16 c, int half)
 {
   int x, y, ye = half ? (y0 + y1) / 2 : y1;
@@ -114,7 +91,6 @@ static void ellipse(int x0, int y0, int x1, int y1, u16 c, int half)
         cv[y * cv_pitch + x] = c;
 }
 
-/* an ellipse outline w px thick */
 static void ellipse_ring(int x0, int y0, int x1, int y1, int w, u16 c)
 {
   int x, y;
@@ -127,8 +103,6 @@ static void ellipse_ring(int x0, int y0, int x1, int y1, int w, u16 c)
         cv[y * cv_pitch + x] = c;
 }
 
-/* a filled polygon (even-odd, sampled at pixel centres; the edges' own
-   pixels count, as in the design's pictures) */
 static void polygon(const int *pts, int n, u16 c)
 {
   int y, i, j, ymin = pts[1], ymax = pts[1];
@@ -143,7 +117,6 @@ static void polygon(const int *pts, int n, u16 c)
   for(y = ymin; y <= ymax; y++)
   {
     int xs[64] = { 0 }, k = 0;
-    /* in eighths of a pixel: the crossing at the row's centre */
     int cy = y * 8 + 4;
 
     for(i = 0, j = n - 1; (i < n) && (k < 64); j = i++)
@@ -154,7 +127,6 @@ static void polygon(const int *pts, int n, u16 c)
         continue;
       xs[k++] = ax + (cy - ay) * (bx - ax) / (by - ay);
     }
-    /* sort the crossings */
     for(i = 1; i < k; i++)
       for(j = i; (j > 0) && (xs[j - 1] > xs[j]); j--)
       {
@@ -164,17 +136,12 @@ static void polygon(const int *pts, int n, u16 c)
       }
     for(i = 0; i + 1 < k; i += 2)
     {
-      /* pixels whose centre lies inside, plus the edge pixels */
       int a = xs[i] >> 3, b = (xs[i + 1] - 1) >> 3;
       if(b >= a)
         plot_span(y, a, b, c);
     }
   }
 }
-
-/* ---- Python's random, for the "tiles" motif ---------------------------------
- * The design picks tiles with random.Random(seed).choice(...), Python's
- * Mersenne Twister, so the same few lines here give the same tiles. */
 
 static u32 mt[624];
 static int mt_i;
@@ -188,7 +155,6 @@ static void mt_init(u32 s)
   mt_i = 624;
 }
 
-/* init_by_array with a one-word key: how Python seeds from an int below 2^32 */
 static void mt_seed(u32 key)
 {
   int i = 1, j = 0, k;
@@ -198,7 +164,7 @@ static void mt_seed(u32 key)
   {
     mt[i] = (mt[i] ^ ((mt[i - 1] ^ (mt[i - 1] >> 30)) * 1664525U)) + key + j;
     i++;
-    j = 0;  /* the key has one word */
+    j = 0;
     if(i >= 624)
     {
       mt[0] = mt[623];
@@ -241,7 +207,6 @@ static u32 mt_next(void)
   return y;
 }
 
-/* random.choice over four items: three bits, again while 4 or more */
 static int mt_choice4(void)
 {
   u32 r;
@@ -251,10 +216,6 @@ static int mt_choice4(void)
   return r;
 }
 
-/* ---- the motifs -------------------------------------------------------------- */
-
-/* v / 2 at this size, rounded half to even: px() for the half units the
-   design uses (4.5) */
 static int px_half(int v2)
 {
   int n = v2 * cv_size, q, r;
@@ -266,18 +227,15 @@ static int px_half(int v2)
   return q;
 }
 
-/* The 12 motifs, composed for the full square (maintainer, 2026-11-20):
-   the art fills and centres in all 64 x 64 units, with no empty band kept
-   at the bottom for a title. */
 static void motif(int name, u32 s, const u16 *col)
 {
   int size = cv_size, c = size / 2, i;
   u16 F = col[1], M2 = col[2], D = col[3], bg = col[0];
-  int thin = (px(1) - 1 > 0) ? px(1) - 1 : 0;  /* a 1-unit line's extra rows */
+  int thin = (px(1) - 1 > 0) ? px(1) - 1 : 0;
 
   switch(name)
   {
-    case HORIZON:  /* a sun over a banded sea, the horizon just below the middle */
+    case HORIZON:
     {
       int r = px(15);
       ellipse(c - r, px(22) - r, c + r, px(22) + r, F, 0);
@@ -286,7 +244,7 @@ static void motif(int name, u32 s, const u16 *col)
         rect(0, px(39 + i * 5), size, px(39 + i * 5) + thin, M2);
       break;
     }
-    case SLASH:    /* diagonal stripes behind a centred disc */
+    case SLASH:
     {
       int w = px(10) > 4 ? px(10) : 4, r = px(15);
       for(i = -size; i < size; i += w)
@@ -297,7 +255,7 @@ static void motif(int name, u32 s, const u16 *col)
       ellipse(c - r, c - r, c + r, c + r, F, 0);
       break;
     }
-    case PEAKS:    /* two ranges of mountains rising to the middle of the sky */
+    case PEAKS:
     {
       int a[14] = { 0, px(34), px(22), px(10), px(40), px(30), px(52), px(16),
        size, px(30), size, size, 0, size };
@@ -306,7 +264,7 @@ static void motif(int name, u32 s, const u16 *col)
       polygon(b, 5, M2);
       break;
     }
-    case TARGET:   /* centred rings */
+    case TARGET:
     {
       static const int rs[4] = { 30, 22, 14, 6 };
       for(i = 0; i < 4; i++)
@@ -316,7 +274,7 @@ static void motif(int name, u32 s, const u16 *col)
       }
       break;
     }
-    case SPLIT:    /* a diagonal halves the square, a disc on its centre */
+    case SPLIT:
     {
       int p[6] = { 0, size, size, 0, size, size };
       int r = px(10);
@@ -324,7 +282,7 @@ static void motif(int name, u32 s, const u16 *col)
       ellipse(c - r, c - r, c + r, c + r, F, 0);
       break;
     }
-    case DOTS:     /* a halftone grid over the whole square, growing toward a corner */
+    case DOTS:
     {
       int step = px(8) > 4 ? px(8) : 4, x, y, big = px_half(9);
       for(y = step / 2; y < size; y += step)
@@ -337,7 +295,7 @@ static void motif(int name, u32 s, const u16 *col)
         }
       break;
     }
-    case ARCS:     /* quarter circles from opposite corners */
+    case ARCS:
     {
       static const int r1[3] = { 44, 32, 20 }, r2[3] = { 36, 24, 12 };
       for(i = 0; i < 3; i++)
@@ -352,7 +310,7 @@ static void motif(int name, u32 s, const u16 *col)
       }
       break;
     }
-    case SUNSET:   /* sky bands narrowing toward the horizon, half a sun on it, dark water */
+    case SUNSET:
     {
       int y = 0, hz = px(42), r = px(16);
       for(i = 0; i < 5; i++)
@@ -370,7 +328,7 @@ static void motif(int name, u32 s, const u16 *col)
       }
       break;
     }
-    case ORBIT:    /* a centred planet with a ring, a moon in the corner */
+    case ORBIT:
     {
       int r = px(14), m = px(5);
       int w = px(2) > 1 ? px(2) : 1, t = px(1) > 1 ? px(1) : 1;
@@ -380,7 +338,7 @@ static void motif(int name, u32 s, const u16 *col)
       ellipse(px(52) - m, px(12) - m, px(52) + m, px(12) + m, F, 0);
       break;
     }
-    case BLOCKS:   /* three overlapping blocks, Bauhaus-style, across the square */
+    case BLOCKS:
     {
       int r = px(10);
       rect(px(6), px(10), px(36), px(42), F);
@@ -388,7 +346,7 @@ static void motif(int name, u32 s, const u16 *col)
       ellipse(px(44) - r, px(16) - r, px(44) + r, px(16) + r, F, 0);
       break;
     }
-    case ZIGZAG:   /* chevron bands down the whole square */
+    case ZIGZAG:
     {
       int h = px(6) > 3 ? px(6) : 3, p8 = px(8), row;
       if(p8 < 1)
@@ -404,7 +362,6 @@ static void motif(int name, u32 s, const u16 *col)
         }
         for(x = size + p8; (x > -p8) && (n < 64); x -= p8)
         {
-          /* Python's // floors: -p8 // p8 is -1, odd */
           int q = (x >= 0) ? x / p8 : -((-x + p8 - 1) / p8);
           pts[n * 2] = x;
           pts[n * 2 + 1] = row + h + ((q & 1) ? 0 : h);
@@ -414,7 +371,7 @@ static void motif(int name, u32 s, const u16 *col)
       }
       break;
     }
-    case TILES:    /* a 4 x 4 grid, a few tiles lit */
+    case TILES:
     {
       int q = size / 4, x, y;
       mt_seed(s);
@@ -431,8 +388,6 @@ static void motif(int name, u32 s, const u16 *col)
   }
 }
 
-/* The seed of a title: crc32 of it in lower case (ASCII letters only; other
-   characters stay as they are, as Python's lower() leaves CJK). */
 u32 ui_cover_seed(const char *title)
 {
   char low[256];

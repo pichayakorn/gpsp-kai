@@ -1,4 +1,3 @@
-/* UI input: key edges, taps, holds and d-pad repeat, read once per frame. */
 #include "../common.h"
 #include "ui.h"
 
@@ -9,7 +8,7 @@
 #define UI_DPAD (PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT)
 #define UI_REPEAT_DELAY 18
 #define UI_REPEAT_RATE   4
-#define UI_STICK_MARGIN 64  /* stick counts as a direction beyond 128 +- this */
+#define UI_STICK_MARGIN 64
 
 u32 ui_key_confirm = PSP_CTRL_CROSS;
 u32 ui_key_back    = PSP_CTRL_CIRCLE;
@@ -42,7 +41,7 @@ void ui_input_init(void)
 
   /* PSP_SYSTEMPARAM_ID_INT_UNKNOWN (9): 0 = ○ confirms (Japanese models) */
   sceUtilityGetSystemParamInt(9, &enter);
-  if(g_gpsp_config.confirm_button != CONFIRM_SYSTEM)  /* Settings › Confirm button */
+  if(g_gpsp_config.confirm_button != CONFIRM_SYSTEM)
     enter = (g_gpsp_config.confirm_button == CONFIRM_CROSS);
   ui_key_confirm = enter ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
   ui_key_back    = enter ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
@@ -85,7 +84,6 @@ void ui_input_update(void)
         hold_frames[i]++;
       if(hold_frames[i] == UI_F_HOLD)
         keys_held |= bit;
-      /* the d-pad, and L R for Settings' tabs, repeat while held */
       if(((UI_DPAD | PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER) & bit) && ((hold_frames[i] == 1) ||
        ((hold_frames[i] > UI_REPEAT_DELAY) &&
        (((hold_frames[i] - UI_REPEAT_DELAY) % UI_REPEAT_RATE) == 0))))
@@ -113,7 +111,6 @@ int ui_step(int i, int count, u32 less, u32 more)
   if(ui_repeat(more)) to++;
   if((to < 0) || (to >= count))
   {
-    /* a fresh press wraps to the other end; a repeat stops at the end */
     if(!ui_pressed(less | more))
       return i;
     to = (to + count) % count;
@@ -127,8 +124,6 @@ u32 ui_tap(u32 mask)
   u32 i, bit, released = ui_released(mask);
 
   for(i = 0, bit = 1; i < 32; i++, bit <<= 1)
-    /* a tap is a release within UI_F_HOLD_SHOW; held longer, the press is a
-       hold, and letting go before it fills does nothing */
     if((released & bit) && (last_hold[i] < UI_F_HOLD_SHOW))
       return 1;
   return 0;

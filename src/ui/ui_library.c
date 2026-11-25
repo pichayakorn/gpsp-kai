@@ -1,14 +1,3 @@
-/* ui_library.c - the Library (spec section 4 "Library", step 5)
- *
- * Every game under the ROM folder and its subfolders (.gba and .zip), shown
- * as a grid of covers or a list. A game without box art gets its preset
- * cover (ui_cover.c). The name is the file name, cleaned up (display_name).
- *
- * This part: the All tab (the list), Sort, the empty library
- * and starting a game. Recent with its Continue card, the game card,
- * Favourites, Folders and the letter jump come in the next parts.
- */
-
 #include <stddef.h>
 #include "../common.h"
 #include "ui.h"
@@ -22,21 +11,17 @@
 #define ARENA_SIZE  (64 * 1024)
 #define SCAN_DEPTH  4
 
-/* the grid: 64 px covers, five across on a 94 px pitch from x 20, rows at
-   y 40 + 70 k (three in view; the third ends at 244, clear of the hints) */
-#define COVER      80   /* the grid's covers (maintainer, 2026-11-20) */
+#define COVER      80
 #define GRID_X     20
 #define GRID_Y     grid_y0()
 #define GRID_PX    90
 #define GRID_PY    88
-#define GRID_B     216  /* the covers end over the bar (y 220) */
+#define GRID_B     216
 #define GRID_COLS  5
 #define GRID_ROWS  grid_view_rows()
-#define VIEW_T     38   /* the list area, under the header */
-#define VIEW_B     248  /* the hint strip */
+#define VIEW_T     38
+#define VIEW_B     248
 
-/* the list: 22 px rows, 4 px apart; the selected game opens into an 84 px
-   card with 4 px more ground above it, its top at y 88 when at rest */
 #define LIST_SM    22
 #define LIST_BIG   84
 #define LIST_GAP   4
@@ -48,15 +33,9 @@
 #define POP_FIRST_ROW (has_view_row() ? 0 : 1)
 #define POP_H  (has_view_row() ? 98 : 64)
 
-/* Three styles for All and Favourites (View & sort): Panel, the default,
-   a fixed panel on the left with rows that never change size; Shelf, the
-   list whose selected row opens into a card (maintainer, 2026-11-20);
-   Grid, the covers five across (back, maintainer, 2026-11-19). */
 enum { VIEW_GRID, VIEW_LIST, VIEW_PANEL };
 #define VIEW_SHELF VIEW_LIST
 
-/* Panel: rows at x 184-460, 20 px on a 26 px pitch from y 42 (66 under the
-   No BIOS notice), eight in view (seven); the panel at x 20, 152 wide */
 #define PANEL_LX   184
 #define PANEL_LW   276
 #define PANEL_PX   20
@@ -67,106 +46,102 @@ enum { SORT_NAME, SORT_RECENT, SORT_SIZE, SORTS };
 
 typedef struct
 {
-  const char *name;   /* file name */
-  const char *title;  /* display name */
-  u32 size;           /* bytes */
-  u16 dir;            /* index into dirs */
-  s16 recent;         /* place in recent.txt, -1: not there */
-  u8 fav;             /* hearted: on Favourites */
-  u8 art;             /* its box art: ART_NONE, or which name it is under */
+  const char *name;
+  const char *title;
+  u32 size;
+  u16 dir;
+  s16 recent;
+  u8 fav;
+  u8 art;
 } game_t;
 
-/* Box art (#71): GBA/ART/<game>.art beside the ROM folder, <game> the ROM's
-   file name without its extension, else the library's cleaned name */
 enum { ART_NONE, ART_BY_FILE, ART_BY_NAME };
-#define ART_SLOTS  2048    /* the art folder's names, hashed, while it is read */
-#define ICON_CACHE 32      /* 16 px icons kept from box art */
-#define ROW_CACHE  8       /* 32 px covers kept for the Recent rows */
+#define ART_SLOTS  2048
+#define ICON_CACHE 32
+#define ROW_CACHE  8
 
 typedef struct
 {
-  int game;           /* -1: free */
-  u32 used;           /* frame it was last drawn */
-  u16 *px;            /* COVER x COVER */
+  int game;
+  u32 used;
+  u16 *px;
 } cover_t;
-#define MAX_COVERS 16  /* the grid's; without it, the Recent row's five and spares: 8 */
+#define MAX_COVERS 16
 
 static struct
 {
   game_t *games;
   int count;
-  int *order;         /* the games in view order (the tab's games) */
-  int n;              /* how many: every game on All, the hearted on Favourites */
+  int *order;
+  int n;
   const char **dirs;
-  const char **dir_shown;  /* a folder's own name, as UTF-8 */
+  const char **dir_shown;
   int dir_count;
   char *arena;
   int arena_used;
 
   int view, sort;
-  int views[2];               /* All, Favourites: VIEW_PANEL, VIEW_SHELF or VIEW_GRID */
-  int ptop, ptop_from, ptop_f;  /* Panel: the first row in view, sliding from px */
-  int rest_f;                 /* Shelf: frames the list has rested, d-pad up */
-  int art_game;               /* Panel: the game drawn in art (-1 none) */
+  int views[2];
+  int ptop, ptop_from, ptop_f;
+  int rest_f;
+  int art_game;
   u16 art[(PANEL_ART - 4) * (PANEL_ART - 4)];
-  int cur, cur_from, cur_f;   /* selection (in view order) and its move */
-  int top, off_from, top_f;   /* grid: first row in view, sliding from off_from px */
-  int pos, pos_from, pos_f;   /* list: selection in 1/256, eased (list_scroll) */
-  int open_row, open_f;       /* list: the card opening or open (-1: none) */
-  int close_row, close_from, close_f;  /* list: the card closing, from how open */
-  int *ys;                    /* list: every row's top this frame */
-  int marq_f;                 /* frames the selection has rested (marquee) */
-  int jump_t, rail_f;         /* letter jump: frames since the last (-1: rail gone); rail in */
-  int letter_f, letter_keep;  /* the big letter (-1: none); a jump while it was up */
-  int letter;                 /* the letter it shows */
+  int cur, cur_from, cur_f;
+  int top, off_from, top_f;
+  int pos, pos_from, pos_f;
+  int open_row, open_f;
+  int close_row, close_from, close_f;
+  int *ys;
+  int marq_f;
+  int jump_t, rail_f;
+  int letter_f, letter_keep;
+  int letter;
 
-  int tab, tab_prev, tab_f;   /* the tab shown (TAB_*), the one before, its slide */
-  int tab_ids[4], tab_count;  /* the tabs on the bar */
-  int recent[30], recent_count;  /* games in recent.txt order */
-  int rec_row, rec_cur;       /* Recent: 0 the Continue card, 1 the rows; which row */
-  int rec_from, rec_f;        /* the place the frame flies from, its frames */
-  u16 *pic;                   /* the Continue card's picture, 144 x 96 */
-  int pic_ok, cont_slot;      /* it was read; the slot Continue resumes (-1 none) */
-  u64 cont_time;              /* that slot's save time */
+  int tab, tab_prev, tab_f;
+  int tab_ids[4], tab_count;
+  int recent[30], recent_count;
+  int rec_row, rec_cur;
+  int rec_from, rec_f;
+  u16 *pic;
+  int pic_ok, cont_slot;
+  u64 cont_time;
   int chosen_game, chosen_slot;
 
-  int sorts[3], tab_cur[4];   /* All, Favourites, Folders: the sort; every tab: its cursor */
-  int dir_parent[MAX_DIRS], dir_games[MAX_DIRS];  /* a folder's parent; its games, all levels */
-  int fold_dir, fold_count, fold_open;           /* Folders: the folder shown, its rows */
+  int sorts[3], tab_cur[4];
+  int dir_parent[MAX_DIRS], dir_games[MAX_DIRS];
+  int fold_dir, fold_count, fold_open;
   int fold_kind[MAX_FOLD_ROWS], fold_item[MAX_FOLD_ROWS];
-  int fold_cur, fold_from, fold_f;               /* the cursor and its flight */
-  int fold_top, fold_top_from, fold_top_f;       /* the first row in view, its slide */
-  int card, card_f, card_out, card_game;  /* the game card, its motion, its game */
-  u32 card_mark;              /* pool mark: the card's memory goes when it closes */
-  u16 *thumbs, *card_cover;   /* the tiles' 60 x 40 pictures; the 96 px cover */
-  int tile_slot[12], tile_pic[12], tile_count;  /* -1 Start fresh, else the slot */
+  int fold_cur, fold_from, fold_f;
+  int fold_top, fold_top_from, fold_top_f;
+  int card, card_f, card_out, card_game;
+  u32 card_mark;
+  u16 *thumbs, *card_cover;
+  int tile_slot[12], tile_pic[12], tile_count;
   u64 tile_time[12];
-  int card_cur, card_from, card_cf;            /* the focused tile, its frame's flight */
-  int card_first, card_first_from, card_first_f;  /* the first tile in view, scroll */
+  int card_cur, card_from, card_cf;
+  int card_first, card_first_from, card_first_f;
   int fav_flash, fav_changed, card_changed;
-  ui_hold_t hold;             /* SELECT held: delete */
+  ui_hold_t hold;
   char toast[64];
   u16 toast_edge;
-  int toast_f, toast_undo;    /* -1: no toast; the slot Undo brings back, -1 none */
-  char facts[96];             /* the card's cheats and settings line */
-  int help, help_f, help_out; /* the No BIOS help card */
-  int name_mode;              /* the card's name: NAME_* */
-  char name_l1[256], name_l2[256];  /* its two 2x lines */
+  int toast_f, toast_undo;
+  char facts[96];
+  int help, help_f, help_out;
+  int name_mode;
+  char name_l1[256], name_l2[256];
   int dirty;
   u32 frame;
 
-  int pop, pop_f, pop_out, pop_row, pop_flash;  /* View & sort */
-  u32 played;                 /* the last game_played(): its seconds */
-  u32 last_played;            /* and when it was last left, Unix time (0: never) */
-  struct { u32 secs, last; u8 known; } *play;  /* every game's, read once */
+  int pop, pop_f, pop_out, pop_row, pop_flash;
+  u32 played;
+  u32 last_played;
+  struct { u32 secs, last; u8 known; } *play;
 
   cover_t covers[MAX_COVERS];
   int cover_count;
   struct { int game; u32 used; u16 px[16 * 16]; } icons[ICON_CACHE];
   struct { int game; u32 used; u16 px[32 * 32]; } rowart[ROW_CACHE];
 } L;
-
-/* ---- the game list ------------------------------------------------------------ */
 
 static char *arena_str(const char *s, int n)
 {
@@ -251,7 +226,6 @@ static void scan_dir(const char *path, int depth, int parent)
         path_printf(sub, sizeof(sub), "%s/%s", dir_path, e.d_name);
         sceIoDclose(d);
         scan_dir(sub, depth + 1, dir);
-        /* reopen and skip back to where this folder was */
         {
           char seen[256];
           snprintf(seen, sizeof(seen), "%s", e.d_name);
@@ -269,15 +243,13 @@ static void scan_dir(const char *path, int depth, int parent)
       game_t *g = &L.games[L.count];
       char shown[256 * 3];
       const char *dot;
-      /* the pool isn't cleared: every field starts known (a stray byte in
-         fav made every game a favourite that △ couldn't clear) */
       memset(g, 0, sizeof(*g));
       g->name = arena_str(e.d_name, strlen(e.d_name));
       name_utf8(e.d_name, shown);
       dot = strrchr(shown, '.');
       g->title = g->name ? display_name(shown, dot - shown) : NULL;
       if(g->title == NULL)
-        break;  /* out of room: the list ends here */
+        break;
       g->size = (u32)e.d_stat.st_size;
       g->dir = dir;
       g->recent = -1;
@@ -295,8 +267,6 @@ static const char *display_name(const char *name, int n)
   return arena_str(out, o);
 }
 
-/* The i-th (...) or [...] part of a file name, brackets included.
-   Returns 0 when there are fewer parts. */
 static int name_part(const char *file, int i, const char **at, int *len)
 {
   const char *dot = strrchr(file, '.');
@@ -339,10 +309,6 @@ static int title_order(const void *a, const void *b)
   return strcasecmp(L.games[*(const int *)a].title, L.games[*(const int *)b].title);
 }
 
-/* Same-named games (spec section 4, #14): when two games would show the
- * same name, each keeps the parts of its file name that tell them apart,
- * e.g. "Pokemon - FireRed Version (Rev 1)". When no part does, the whole
- * file name (without its extension) is shown. */
 static void tell_apart(void)
 {
   u32 mark = ui_pool_mark();
@@ -378,7 +344,6 @@ static void tell_apart(void)
       if(g->title == NULL)
         g->title = g->name;
     }
-    /* still the same: the file names */
     for(k = i; k < j; k++)
       for(m = i; m < j; m++)
         if((m != k) && !strcasecmp(L.games[idx[k]].title, L.games[idx[m]].title))
@@ -393,10 +358,8 @@ static void tell_apart(void)
   ui_pool_release(mark);
 }
 
-/* The game started from the library and the name it showed there */
 static char launched_file[MAX_FILE], launched_title[256];
 
-/* The name the library shows for a file (for the pause screen's chip). */
 void ui_display_name(const char *file, char *out)
 {
   const char *dot = strrchr(file, '.');
@@ -409,7 +372,6 @@ void ui_display_name(const char *file, char *out)
   game_name_clean(file, n, out);
 }
 
-/* recent.txt (written on leaving a game): full paths, newest first */
 static void read_recent(void)
 {
   char path[MAX_PATH], line[MAX_PATH];
@@ -462,7 +424,6 @@ static void sort_games(void)
   int i, keep = (L.n > 0) ? L.order[L.cur] : 0;
 
   qsort(L.order, L.n, sizeof(int), compare_games);
-  /* the cursor stays on its game */
   for(i = 0; i < L.n; i++)
     if(L.order[i] == keep)
       L.cur = L.cur_from = i;
@@ -487,7 +448,6 @@ static int load_games(void)
   scan_dir(g_default_rom_dir, 0, -1);
   tell_apart();
   find_art();
-  /* every folder's games, its subfolders' included */
   memset(L.dir_games, 0, sizeof(L.dir_games));
   for(i = 0; i < L.count; i++)
   {
@@ -504,11 +464,9 @@ static int load_games(void)
     L.order[i] = i;
   L.n = L.count;
   sort_games();
-  L.cur = L.cur_from = 0;  /* a fresh list opens on its first game */
+  L.cur = L.cur_from = 0;
   return 1;
 }
-
-/* ---- covers --------------------------------------------------------------------- */
 
 static void covers_init(void)
 {
@@ -521,8 +479,6 @@ static void covers_init(void)
     L.rowart[i].game = -1;
   for(i = 0; i < MAX_COVERS; i++)
   {
-    /* only what the pool can spare, keeping room for the game card; with
-       none, covers are drawn each time */
     if(ui_pool_free() < 160 * 1024 + COVER * COVER * 2)
       break;
     L.covers[i].px = ui_pool_alloc(COVER * COVER * 2);
@@ -533,15 +489,9 @@ static void covers_init(void)
   }
 }
 
-/* The name plate (spec section 5, "the name is the cover"): from 32 px up
- * the name sits on a dark plate at the bottom, 12 px regular cream at x 4, on
- * up to three lines 14 px apart; the plate is 14 per line + 6 high. A name
- * longer than three lines has its third line cut with "…". */
 #define PLATE_LINES 3
 #define PLATE_PITCH 14
 
-/* the plate's lines for a cover of this size; returns how many (0-3).
-   rest: the name from the third line on (for the marquee), may be NULL */
 static int plate_lines(const char *title, int size, char lines[PLATE_LINES][128],
  char *rest, int rest_size)
 {
@@ -565,7 +515,7 @@ static int plate_lines(const char *title, int size, char lines[PLATE_LINES][128]
       snprintf(rest + k, rest_size - k, "%s%s", k ? " " : "", s);
     }
   }
-  return (n > PLATE_LINES) ? -PLATE_LINES : n;  /* negative: cut */
+  return (n > PLATE_LINES) ? -PLATE_LINES : n;
 }
 
 static void cover_plate(int x, int y, int size, const char *title)
@@ -582,15 +532,13 @@ static void cover_plate(int x, int y, int size, const char *title)
   for(i = 0; i < n; i++)
   {
     int ty = y + size - h + 2 + PLATE_PITCH * i;
-    if(cut && (i == n - 1))  /* the rest of the name, cut with "…" */
+    if(cut && (i == n - 1))
       ui_print_fit(x + 4, ty, rest, UI_COL_CREAM, UI_FONT_BODY, 0, size - 8);
     else
       ui_print(x + 4, ty, lines[i], UI_COL_CREAM, UI_FONT_BODY, 0);
   }
 }
 
-/* A cover of any size at x, y on the current target (clipped); plate 0:
-   the art alone (the list card, a grid row cut by the hint strip). */
 static void draw_cover_any(int x, int y, int size, const char *title, int plate)
 {
   static u16 buf[96 * 96];
@@ -603,7 +551,6 @@ static void draw_cover_any(int x, int y, int size, const char *title, int plate)
     cover_plate(x, y, size, title);
 }
 
-/* A 64 px grid cover with its plate, from the cache when it has room. */
 static void draw_cover(int x, int y, int game)
 {
   int i, free_i = -1, old_i = 0;
@@ -637,7 +584,6 @@ static void draw_cover(int x, int y, int game)
   if(!art_read(game, COVER, c->px))
   {
     ui_cover_art(c->px, COVER, COVER, L.games[game].title);
-    /* the plate goes into the cached picture too (box art has none) */
     if(ui_target_begin(c->px, COVER, COVER, COVER))
     {
       cover_plate(0, 0, COVER, L.games[game].title);
@@ -647,15 +593,11 @@ static void draw_cover(int x, int y, int game)
   ui_blit(c->px, COVER, x, y, COVER, COVER);
 }
 
-/* ---- box art (#71; the .art file of gpsp-kai-tools' docs/art-format.md) ---------------
+/* .art (gpsp-kai-tools docs/art-format.md):
  * "KART", version 1, the number of pictures, 2 bytes 0; then per picture
  * its width, height and 2 bytes 0; then the pictures, rows top to bottom,
- * as kai's 16-bit colours. Made on a computer, so kai only copies pixels:
- * no image decoder. A size the file lacks is shrunk from the next larger
- * picture; a file that doesn't read right means the preset cover. Box art
- * replaces the whole cover, with no name plate. */
+ * as kai's 16-bit colours. */
 
-/* GBA/ART beside the ROM folder */
 static void art_dir(char *out, int size)
 {
   char *slash;
@@ -692,8 +634,6 @@ static int hash_has(const u32 *tab, u32 h)
   return 0;
 }
 
-/* which games have art: the folder is listed once, so drawing a row never
-   asks the Memory Stick */
 static void find_art(void)
 {
   u32 mark = ui_pool_mark(), *tab = ui_pool_alloc(ART_SLOTS * 4), used = 0;
@@ -745,7 +685,6 @@ static void find_art(void)
   ui_pool_release(mark);
 }
 
-/* game's art at size x size into out; 0 when it has none that reads */
 static int art_read(int game, int size, u16 *out)
 {
   static u16 big[128 * 128];
@@ -778,7 +717,6 @@ static int art_read(int game, int size, u16 *out)
   count = head[5];
   if(fread(list, 4, count, f) != (size_t)count)
     goto bad;
-  /* the exact size, else the smallest larger one to shrink */
   off = 8 + count * 4;
   for(i = 0; i < count; i++)
   {
@@ -793,7 +731,7 @@ static int art_read(int game, int size, u16 *out)
   if(!best)
   {
     fclose(f);
-    return 0;  /* no picture this big: the preset cover, this time only */
+    return 0;
   }
   if(fseek(f, best_at, SEEK_SET))
     goto bad;
@@ -813,15 +751,10 @@ static int art_read(int game, int size, u16 *out)
 bad:
   fclose(f);
 none:
-  g->art = ART_NONE;  /* the preset cover from now on */
+  g->art = ART_NONE;
   return 0;
 }
 
-/* A game's cover at size x size: its box art when it has some, else the
-   preset (with its name plate when plate is set and the size has one) */
-/* A small picture cache: 16 px row icons, 32 px Recent covers. A game's
-   box art, else its preset cover, made once and kept, so a list that
-   slides or a cursor that moves only copies pixels. */
 static u16 *small_cover(int game, int size)
 {
   int i, old = 0, n = (size == 16) ? ICON_CACHE : ROW_CACHE;
@@ -857,8 +790,6 @@ static u16 *small_cover(int game, int size)
   }
 }
 
-/* A game's cover at size x size: its box art when it has some, else the
-   preset (with its name plate when plate is set and the size has one) */
 static void game_cover(int game, int x, int y, int size, int plate)
 {
   static int last_game = -1, last_size;
@@ -890,11 +821,6 @@ static void game_cover(int game, int x, int y, int size, int plate)
   draw_cover_any(x, y, size, L.games[game].title, plate);
 }
 
-/* ---- the marquee ---------------------------------------------------------------------
- * A long name on the selected item runs sideways once the cursor has rested
- * UI_MARQUEE_DELAY frames, 1 px a frame; it waits at the end as long, then
- * starts again. Only the selected item, clipped to its own line. */
-
 static int marquee_shift(int over)
 {
   int t = L.marq_f - UI_MARQUEE_DELAY, cycle = over + 2 * UI_MARQUEE_DELAY;
@@ -905,8 +831,6 @@ static int marquee_shift(int over)
   return (t < over) ? t : (t < over + UI_MARQUEE_DELAY) ? over : 0;
 }
 
-/* the grid's selected cover at x, y: a cut third line runs the rest of the
-   name (clipped to x 4-60 of the cover) */
 static void grid_marquee(int x, int y, int game)
 {
   char lines[PLATE_LINES][128], rest[256];
@@ -914,10 +838,10 @@ static void grid_marquee(int x, int y, int game)
   int n, w, ly;
 
   if(L.games[game].art != ART_NONE)
-    return;  /* box art has no name plate, so nothing runs over it */
+    return;
   n = plate_lines(title, COVER, lines, rest, sizeof(rest));
   if(n >= 0)
-    return;  /* three lines or fewer: nothing moves */
+    return;
   w = ui_print_width(rest, UI_FONT_BODY, 0);
   if(L.marq_f <= UI_MARQUEE_DELAY)
     return;
@@ -929,19 +853,11 @@ static void grid_marquee(int x, int y, int game)
   ui_clip_reset();
 }
 
-/* ---- the grid --------------------------------------------------------------------- */
-
-/* The grid (spec section 4, Grid; maintainer, 2026-11-20): 80 px covers
- * five across on a 90 px pitch, two rows on an 88 px pitch from y 42,
- * scrolling by whole rows (list_scroll); under them a bar names the
- * selected game. Under the No BIOS notice the covers start at y 64. */
-
 static int grid_y0(void)
 {
   return list_banner() ? 64 : 42;
 }
 
-/* whole rows in view: two, one under the notice */
 static int grid_view_rows(void)
 {
   return list_banner() ? 1 : 2;
@@ -957,7 +873,6 @@ static int grid_off(void)
   return ui_ease_out_cubic(L.off_from, L.top * GRID_PY, L.top_f, UI_F_LIST_SCROLL);
 }
 
-/* a favourite's heart, top right of a grid cover */
 static void grid_heart(int x, int y, int game, u16 ink)
 {
   if(L.games[game].fav)
@@ -970,15 +885,12 @@ static void grid_item_xy(int i, int off, int *x, int *y)
   *y = GRID_Y + (i / GRID_COLS) * GRID_PY - off;
 }
 
-/* A grid cover, cut to the list area; a row cut by the hint strip shows
-   its art only, never half a name plate. */
 static void grid_cover(int i, int x, int y)
 {
   int bottom = (y + COVER < GRID_B) ? y + COVER : GRID_B, top = GRID_Y - 2;
 
   ui_clip_set(0, top, UI_SCREEN_W, bottom - top);
   if(y + COVER > GRID_B)
-    /* cut by the strip: its art only, never half a name plate */
     if(L.games[L.order[i]].art != ART_NONE)
       draw_cover(x, y, L.order[i]);
     else
@@ -989,8 +901,6 @@ static void grid_cover(int i, int x, int y)
   ui_clip_reset();
 }
 
-/* the bar under the covers: the selected game's name, then when it was
-   last played and its play time */
 static void last_text(u32 unix_time, char *out, int n);
 static u32 game_played(int game);
 static void played_text(u32 seconds, char *out, int n);
@@ -1040,7 +950,6 @@ static void grid_ground(void)
   }
 }
 
-/* the selected cover lifted, and the cursor frame flying to it */
 static void grid_selection(void)
 {
   int off = grid_off(), x, y, fx, fy, x0, y0, x1, y1;
@@ -1065,19 +974,11 @@ static void grid_selection(void)
   ui_cursor_frame(fx - UI_LIFT, fy - UI_LIFT, COVER, COVER);
 }
 
-/* ---- the list ----------------------------------------------------------------------
- * Motion "A+" (spec section 6: list_scroll, list_close, list_open): the list
- * slides with every row slim and no overshoot; the open card closes as a
- * move starts and the new one opens only once the d-pad is up and the slide
- * has stopped. A card between sizes shows only its slim row's contents. */
-
-/* the selection's place in 1/256 rows, eased */
 static int list_pos(void)
 {
   return ui_ease_out_cubic(L.pos_from, L.pos, L.pos_f, UI_F_LIST_SCROLL);
 }
 
-/* how open row i is, 0-256 */
 static int list_open_p(int i)
 {
   if(i == L.open_row)
@@ -1092,17 +993,11 @@ static int list_h(int i)
   return LIST_SM + (LIST_BIG - LIST_SM) * list_open_p(i) / 256;
 }
 
-/* 4 px more ground above an open card: it lifts 2 px, so its frame keeps
-   3 px of ground above and below */
 static int list_gap(int i)
 {
   return LIST_GAP + 4 * list_open_p(i) / 256;
 }
 
-/* Every row's top for this frame, into L.ys: the row under the selection
- * sits at LIST_FY and moves up by its own pitch as the selection passes it;
- * then the whole list shifts so no ground shows above the first row (top
- * at y 42 or above) or below the last (bottom at y 244 or below). */
 #define LIST_FIRST 42
 #define LIST_LAST  244
 static void list_layout(int pos)
@@ -1120,8 +1015,6 @@ static void list_layout(int pos)
   for(i = lo - 1; i >= 0; i--)
     L.ys[i] = L.ys[i + 1] - list_h(i) - list_gap(i + 1);
   bottom = L.ys[L.n - 1] + list_h(L.n - 1);
-  /* before the first game the No BIOS notice is the list's first line,
-     24 px above row 0: the top bound moves down to make room */
   first = list_banner() ? LIST_FIRST + 22 : LIST_FIRST;
   if(L.ys[0] > first)
     d = first - L.ys[0];
@@ -1145,15 +1038,9 @@ static void size_text(u32 bytes, char *out, int n)
     snprintf(out, n, "%u MB", (unsigned)mb);
 }
 
-/* The play time of a game, from its .cfg (read once per selection). */
-/* game_played() reads play_seconds and last_played as one 8-byte pair */
 typedef char play_pair_check[(offsetof(game_config_t, last_played) ==
  offsetof(game_config_t, play_seconds) + 4) ? 1 : -1];
 
-/* A game's play time and when it was last played, from its .cfg: only
- * those 8 bytes are read (by seeking), once per game while the library is
- * open, so moving the cursor never reads the Memory Stick again. Also sets
- * L.last_played. */
 static u32 game_played(int game)
 {
   char path[MAX_PATH], name[MAX_PATH];
@@ -1175,8 +1062,6 @@ static u32 game_played(int game)
   f = fopen(path, "rb");
   if(f)
   {
-    /* the file: "gcfg", the version, then the settings (gui.c), where
-       play_seconds and last_played sit side by side */
     if((fread(head, 4, 2, f) == 2) && !memcmp(head, "gcfg", 4) &&
      !fseek(f, 8 + offsetof(game_config_t, play_seconds), SEEK_SET) &&
      (fread(v, 4, 2, f) == 2))
@@ -1205,8 +1090,6 @@ static void played_text(u32 seconds, char *out, int n)
     snprintf(out, n, "Played %u h", (unsigned)(seconds / 3600));
 }
 
-/* "Today 21:46 · Played 12 h", or "Not played yet" (the grid's bar and
-   the Recent rows) */
 static void played_info(int game, char *out, int n)
 {
   char when[32], played[32];
@@ -1222,8 +1105,6 @@ static void played_info(int game, char *out, int n)
     snprintf(out, n, "%s \xC2\xB7 %s", when, played);
 }
 
-/* a slim row's icon, name and size; on a card between sizes they are plum
-   and bold, moved with its lift */
 static void list_slim_contents(const game_t *g, int y, int lift, int on_card)
 {
   char size[16];
@@ -1238,7 +1119,6 @@ static void list_slim_contents(const game_t *g, int y, int lift, int on_card)
    on_card ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
 }
 
-/* row i at y as a card (open or between sizes, o of 256) */
 static void list_card(int i, int y, int o)
 {
   const game_t *g = &L.games[L.order[i]];
@@ -1253,8 +1133,6 @@ static void list_card(int i, int y, int o)
     list_slim_contents(g, y, lift, 1);
     return;
   }
-  /* open: the full art (no plate, the name is beside it), 76 px in the
-     80 px plum box, 2 px of tangerine round the box */
   ui_fill(20, y, 80, 80, UI_COL_PLUM);
   game_cover(L.order[i], 22, y + 2, 76, 0);
   ui_print_fit(110, y + 6, g->title, UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD, 330);
@@ -1285,7 +1163,6 @@ static void list_ground(void)
     }
     ui_round_fill(20, y, 440, h, 2, UI_COL_CARD);
     list_slim_contents(&L.games[L.order[i]], y, 0, 0);
-    /* the row past the last whole one: dimmed, a "more below" peek */
     if(y + h > VIEW_B)
       ui_door(20, y, 440, h);
   }
@@ -1300,8 +1177,6 @@ static void list_ground(void)
   }
 }
 
-/* the cursor frame between rows lo and lo + 1, with their current heights;
-   on the open card at rest, a long name runs sideways */
 static void list_selection(void)
 {
   int pos = list_pos(), lo = pos >> 8, hi, fr = pos & 0xFF, y0, y1, h0, h1;
@@ -1337,15 +1212,8 @@ static void list_selection(void)
   }
 }
 
-/* ---- the list, Panel style (spec section 4, Panel; maintainer, 2026-11-20) ------------
- * A fixed panel on the left shows the selected game; the rows on the right
- * never change size, so only the cursor and the list move (list_scroll),
- * by whole rows, keeping the cursor two rows from either edge. The panel
- * swaps at once when the cursor lands. */
-
 static int bold_line(const char *t, int n, int w, char *out, int size);
 
-/* days since 0001-01-01 of a date */
 static int day_number(int y, int m, int d)
 {
   if(m < 3)
@@ -1356,8 +1224,6 @@ static int day_number(int y, int m, int d)
   return 365 * y + y / 4 - y / 100 + y / 400 + (153 * (m - 3) + 2) / 5 + d;
 }
 
-/* "Today 21:46", "Yesterday 19:02" or "3 days ago", from Unix time; ""
-   for never */
 static void last_text(u32 unix_time, char *out, int n)
 {
   u64 utc, local;
@@ -1382,7 +1248,7 @@ static void last_text(u32 unix_time, char *out, int n)
 
 static int panel_y0(void)
 {
-  return list_banner() ? 66 : 42;  /* the No BIOS notice spans both columns at y 40 */
+  return list_banner() ? 66 : 42;
 }
 
 static int panel_rows(void)
@@ -1390,7 +1256,6 @@ static int panel_rows(void)
   return list_banner() ? 7 : 8;
 }
 
-/* the first row in view that keeps row cur two rows from either edge */
 static int panel_top_for(int cur)
 {
   int view = panel_rows(), top = L.ptop;
@@ -1406,7 +1271,6 @@ static int panel_top_for(int cur)
   return top;
 }
 
-/* how far the list has slid, in px */
 static int panel_top_px(void)
 {
   return ui_ease_out_cubic(L.ptop_from, L.ptop * UI_ROW_PITCH, L.ptop_f, UI_F_LIST_SCROLL);
@@ -1431,8 +1295,6 @@ static void panel_row(int i, int y, int sel)
    sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
 }
 
-/* the panel: the art (full square, no plate) in a plum box, the name in
-   12 px bold on up to two lines, the size chip at the bottom */
 static void panel_card(void)
 {
   const game_t *g = &L.games[L.order[L.cur]];
@@ -1449,7 +1311,6 @@ static void panel_card(void)
   ui_fill(ax, py + 10, art, art, UI_COL_PLUM);
   if(L.art_game != L.order[L.cur])
   {
-    /* drawn once per game, not on every frame of a slide */
     if(!art_read(L.order[L.cur], art - 4, L.art))
       ui_cover_art(L.art, art - 4, art - 4, g->title);
     L.art_game = L.order[L.cur];
@@ -1457,8 +1318,6 @@ static void panel_card(void)
   ui_blit(L.art, art - 4, ax + 2, py + 12, art - 4, art - 4);
   if(g->fav)
     draw_icon11(ax + art - 16, py + 14, icon_heart, UI_COL_PINK, 1);
-  /* the name: always one size, so it never jumps as the cursor moves; a
-     name longer than two lines cuts the second with "…" */
   ny = py + 10 + art + 8;
   if(bold_line(g->title, 0, w, l1, sizeof(l1)))
   {
@@ -1467,7 +1326,6 @@ static void panel_card(void)
     {
       if(bold_line(g->title, 2, w, l2, sizeof(l2)))
       {
-        /* the rest of the name after the first line, cut to fit */
         const char *rest = strstr(g->title, l1);
         rest = rest ? rest + strlen(l1) : g->title;
         while(*rest == ' ')
@@ -1477,8 +1335,6 @@ static void panel_card(void)
       ui_print_fit(PANEL_PX + 8, ny + 16, l2, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, w);
     }
   }
-  /* the foot: when it was last played (cream), its play time (mute); the
-     size stays on the rows and the game card (maintainer, 2026-11-20) */
   seconds = game_played(L.order[L.cur]);
   last_text(L.last_played, when, sizeof(when));
   if(!when[0] && !seconds)
@@ -1519,7 +1375,6 @@ static void panel_ground(void)
   }
 }
 
-/* the selected row, lifted, and the cursor frame gliding to it */
 static void panel_selection(void)
 {
   int y0 = panel_y0(), top = panel_top_px();
@@ -1547,39 +1402,28 @@ static void panel_step(void)
   }
 }
 
-/* ---- Recent and the Continue card (spec section 4, Home) -----------------------------
- * The first tab once a game has been played: the Continue card for the last
- * game (its Last picture, name, when, play time) and the recent games as
- * covers below it. × resumes a game from Last, or from its newest
- * savestate, here and on every list row (only the game card differs). Before any game has been played there is no Recent
- * tab and the library opens on All. */
-
 #define RECENT_MAX   30
-#define CONT_X       20     /* the Continue card, the left column */
+#define CONT_X       20
 #define CONT_Y       40
 #define CONT_W       204
 #define CONT_H       200
-#define PIC_W        180    /* its save picture, in a 4 px plum bezel */
+#define PIC_W        180
 #define PIC_H        120
-#define REC_X        232    /* the next recent games, the right column */
+#define REC_X        232
 #define REC_W        228
 #define REC_H        44
-#define REC_PITCH    52     /* 8 px between the rows, as between the columns */
-#define SVS_SHOT     8                       /* the screenshot follows the 8-byte header */
+#define REC_PITCH    52
+#define SVS_SHOT     8
 #define SVS_TIME     (SVS_SHOT + 240 * 160 * 2)
 #define SHOT_ROWS    20
 
 static int banner_up(void);
 
-/* the Recent tab shows once a game has been played, unless System's "Show
-   Recent tab" is off: then the library opens on All, as before the first
-   game (maintainer, 2026-11-21) */
 static int recent_tab_on(void)
 {
   return (L.recent_count > 0) && g_gpsp_config.show_recent;
 }
 
-/* a game's savestate file for slot 0-10 */
 static void state_path(int game, int slot, char *out)
 {
   char ext[16], name[MAX_FILE];
@@ -1592,8 +1436,6 @@ static void state_path(int game, int slot, char *out)
     snprintf(out, MAX_PATH, "%s", name);
 }
 
-/* the save time of a game's slot (RTC ticks); 0 when the slot is empty or
-   too old to have one; -1 in *has when there is no file */
 static u64 state_time(int game, int slot, int *has)
 {
   char path[MAX_PATH];
@@ -1614,8 +1456,6 @@ static u64 state_time(int game, int slot, int *has)
   return t;
 }
 
-/* Where Continue resumes a game: Last (10) when it has one, else its newest
- * savestate, else -1 (from the start). */
 static int resume_slot(int game, u64 *when)
 {
   int has, slot, best = -1;
@@ -1640,8 +1480,6 @@ static int resume_slot(int game, u64 *when)
   return best;
 }
 
-/* The Continue card's picture: the resume slot's screenshot shrunk 4:3 to
- * 180 x 120, read SHOT_ROWS rows at a time. */
 static int load_resume_picture(int game, int slot)
 {
   char path[MAX_PATH];
@@ -1672,11 +1510,10 @@ static int load_resume_picture(int game, int slot)
     }
     sceIoClose(fd);
   }
-  ui_pool_release(mark);  /* the rows only lived for the read */
+  ui_pool_release(mark);
   return ok;
 }
 
-/* "today 21:46" or "11/13" from RTC ticks in UTC */
 static void when_text(u64 tick, char *out, int n)
 {
   u64 local;
@@ -1697,7 +1534,6 @@ static void recent_init(void)
 {
   int i, k, n = 0;
 
-  /* games in recent.txt order (read_recent numbered them) */
   for(k = 0; (k < RECENT_MAX) && (n < RECENT_MAX); k++)
     for(i = 0; i < L.count; i++)
       if(L.games[i].recent == k)
@@ -1713,8 +1549,6 @@ static void recent_init(void)
   L.pic_ok = load_resume_picture(L.recent[0], L.cont_slot);
 }
 
-/* the right column's rows: the next four recent games, three under the
-   No BIOS notice (it takes the first row) */
 static int recent_rows(void)
 {
   int n = L.recent_count - 1, max = banner_up() ? 3 : 4;
@@ -1726,13 +1560,11 @@ static int recent_row_y(int k)
   return CONT_Y + (banner_up() ? REC_PITCH : 0) + k * REC_PITCH;
 }
 
-/* the game on a place: 0 the Continue card's, 1 + k the k-th row's */
 static int recent_game(int place)
 {
   return L.recent[place];
 }
 
-/* the cursor's box for a place on the Recent tab (as lifted) */
 static void recent_box(int place, int *x, int *y, int *w, int *h)
 {
   if(place == 0)
@@ -1756,14 +1588,6 @@ static int recent_place(void)
   return L.rec_row ? 1 + L.rec_cur : 0;
 }
 
-/* A headline title (spec section 4, Long game names; the Continue card and
- * the game card): 12 px bold at 2x when it fits w; else 12 px bold on up
- * to two lines 16 px apart, 2 px higher, so the block keeps the 2x
- * title's height. Past two lines the second is cut with "…"; with shift >
- * 0 (the focused card's marquee) it runs sideways instead, over bg. */
-/* Line n of a headline wrapped at w, measured in bold as it is drawn:
-   breaks at spaces; text without spaces (CJK) breaks between characters
-   (ui_wrap_line). Returns 0 past the end. */
 static int bold_line(const char *t, int n, int w, char *out, int size)
 {
   const char *p = t;
@@ -1779,7 +1603,6 @@ static int bold_line(const char *t, int n, int w, char *out, int size)
       p++;
     if(!*p)
       break;
-    /* take words while the line, in bold, fits w */
     end = p;
     for(q = p; ; )
     {
@@ -1851,7 +1674,6 @@ static void big_title(int x, int y, int w, const char *t, u16 ink, u16 bg, int s
   ui_clip_reset();
 }
 
-/* how far a headline's second line runs past w (0: it fits, or one line) */
 static int big_title_over(const char *t, int w)
 {
   char line[128], rest[256];
@@ -1872,7 +1694,6 @@ static int big_title_over(const char *t, int w)
   return (k > 0) ? k : 0;
 }
 
-/* ink mixed 35 % toward bg (the Continue card's play time) */
 static u16 mix35(u16 ink, u16 bg)
 {
   u16 out = ink & 0x8000;
@@ -1886,10 +1707,6 @@ static u16 mix35(u16 ink, u16 bg)
   return out;
 }
 
-/* The Continue card (spec section 4, Home; maintainer, 2026-11-20): the
- * save's picture in a plum bezel with the CONTINUE badge on it, the name,
- * what it resumes and when, the play time. Tangerine and lifted when
- * selected. A game without a savestate shows its cover in the picture. */
 static void draw_continue(int hero)
 {
   int game = L.recent[0], lift = hero ? UI_LIFT : 0, x, y, w;
@@ -1912,8 +1729,6 @@ static void draw_continue(int hero)
   ui_print(x + 18, y + 13, chip, UI_COL_PLUM, UI_FONT_SMALL, 0);
   ui_print_fit(x + 8, y + 144, L.games[game].title, ink, UI_FONT_BODY, UI_TEXT_BOLD,
    CONT_W - 16);
-  /* "Last · Today 21:46", "Slot 3 · 2 days ago"; no savestate: when it
-     was last played */
   if(L.cont_slot >= 0)
   {
     char slot[16];
@@ -1943,8 +1758,6 @@ static void draw_continue(int hero)
   }
 }
 
-/* one of the next recent games: a 32 px cover in a plum frame, the name,
-   when it was last played and its play time */
 static void draw_recent_row(int k, int sel)
 {
   int game = recent_game(1 + k), y = recent_row_y(k), l2 = sel ? UI_LIFT : 0;
@@ -1964,8 +1777,6 @@ static void draw_recent_row(int k, int sel)
    REC_W - 56);
 }
 
-/* The No BIOS notice as the right column's first row: cream, two lines,
-   □ Help at its bottom right; never selectable */
 static void draw_bios_row(int x, int y)
 {
   static const char t[] = "No GBA BIOS: games start in Game Cart mode.";
@@ -1981,8 +1792,6 @@ static void draw_bios_row(int x, int y)
   ui_print(hx + 17, y + REC_H - 18, "Help", UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
 }
 
-/* Recent (spec section 4, Home; maintainer, 2026-11-20): two columns on
-   one grid from y 40 to 240, 8 px apart */
 static void recent_ground(void)
 {
   int k, n = recent_rows();
@@ -1994,7 +1803,6 @@ static void recent_ground(void)
     draw_recent_row(k, (L.rec_row == 1) && (k == L.rec_cur));
 }
 
-/* the frame flies to the new place, also between the columns */
 static void recent_selection(void)
 {
   int x0, y0, w0, h0, x1, y1, w1, h1;
@@ -2007,7 +1815,6 @@ static void recent_selection(void)
    ui_ease_out_back(h0, h1, L.rec_f, UI_F_CURSOR));
 }
 
-/* → from the Continue card to the rows, ↑↓ in the rows, ← back */
 static void recent_move(void)
 {
   int n = recent_rows(), from = recent_place(), row = L.rec_row, cur = L.rec_cur;
@@ -2029,13 +1836,9 @@ static void recent_move(void)
     L.rec_cur = cur;
     L.rec_f = 0;
     L.marq_f = 0;
-    L.dirty = 1;  /* the card and the rows show which is selected */
+    L.dirty = 1;
   }
 }
-
-/* ---- Favourites ------------------------------------------------------------------------
- * The hearted games, kept in CFG/favourites.txt (one full path per line);
- * △ on the game card turns a game's heart on or off. */
 
 static const u16 icon_heart[11] =
  { 0x000, 0x38E, 0x7DF, 0x7FF, 0x7FF, 0x3FE, 0x1FC, 0x0F8, 0x070, 0x020, 0x000 };
@@ -2091,9 +1894,6 @@ static void write_favourites(void)
   fclose(f);
 }
 
-/* the heart corner on a 64 px cover */
-/* Favourites with nothing hearted yet: the empty folder's layout with a
-   pink heart */
 static void draw_no_favourites(void)
 {
   static const char t[] = "No favourites yet";
@@ -2105,13 +1905,6 @@ static void draw_no_favourites(void)
    UI_FONT_BODY, UI_TEXT_BOLD);
   ui_print(240 - ui_print_width(b, UI_FONT_SMALL, 0) / 2, 166, b, UI_COL_MUTE, UI_FONT_SMALL, 0);
 }
-
-/* ---- the game card (spec section 4, Game card; r4 card, r5 card_delete) -------------------
- * △ on any game: a card over the library with the game's cover, facts and
- * its savestates as tiles (Start fresh first, then every used slot newest
- * first, the newest focused). × plays from the focused tile, △ hearts the
- * game, SELECT held deletes the focused savestate (Undo on the toast), ○
- * drops the card away. */
 
 #define CARD_X      14
 #define CARD_Y      22
@@ -2125,9 +1918,6 @@ static void draw_no_favourites(void)
 #define THUMB_H     40
 #define CARD_COVER  96
 
-/* the pause tiles' 20 x 20 play icon (design icons20.py), as Start fresh's
-   picture: per row ink then fill, bit 19 the left pixel; a 1 px plum
-   shadow down-right, plum ink, lime fill */
 static const u32 play20[2][20] =
 {
   { 0x00000, 0x00000, 0x00000, 0x0C000, 0x0B000, 0x08C00, 0x08300, 0x080C0, 0x08030, 0x0800C,
@@ -2154,7 +1944,6 @@ static void draw_play20(int x, int y)
     }
 }
 
-/* the card's tiles: -1 Start fresh, else the slot, newest first */
 static void card_read_tiles(void)
 {
   char path[MAX_PATH];
@@ -2173,7 +1962,6 @@ static void card_read_tiles(void)
     L.tile_slot[n] = slot;
     L.tile_time[n] = t;
     L.tile_pic[n] = (got == 2);
-    /* newest first: move it up past older ones */
     for(i = n; (i > 1) && (L.tile_time[i] > L.tile_time[i - 1]); i--)
     {
       int s = L.tile_slot[i], p = L.tile_pic[i];
@@ -2194,8 +1982,6 @@ static void card_read_tiles(void)
   L.tile_count = n;
 }
 
-/* The card's facts line: "Cheats: 2 / 8  ·  Settings: 5 saved for this
- * game", from the running game's config or the game's .cfg. */
 static void card_facts(int game)
 {
   const game_t *g = &L.games[game];
@@ -2207,7 +1993,7 @@ static void card_facts(int game)
 
   if(gamepak_filename[0] && !strcasecmp(gamepak_filename, g->name) &&
    !strcasecmp(rom_path, L.dirs[g->dir]))
-    cfg = &g_game_config;  /* the game behind the pause screen */
+    cfg = &g_game_config;
   else
   {
     char name[MAX_FILE], path[MAX_PATH];
@@ -2239,13 +2025,6 @@ static void card_facts(int game)
   ui_pool_release(mark);
 }
 
-/* ---- the game card's name ("B balanced", maintainer, 2026-11-20) ----------------------
- * 316 px wide. 2x on one line when it fits; else 2x on two lines, each at
- * most 158 px at 1x bold, broken after a subtitle mark (" -", ":", "~" and
- * their full-width forms; the mark stays on line 1), else at the break
- * that makes the two lines closest in width. Too long for that: 1x on one
- * line (the rest moves up 12 px), or the headline rule (big_title) on two.
- * No file name line: the facts sit 22 px under the chips. */
 enum { NAME_2X, NAME_2X_TWO, NAME_1X, NAME_BIG };
 
 static int cjk_cp(u32 c)
@@ -2273,7 +2052,6 @@ static int ends_with(const char *a, int n, const char *mark)
   return (n >= m) && !memcmp(a + n - m, mark, m);
 }
 
-/* The two lines for t (each at most w at 1x bold), or 0. */
 static int name_lines2(const char *t, int w, char *l1, char *l2, int size)
 {
   int best_rank = 3, best_diff = 0, i = 0, prev_cjk = 0, len;
@@ -2344,20 +2122,19 @@ static int card_open(int game)
   card_facts(game);
   card_name_layout(L.games[game].title);
   card_read_tiles();
-  /* the art alone: the name is beside it */
   if(!art_read(game, CARD_COVER, L.card_cover))
     ui_cover_art(L.card_cover, CARD_COVER, CARD_COVER, L.games[game].title);
   L.card = 1;
   L.card_f = 0;
   L.card_out = 0;
-  L.card_cur = L.card_from = (L.tile_count > 1) ? 1 : 0;  /* the newest */
+  L.card_cur = L.card_from = (L.tile_count > 1) ? 1 : 0;
   L.card_cf = UI_F_CURSOR;
   L.card_first = 0;
   L.card_first_from = 0;
   L.card_first_f = UI_F_SCROLL;
   L.fav_flash = UI_F_FLASH;
   L.card_changed = 0;
-  L.marq_f = 0;  /* a long name waits again before it runs */
+  L.marq_f = 0;
   memset(&L.hold, 0, sizeof(L.hold));
   L.toast_f = -1;
   L.dirty = 1;
@@ -2372,7 +2149,6 @@ static void card_close_now(void)
   L.card_cover = NULL;
   if(L.card_changed && (L.recent_count > 0))
   {
-    /* a savestate went or came back: Continue may resume another one */
     L.cont_slot = resume_slot(L.recent[0], &L.cont_time);
     L.pic_ok = load_resume_picture(L.recent[0], L.cont_slot);
   }
@@ -2402,7 +2178,6 @@ static void slot_label(int slot, char *out, int n)
     snprintf(out, n, "Slot %d", slot);
 }
 
-/* "21:46" today, else "11/13" */
 static void tile_when(u64 tick, char *out, int n)
 {
   when_text(tick, out, n);
@@ -2421,7 +2196,6 @@ static void draw_card(void)
   ui_fill(x + 4, y, CARD_W - 8, 4, UI_COL_TANGERINE);
   ui_fill(x + 12, y + 14, 100, 100, UI_COL_PLUM);
   ui_blit(L.card_cover, CARD_COVER, x + 14, y + 16, CARD_COVER, CARD_COVER);
-  /* the name (card_name_layout); dy moves what follows it */
   switch(L.name_mode)
   {
     case NAME_2X:
@@ -2438,14 +2212,12 @@ static void draw_card(void)
       dy = -12;
       break;
     default:
-      /* the card is focused: a cut second line runs sideways */
       big_title(x + 124, y + 12, 316, g->title, UI_COL_CREAM, UI_COL_CARD,
        (L.card_f >= UI_F_POPUP_IN) ? marquee_shift(big_title_over(g->title, 316)) : 0);
       dy = 0;
       break;
   }
 
-  /* chips: size, play time, the heart (△ flashes it) */
   cx = x + 124;
   size_text(g->size, size, sizeof(size));
   snprintf(chip, sizeof(chip), "GBA \xC2\xB7 %s", size);
@@ -2465,11 +2237,9 @@ static void draw_card(void)
     draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
     ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
   }
-  /* the facts line, 22 px under the chips */
   ui_print_fit(x + 124, y + 68 + dy, L.facts,
    UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
-  /* the savestates */
   ui_print(x + 12, y + 118, "Savestates", UI_COL_MUTE, UI_FONT_SMALL, 0);
   ui_clip_set(x + 8, y + 130, CARD_W - 16, 90);
   for(i = 0; i < L.tile_count; i++)
@@ -2498,7 +2268,6 @@ static void draw_card(void)
       ui_print(sx + 4, sy + 60, when, sel ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
     }
   }
-  /* the cursor frame flies along the strip */
   {
     int fx = ui_ease_out_back(L.card_from * TILE_PITCH, L.card_cur * TILE_PITCH, L.card_cf,
      UI_F_CURSOR);
@@ -2506,7 +2275,6 @@ static void draw_card(void)
   }
   ui_clip_reset();
 
-  /* SELECT held on a savestate: the pause screen's hold card over its picture */
   if(L.hold.shown && (L.tile_slot[L.card_cur] >= 0))
   {
     static const char verb[] = "Delete (hold)";
@@ -2535,7 +2303,7 @@ static void card_select(int i)
   L.card_from = L.card_cur;
   L.card_cur = i;
   L.card_cf = 0;
-  L.dirty = 1;  /* SELECT Hold: delete shows on a savestate only */
+  L.dirty = 1;
   if((i < L.card_first) || (i >= L.card_first + TILES_SEEN))
   {
     L.card_first_from = card_first_px();
@@ -2551,10 +2319,9 @@ static void card_toast(const char *text, u16 edge, int undo_slot)
   L.toast_edge = edge;
   L.toast_undo = undo_slot;
   L.toast_f = 0;
-  L.dirty = 1;  /* SELECT reads Undo while it is up */
+  L.dirty = 1;
 }
 
-/* returns 1 when × chose a tile to play */
 static int card_input(void)
 {
   if(L.card_out)
@@ -2573,7 +2340,6 @@ static int card_input(void)
     L.fav_changed = 1;
     return 0;
   }
-  /* while the toast offers Undo, SELECT is Undo */
   if((L.toast_f >= 0) && (L.toast_undo >= 0) && ui_pressed(PSP_CTRL_SELECT))
   {
     char path[MAX_PATH];
@@ -2632,21 +2398,14 @@ static void card_step(void)
   if(L.fav_flash < UI_F_FLASH) L.fav_flash++;
 }
 
-/* ---- Folders (spec section 4, Folders; r5 folders, folder_empty) ---------------------------
- * The ROM folder as it is on the Memory Stick: a breadcrumb path, then
- * ".." (below the top), the subfolders with their game counts, then the
- * games. × opens a folder or plays a game, ○ goes up a folder. */
-
 #define FOLD_Y      60
 #define FOLD_PITCH  22
-#define FOLD_ROWS   8     /* rows in view, y 60-236 */
+#define FOLD_ROWS   8
 enum { ROW_UP, ROW_DIR, ROW_GAME };
 
 static const u16 icon_up[11] =
  { 0x000, 0x020, 0x070, 0x0A8, 0x124, 0x020, 0x020, 0x020, 0x020, 0x000, 0x000 };
 
-/* the rows of the folder shown: ".." below the top, its folders, its
-   games (in the Folders tab's sort) */
 static void fold_fill(void)
 {
   int i, n = 0;
@@ -2662,7 +2421,6 @@ static void fold_fill(void)
       L.fold_kind[n] = ROW_DIR;
       L.fold_item[n++] = i;
     }
-  /* folders by name */
   {
     int a, b, first = (L.fold_dir != 0) ? 1 : 0;
     for(a = first + 1; a < n; a++)
@@ -2674,7 +2432,6 @@ static void fold_fill(void)
         L.fold_item[b - 1] = t;
       }
   }
-  /* its games, sorted like a list tab */
   L.n = 0;
   for(i = 0; i < L.count; i++)
     if(L.games[i].dir == L.fold_dir)
@@ -2702,13 +2459,12 @@ static void fold_go(int dir, int focus_dir)
   L.fold_dir = dir;
   fold_fill();
   L.fold_cur = 0;
-  /* going up: the cursor on the folder we came from */
   for(i = 0; i < L.fold_count; i++)
     if((L.fold_kind[i] == ROW_DIR) && (L.fold_item[i] == focus_dir))
       L.fold_cur = i;
   if((focus_dir < 0) && (L.fold_count > 0) && (L.fold_kind[0] == ROW_UP) &&
    (L.fold_count > 1))
-    L.fold_cur = 1;  /* opening a folder: its first entry, not ".." */
+    L.fold_cur = 1;
   L.fold_from = L.fold_cur;
   L.fold_f = UI_F_CURSOR;
   L.fold_top = (L.fold_cur >= FOLD_ROWS) ? L.fold_cur - FOLD_ROWS + 1 : 0;
@@ -2752,7 +2508,6 @@ static void fold_breadcrumb(void)
   }
 }
 
-/* one row at y; sel: drawn lifted in tangerine */
 static void fold_row(int i, int y, int sel)
 {
   int lift = sel ? UI_LIFT : 0, kind = L.fold_kind[i], item = L.fold_item[i];
@@ -2855,15 +2610,10 @@ static void fold_move(void)
     L.fold_top = (i < L.fold_top) ? i : i - FOLD_ROWS + 1;
     L.fold_top_f = 0;
   }
-  L.dirty = 1;  /* × reads Open or Play */
+  L.dirty = 1;
 }
 
-/* ---- the No BIOS notice (spec section 4, No BIOS; r4 bios, bios_new) ------------------------
- * Without gba_bios.bin kai runs games on its built-in BIOS. A one-line
- * notice says so on every start until the first game is launched (unless
- * System -> No-BIOS notice is off); the library keeps working around it. */
-
-int ui_no_bios = 0;       /* set at start when the built-in BIOS is in use */
+int ui_no_bios = 0;
 static int banner_gone = 0;
 
 static int banner_up(void)
@@ -2871,7 +2621,6 @@ static int banner_up(void)
   return ui_no_bios && !banner_gone && g_gpsp_config.bios_note;
 }
 
-/* is any of the notice on screen (□ Help works then)? */
 static int notice_in_view(void)
 {
   if(!banner_up() || (L.count == 0))
@@ -2879,20 +2628,15 @@ static int notice_in_view(void)
   if(L.tab_ids[L.tab] == TAB_RECENT)
     return 1;
   if((L.view == VIEW_PANEL) || (L.view == VIEW_GRID))
-    return list_banner();  /* it stays at the top */
+    return list_banner();
   return list_banner() && (L.ys[0] - 24 + 16 > VIEW_T);
 }
 
-/* before the first game (no Recent tab) it is the top item of the All
-   list instead, so it hides no game (design session, 2026-11-19) */
 static int list_banner(void)
 {
   return banner_up() && !recent_tab_on() && (L.tab_ids[L.tab] == TAB_ALL) && (L.n > 0);
 }
 
-/* the notice: one cream line, 440 x 16 at x 20 with a 4 px tangerine edge;
-   the line in plum, □ Help at its right end (□ opens its help with the
-   Help step) */
 static void draw_banner_at(int y)
 {
   static const char t[] = "No GBA BIOS: games start in Game Cart mode.";
@@ -2906,8 +2650,6 @@ static void draw_banner_at(int y)
   ui_print_fit(30, y + 1, t, UI_COL_PLUM, UI_FONT_SMALL, 0, hx - 30 - 10);
 }
 
-/* ---- View & sort ------------------------------------------------------------------- */
-
 static int tab_is(int id);
 static const char *view_labels[3] = { "Panel", "Shelf", "Grid" };
 static const int view_ids[3] = { VIEW_PANEL, VIEW_SHELF, VIEW_GRID };
@@ -2918,7 +2660,6 @@ static int view_index(int view)
 }
 static const char *sort_labels[SORTS] = { "Name", "Recently played", "Size" };
 
-/* All and Favourites choose their list style; Folders keeps its own rows */
 static int has_view_row(void)
 {
   return !tab_is(TAB_FOLDERS);
@@ -2965,9 +2706,6 @@ static void draw_popup(void)
   }
 }
 
-/* ---- hints, the empty library, the ground --------------------------------------------- */
-
-/* the heart means favourite everywhere (maintainer, 2026-11-21) */
 static const char *tab_names[4] = { "Recent", "All", "\xE2\x99\xA5 Favourites", "Folders" };
 
 static int tab_is(int id)
@@ -2975,8 +2713,6 @@ static int tab_is(int id)
   return L.tab_ids[L.tab] == id;
 }
 
-/* the games of a list tab, in its sort: every game on All, the hearted on
-   Favourites; the cursor goes back where it was on that tab */
 static void fill_order(void)
 {
   int i, fav = tab_is(TAB_FAV);
@@ -3004,7 +2740,7 @@ static void tabs_init(void)
   L.tab_ids[L.tab_count++] = TAB_FAV;
   L.tab_ids[L.tab_count++] = TAB_FOLDERS;
   L.fold_open = 0;
-  L.tab = 0;  /* Recent when there is one, else All */
+  L.tab = 0;
   L.tab_prev = 0;
   L.tab_f = UI_F_TAB;
   memset(L.tab_cur, 0, sizeof(L.tab_cur));
@@ -3015,7 +2751,6 @@ static void tabs_init(void)
   }
 }
 
-/* L or R: tabs never wrap */
 static void turn_tab(int d)
 {
   L.tab_cur[L.tab] = L.cur;
@@ -3025,7 +2760,6 @@ static void turn_tab(int d)
   L.marq_f = 0;
   if(tab_is(TAB_FOLDERS))
   {
-    /* the folder left open last time, else the top */
     if(!L.fold_open)
       fold_go(0, -1);
     else
@@ -3047,8 +2781,6 @@ static void draw_hints(void)
 
   if(L.card && !L.card_out)
   {
-    /* ○ Back · △ Favourite never change; SELECT comes and goes (Start
-       fresh is not a savestate; Undo while the toast offers it) */
     h[n].keys = ui_key_back;        h[n++].verb = "Back";
     h[n].keys = PSP_CTRL_TRIANGLE;  h[n++].verb = "Favourite";
     if((L.toast_f >= 0) && (L.toast_undo >= 0))
@@ -3077,7 +2809,6 @@ static void draw_hints(void)
   }
   else if(tab_is(TAB_RECENT))
   {
-    /* × reads Continue on the Continue card */
     h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
     h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? "Play" : "Continue";
@@ -3104,7 +2835,7 @@ static void draw_hints(void)
        (L.fold_kind[L.fold_cur] == ROW_GAME) ? "Play" : "Open";
     }
   }
-  else if(L.n == 0)  /* Favourites, nothing hearted: nothing to play */
+  else if(L.n == 0)
   {
     h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
     h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
@@ -3123,7 +2854,6 @@ static void draw_hints(void)
   ui_hint_packed(h, n, 14);
 }
 
-/* the folder icon (spec icons), drawn at 4x on the empty library */
 static const u16 icon_folder[11] =
  { 0x000, 0x3C0, 0x27C, 0x204, 0x3FE, 0x202, 0x202, 0x202, 0x3FE, 0x000, 0x000 };
 
@@ -3179,8 +2909,6 @@ static void build_ground(void)
     panel_ground();
   else
     list_ground();
-  /* the game card: the library, its tabs and chip stay behind the screen
-     door (they are drawn here, not each frame, while it is up) */
   if(L.card)
   {
     draw_tab_bar();
@@ -3190,8 +2918,6 @@ static void build_ground(void)
   draw_hints();
   ui_layer_end();
 }
-
-/* ---- moving ------------------------------------------------------------------------- */
 
 static void select_game(int i)
 {
@@ -3209,16 +2935,13 @@ static void select_game(int i)
       top = row - GRID_ROWS + 1;
     if(top != L.top)
     {
-      L.off_from = grid_off();  /* a new move starts from where it is now */
+      L.off_from = grid_off();
       L.top = top;
       L.top_f = 0;
     }
   }
   else
   {
-    /* the open card closes as the move starts; one not yet fully open
-       goes at once (maintainer, 2026-11-20); the list slides with every
-       row slim; the new card opens later */
     if(L.open_row >= 0)
     {
       if(L.open_f >= UI_F_LIST_OPEN)
@@ -3238,7 +2961,7 @@ static void select_game(int i)
       int top = panel_top_for(i);
       if(top != L.ptop)
       {
-        L.ptop_from = panel_top_px();  /* re-targeted from where it is now */
+        L.ptop_from = panel_top_px();
         L.ptop = top;
         L.ptop_f = 0;
       }
@@ -3248,9 +2971,6 @@ static void select_game(int i)
   L.dirty = 1;
 }
 
-/* list_open: once the slide has stopped and the list has rested list_rest
-   with the d-pad up, the selected row grows into the card (a single tap
-   opens it about 18 f after the press; quick taps never start it) */
 static void list_step(void)
 {
   if(L.pos_f < UI_F_LIST_SCROLL)
@@ -3283,7 +3003,6 @@ static void list_step(void)
   }
 }
 
-/* the view changed (View & sort): the grid rests with the cursor in view */
 static void view_reset(void)
 {
   int row = L.cur / GRID_COLS;
@@ -3300,7 +3019,7 @@ static void view_reset(void)
   L.ptop_from = L.ptop * UI_ROW_PITCH;
   L.ptop_f = UI_F_LIST_SCROLL;
   L.rest_f = UI_F_LIST_REST;
-  L.open_row = L.cur;  /* the list opens at rest, its card open */
+  L.open_row = L.cur;
   L.open_f = UI_F_LIST_OPEN;
   L.close_row = -1;
   L.marq_f = 0;
@@ -3309,17 +3028,11 @@ static void view_reset(void)
   L.dirty = 1;
 }
 
-/* ---- the letter jump (spec section 4, Letter jump; r5) -------------------------------
- * List views only: ←→ jumps to the next or previous first letter; a rail of
- * the first letters present slides in at the right, and a big letter shows
- * where the cursor landed. Titles that start with anything but A-Z share
- * one entry, "#". */
-
 #define RAIL_X      464
 #define RAIL_T      38
 #define RAIL_H      208
 #define RAIL_SLOTS  13
-#define RAIL_STAY   60    /* the rail goes this long after the last jump */
+#define RAIL_STAY   60
 
 static int letter_of(int game)
 {
@@ -3327,7 +3040,6 @@ static int letter_of(int game)
   return ((ch >= 'A') && (ch <= 'Z')) ? ch : '#';
 }
 
-/* the first letters in list order, and the first row of each */
 static int letters(int *key, int *first)
 {
   int i, j, n = 0;
@@ -3364,12 +3076,11 @@ static void letter_jump(int dir)
   if((j < 0) || (j >= n))
     return;
   select_game(first[j]);
-  /* a jump while the big letter is up keeps the tile and swaps the letter */
   L.letter_keep = (L.letter_f >= 0);
   L.letter_f = 0;
   L.letter = key[j];
   if(L.jump_t < 0)
-    L.rail_f = 0;  /* the rail slides in on the first */
+    L.rail_f = 0;
   L.jump_t = 0;
 }
 
@@ -3386,7 +3097,6 @@ static void letter_step(void)
     L.letter_f = -1;
 }
 
-/* a colour t/256 of the way from a to b, per 5-bit channel */
 static u16 mix_to(u16 a, u16 b, int t)
 {
   int r = (a & 31) + (((b & 31) - (a & 31)) * t + 128) / 256;
@@ -3414,7 +3124,6 @@ static void draw_letter_jump(void)
       ;
     if(n > RAIL_SLOTS)
     {
-      /* a window centred on the current letter */
       lo = j - RAIL_SLOTS / 2;
       if(lo > n - RAIL_SLOTS)
         lo = n - RAIL_SLOTS;
@@ -3445,8 +3154,6 @@ static void draw_letter_jump(void)
   }
   if(L.letter_f >= 0)
   {
-    /* it grows over 20 f with its letter on it (out-back), holds, and fades
-       over the last 8 f; a jump while it is up only pops it by 2 px */
     int f = L.letter_f, size, fade, x, y, w;
     u16 tile, ink;
     if(L.letter_keep)
@@ -3516,11 +3223,7 @@ static void popup_input(void)
   {
     L.pop_out = 1;
     L.pop_f = 0;
-    /* written when the popup closes (spec section 7) */
-    /* the sort is kept per tab */
     L.sorts[tab_is(TAB_FOLDERS) ? 2 : tab_is(TAB_FAV) ? 1 : 0] = L.sort;
-    /* bits 7-8 and 9-10: the views of All and Favourites (0 Panel,
-       1 Shelf, 2 Grid) */
     g_gpsp_config.library_view = (g_gpsp_config.library_view & 1) |
      ((L.sorts[0] & 3) << 1) | ((L.sorts[1] & 3) << 3) | ((L.sorts[2] & 3) << 5) |
      (view_index(L.views[0]) << 7) | (view_index(L.views[1]) << 9);
@@ -3554,7 +3257,7 @@ static void popup_input(void)
           int keep = L.fold_item[L.fold_cur], kind = L.fold_kind[L.fold_cur], i;
           L.sorts[2] = v;
           fold_fill();
-          for(i = 0; i < L.fold_count; i++)  /* the cursor stays on its row */
+          for(i = 0; i < L.fold_count; i++)
             if((L.fold_kind[i] == kind) && (L.fold_item[i] == keep))
               L.fold_cur = L.fold_from = i;
           L.dirty = 1;
@@ -3570,15 +3273,11 @@ static void popup_input(void)
   }
 }
 
-/* ---- starting a game ------------------------------------------------------------------ */
-
-/* the tangerine progress card, "Loading" and its three dots (spec section 2) */
 static void draw_loading(int t, int fill_256)
 {
   int x = (UI_SCREEN_W - 332) / 2, y = 98, w = 332, h = 54, ex, i;
   int k = (30 * fill_256 + 128) / 256 - 1;
 
-  /* nothing can be pressed while a game loads: the hint strip is empty */
   ui_fill(0, UI_STRIP_Y, UI_SCREEN_W, UI_STRIP_H, UI_COL_SHADE);
 
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
@@ -3592,9 +3291,6 @@ static void draw_loading(int t, int fill_256)
     ui_fill(x + 16 + i * 10, y + 32, 8, 12, (i <= k) ? UI_COL_TANGERINE : UI_COL_PLUM_2);
 }
 
-/* While the game loads, its progress fills the Loading card (instead of
-   the old menu's dialog), and the dots hop with each step. The card is
-   drawn over the library's last frame. */
 static void load_hook(int current, int total)
 {
   ui_frame_begin();
@@ -3602,7 +3298,6 @@ static void load_hook(int current, int total)
   ui_frame_end_now();
 }
 
-/* Load the game picked in the library, with the Loading card. */
 s32 ui_library_load(const char *dir, char *name)
 {
   s32 loaded;
@@ -3618,10 +3313,6 @@ s32 ui_library_load(const char *dir, char *name)
   return loaded;
 }
 
-/* ---- the screen ----------------------------------------------------------------------- */
-
-/* START: Settings over the library; a restart asked for there starts kai
-   again on the library */
 static void open_settings(void)
 {
   int r = ui_settings(0, 0);
@@ -3633,14 +3324,12 @@ static void open_settings(void)
     ui_restart_now(tab, row, NULL);
   }
   else if(r == 2)
-    quit(0);  /* Quit kai: no game runs here, nothing to save but kai's own */
+    quit(0);
   ui_status_read();
   ui_input_init();
   L.dirty = 1;
 }
 
-/* Pick a game. Returns 1 with its folder and file name (no game running:
- * kai's start; from the pause screen: a game was left). */
 int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 {
   u32 mark = ui_pool_mark();
@@ -3651,9 +3340,9 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   L.views[1] = view_ids[((g_gpsp_config.library_view >> 9) & 3) % 3];
   L.view = L.views[0];
   L.art_game = -1;
-  L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;  /* All */
-  L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;  /* Favourites */
-  L.sorts[2] = (g_gpsp_config.library_view >> 5) & 3;  /* Folders */
+  L.sorts[0] = (g_gpsp_config.library_view >> 1) & 3;
+  L.sorts[1] = (g_gpsp_config.library_view >> 3) & 3;
+  L.sorts[2] = (g_gpsp_config.library_view >> 5) & 3;
   if(L.sorts[2] >= SORTS)
     L.sorts[2] = SORT_NAME;
   if(L.sorts[0] >= SORTS)
@@ -3672,9 +3361,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
   tabs_init();
   ui_status_read();
   ui_input_init();
-  /* HOME shows the PSP's own quit screen here (spec section 3): no game
-     runs, so nothing can be lost. kai turns that screen off at start for
-     its games; it goes back to that when the library closes. */
   sceImposeSetHomePopup(1);
 
   while(!chosen)
@@ -3684,7 +3370,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
     if(L.help)
     {
-      /* □ or ○ closes it */
       if(!L.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
       {
         L.help_out = 1;
@@ -3693,7 +3378,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     }
     else if(notice_in_view() && !L.card && !L.pop && ui_pressed(PSP_CTRL_SQUARE))
     {
-      /* □ Help on the No BIOS notice */
       L.help = 1;
       L.help_out = 0;
       L.help_f = 0;
@@ -3796,9 +3480,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       else if((L.n > 0) && ui_pressed(ui_key_confirm))
       {
         u64 t;
-        /* × Play resumes from Last, else the newest savestate, else the
-           start (design session, 2026-11-19): a stray × never boots fresh
-           and then lets Exit save over Last. Only the game card differs. */
         L.chosen_game = L.order[L.cur];
         L.chosen_slot = resume_slot(L.chosen_game, &t);
         chosen = 1;
@@ -3819,7 +3500,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       card_step();
       if(!L.card && was && L.fav_changed && tab_is(TAB_FAV))
       {
-        /* a game left or joined Favourites */
         fill_order();
         view_reset();
       }
@@ -3853,7 +3533,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
          L.toast_f, 6))
         {
           L.toast_f = -1;
-          L.dirty = 1;  /* the hint goes back to Hold: delete */
+          L.dirty = 1;
         }
         else
           L.toast_f++;
@@ -3888,7 +3568,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       if(L.pop)
         draw_popup();
       if(L.pop_f == 1)
-        L.dirty = 1;  /* the hints change with it */
+        L.dirty = 1;
     }
     if(L.help)
     {
@@ -3905,7 +3585,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     if(chosen)
     {
       draw_loading(0, 0);
-      banner_gone = 1;  /* the banner hides after the first launch */
+      banner_gone = 1;
     }
     ui_frame_end();
   }
@@ -3926,8 +3606,6 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
 
 static void no_progress(int current, int total);
 
-/* Find a ROM file by name under the ROM folder (four levels, as the
-   library scans). */
 static int find_rom(const char *path, const char *name, int depth, char *dir, int size)
 {
   SceUID d = sceIoDopen(path);
@@ -3951,7 +3629,6 @@ static int find_rom(const char *path, const char *name, int depth, char *dir, in
         found = find_rom(sub, name, depth + 1, dir, size);
         if(found)
           return 1;
-        /* reopen and skip back to where this folder was */
         {
           char seen[256];
           snprintf(seen, sizeof(seen), "%s", e.d_name);
@@ -3975,16 +3652,12 @@ static int find_rom(const char *path, const char *name, int depth, char *dir, in
   return found;
 }
 
-/* Is a ROM file of that name under the ROM folder? */
 int ui_library_has_rom(const char *rom_name)
 {
   char dir[MAX_PATH];
   return find_rom(g_default_rom_dir, rom_name, 0, dir, sizeof(dir));
 }
 
-/* The err_state card's way on: leave the running game (as the Library tile
- * does) for the game a savestate was made with, then load that savestate
- * file into it. Returns 0 when that game is not in the ROM folder. */
 u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
 {
   char dir[MAX_PATH], name[MAX_FILE], file[MAX_FILE];
@@ -4005,8 +3678,6 @@ u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
   reset_gba();
   state_no_question = 1;
   progress_hook = no_progress;
-  /* from the file, even for Last: slot 10 would load the new game's own
-     Last from memory instead (the number only names the slot) */
   load_state(file, (slot == MEM_STATE_NUM) ? 0 : slot);
   progress_hook = NULL;
   state_no_question = 0;
@@ -4023,12 +3694,6 @@ u32 ui_library_switch_to(const char *rom_name, const char *state_file, int slot)
   return 1;
 }
 
-/* The pause screen's Library tile: Last is saved (when the save is on);
- * the game left is noted in Recent, then the one picked is loaded. A load
- * that fails may have overwritten the old game, so the library opens
- * again until one loads. */
-/* Continue: after the game has started, load the savestate it resumes
- * from (Last or a slot 0-9), quietly, as the pause screen does. */
 static void no_progress(int current, int total)
 {
   (void)current;
@@ -4089,19 +3754,11 @@ u32 ui_library_switch(void)
   return 0;
 }
 
-/* ---- start-up (spec section 4, Start-up; r4 startup, a9db06f) --------------------------
- * While kai starts (about a second), its start-up steps call this instead
- * of drawing the old dialog: the plum ground from the first step. No fixed
- * wait: ready within 20 f, the library follows the ground straight away and
- * the name is never drawn (no flash). Past 20 f, once the 4.0 fonts are in,
- * "gpSP kai" at 2x and the version under it, kept at least 20 f once shown
- * (ui_startup_end) so they never blink; past 30 f, the Loading card's three
- * dots under them (squares, no font needed). The library then cuts in. */
 #define STARTUP_NAME_AFTER  20
 #define STARTUP_NAME_HOLD   20
 #define STARTUP_DOTS_AFTER  30
 
-static u32 startup_t0, startup_name_at;  /* name_at: its first frame + 1 */
+static u32 startup_t0, startup_name_at;
 
 static u32 startup_frames(void)
 {
@@ -4146,7 +3803,6 @@ void ui_startup_hook(int current, int total)
   startup_draw();
 }
 
-/* Start-up is over: once the name has shown, it stays its 20 frames. */
 void ui_startup_end(void)
 {
   if(startup_t0 == 0)

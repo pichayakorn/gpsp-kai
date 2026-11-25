@@ -1,13 +1,3 @@
-/******************************************************************************
- * gpSP kai 4.0 UI: restart kai (spec "Restart kai", section 7 "Restart
- * return").
- *
- * Restart saves like Exit, writes a small note and starts kai's own EBOOT
- * again. The next start reads the note once, deletes it and goes back where
- * the player was: the game reopened from Last with Settings over it on the
- * same row. A start without the note is a normal start.
- ******************************************************************************/
-
 #include "../common.h"
 #include <psploadexec_kernel.h>
 #include "ui.h"
@@ -25,7 +15,6 @@ static void note_path(char *path, int size)
   path_printf(path, size, "%s/%s", main_path, NOTE_NAME);
 }
 
-/* Line 1: "<tab> <row>"; line 2: the game's path, or empty. */
 void ui_restart_note_read(void)
 {
   char path[MAX_PATH], buf[MAX_PATH + 32], *nl;
@@ -39,7 +28,7 @@ void ui_restart_note_read(void)
     return;
   n = sceIoRead(fd, buf, sizeof(buf) - 1);
   sceIoClose(fd);
-  sceIoRemove(path);  /* read once */
+  sceIoRemove(path);
   if(n <= 0)
     return;
   buf[n] = 0;
@@ -74,8 +63,6 @@ static void note_write(int tab, int row, const char *game)
   sceIoClose(fd);
 }
 
-/* Called from quit(3) once everything is saved and shut down: start this
- * EBOOT again the way the XMB did. */
 void ui_restart_exec(void)
 {
   char path[256];
@@ -95,8 +82,6 @@ void ui_restart_exec(void)
   sctrlKernelLoadExecVSHWithApitype(apitype, path, &param);
 }
 
-/* Write the note, then shut down like Exit and relaunch. The caller has
- * already saved to Last when that is on. */
 void ui_restart_now(int tab, int row, const char *game)
 {
   note_write(tab, row, game);

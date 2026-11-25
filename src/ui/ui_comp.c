@@ -1,12 +1,6 @@
-/* UI components (spec section 2): card rows and their values, tabs,
- * toast, hold bar and dialog card. Each one draws a single frame from the
- * state it is given; the screen keeps the state and the frame counters.
- * Sizes follow the reference drawings in gpsp-kai-design app-ui/scripts
- * (r2_toybox.py, r3_toybox.py, r4_ux.py, round5_details.py). */
 #include "../common.h"
 #include "ui.h"
 
-/* Text helpers: the UI font, or kai's old font when it is missing. */
 static int body_text(int x, int y, const char *s, u16 color, int flags)
 {
   if(ui_font_loaded())
@@ -64,14 +58,12 @@ void ui_round_frame(int x, int y, int w, int h, int r, u16 color)
   }
 }
 
-/* The cursor frame: 2 px of cream around the selection. */
 void ui_cursor_frame(int x, int y, int w, int h)
 {
   ui_round_frame(x - 3, y - 3, w + 6, h + 6, 3, UI_COL_CREAM);
   ui_round_frame(x - 2, y - 2, w + 4, h + 4, 2, UI_COL_CREAM);
 }
 
-/* A lifted card: up-left by UI_LIFT over a hard shadow. */
 static void lifted_card(int x, int y, int w, int h, u16 color, int r, int lift, int shadow)
 {
   if(lift)
@@ -79,7 +71,6 @@ static void lifted_card(int x, int y, int w, int h, u16 color, int r, int lift, 
   ui_round_fill(x - lift, y - lift, w, h, r, color);
 }
 
-/* 11 x 11 icons, one bit per pixel, MSB = left. */
 static const u16 icon_rom[11] =
 {
   0x000, 0x3F8, 0x20C, 0x2E4, 0x2E4, 0x204, 0x2AC, 0x3F8, 0x000, 0x000, 0x000
@@ -95,15 +86,13 @@ static void draw_icon(int x, int y, const u16 *bits, u16 color)
         ui_fill(x + i, y + j, 1, 1, color);
 }
 
-/* The cartridge mark on its own (the per-game legend). */
 void ui_per_game_mark(int x, int y, u16 color)
 {
   draw_icon(x, y, icon_rom, color);
 }
 
-/* Card row: a 20 px card with the label; selected rows take the group
- * colour and lift. Returns where the value goes: its right edge in *vx and
- * the row's top (lifted) in *vy. */
+/* Returns where the value goes: its right edge in *vx and the row's top
+ * (lifted) in *vy. */
 void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group,
  int flags, int *vx, int *vy)
 {
@@ -113,7 +102,6 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
 
   if(flags & UI_ROW_DISABLED)
   {
-    /* greyed out: a plum-2 card, the label and its per-game mark mute */
     ui_round_fill(x, y, w, UI_ROW_H, 2, UI_COL_PLUM_2);
     end = body_text(x + 8, y + 2, label, UI_COL_MUTE, 0);
     if(flags & UI_ROW_PER_GAME)
@@ -124,29 +112,23 @@ void ui_card_row(int x, int y, int w, const char *label, int selected, u16 group
   }
 
   lifted_card(x, y, w, UI_ROW_H, selected ? group : UI_COL_CARD, 2, lift, UI_SHADOW);
-  if(flags & UI_ROW_CHANGED)  /* not the default: a dot in the margin */
+  if(flags & UI_ROW_CHANGED)
     ui_fill(x - 9, y + 8, 4, 4, UI_COL_TANGERINE);
   x -= lift;
   y -= lift;
   end = body_text(x + 8, y + 2, label, tc, 0);
-  /* Saved for this game only: the cartridge, its ink 6 px after the label
-   * and its 7 rows of ink (bitmap rows 1-7) centred on the capitals, which
-   * sit on rows 4-12 of the 12 px font's cell (CJK ink is centred there
-   * too). The label's cell starts at y + 2. */
   if(flags & UI_ROW_PER_GAME)
     draw_icon(end + 5, y + 2 + 4, icon_rom, selected ? UI_COL_PLUM : UI_COL_TANGERINE);
   *vx = x + w - 8;
   *vy = y;
 }
 
-/* Disabled row's note, right aligned. */
 void ui_row_note(int xr, int y, const char *note)
 {
   small_text(xr - small_width(note), y + 3, note, UI_COL_MUTE);
 }
 
-/* ◀ value ▶, right aligned. A new value slides in from the right over
- * UI_F_VALUE frames (f = frames since the change; f >= UI_F_VALUE = still). */
+/* f = frames since the change; f >= UI_F_VALUE = still. */
 void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int f)
 {
   u16 tc = selected ? UI_COL_PLUM : UI_COL_CREAM;
@@ -163,8 +145,7 @@ void ui_row_cycle(int xr, int y, const char *value, int selected, u16 group, int
 }
 
 /* A cycle value drawn from a 1-bit mask (16 rows of 13 bytes, w px wide)
- * instead of text, in the text's ink: the Language row's names, each in
- * its own script whatever font is loaded. */
+ * instead of text. */
 void ui_row_cycle_mask(int xr, int y, const u8 (*bits)[13], int w, int selected, u16 group,
  int f)
 {
@@ -184,10 +165,6 @@ void ui_row_cycle_mask(int xr, int y, const u8 (*bits)[13], int w, int selected,
   body_text(ex - w - 4 - body_width("\xE2\x97\x80", 0), y + 2, "\xE2\x97\x80", ac, 0);
 }
 
-/* Segments: the chosen one filled; on a change the fill springs from the
- * old segment to the new one. */
-/* A segment label of UI_SEG_CROSS or UI_SEG_CIRCLE is drawn as the
- * button's disc, 9 px, its mark cut in the colour under it. */
 static int seg_disc(const char *label)
 {
   return (label[0] == '\x01') ? label[1] : 0;
@@ -255,8 +232,7 @@ void ui_row_segments(int xr, int y, const char **labels, int count, int k,
   }
 }
 
-/* Switch, 28 x 14: off = mute outline, on = lime with the knob right.
- * p = knob position in 1/256 (0 off .. 256 on; out-back overshoots). */
+/* p = knob position in 1/256 (0 off .. 256 on; out-back overshoots). */
 void ui_row_switch(int xr, int y, int p, int selected)
 {
   int x = xr - 28, on = p >= 128, kx;
@@ -267,22 +243,19 @@ void ui_row_switch(int xr, int y, int p, int selected)
   else
     ui_round_frame(x, y, 28, 14, 3, selected ? UI_COL_PLUM : UI_COL_MUTE);
   if(p < 0) p = 0;
-  if(p > 294) p = 294;  /* 1.15 */
+  if(p > 294) p = 294;
   kx = x + 2 + (14 * p + 128) / 256;
   ui_round_fill(kx, y + 2, 10, 10, 2, (on || !selected) ? UI_COL_CREAM : UI_COL_PLUM);
-  if(on && selected)  /* a lime dash: a dark track under the cursor reads as on */
+  if(on && selected)
     ui_fill(x + 5, y + 6, 6, 2, UI_COL_LIME);
 }
 
-/* The switch knob over UI_F_VALUE frames after a flip to state on. */
 int ui_switch_pos(int on, int f)
 {
   return on ? ui_ease_out_back(0, 256, f, UI_F_VALUE)
             : ui_ease_out_back(256, 0, f, UI_F_VALUE);
 }
 
-/* Blocks: n blocks of 8 x 12, 2 px apart, 0..k filled, with the text left
- * of them. The block that just changed pops up from the bottom. */
 void ui_row_blocks(int xr, int y, int n, int k, const char *text, int f,
  int selected, u16 group)
 {
@@ -306,15 +279,14 @@ void ui_row_blocks(int xr, int y, int n, int k, const char *text, int f,
      selected ? UI_COL_PLUM : UI_COL_CREAM, 0);
 }
 
-/* "▶" for a row that opens something. */
 void ui_row_action(int xr, int y, int selected)
 {
   body_text(xr - body_width("\xE2\x96\xB6", 0), y + 2, "\xE2\x96\xB6",
    selected ? UI_COL_PLUM : UI_COL_CREAM, 0);
 }
 
-/* Tabs between L and R glyphs; the cream pill slides from tab prev to k
- * over UI_F_TAB frames. Returns the right edge. */
+/* The pill slides from tab prev to k over UI_F_TAB frames. Returns the
+ * right edge. */
 int ui_tabs(int x, const char **labels, int count, int k, int prev, int f)
 {
   int xs[8], ws[8], j, px, pw;
@@ -345,25 +317,18 @@ int ui_tabs(int x, const char **labels, int count, int k, int prev, int f)
   return ui_glyph(x + 2, 11, PSP_CTRL_RTRIGGER);
 }
 
-/* Toast: slides in from the right (UI_F_TOAST_IN, out-back), stays
- * UI_F_TOAST_HOLD, slides out (UI_F_TOAST_OUT, in-cubic); f = frames since
- * it was shown. With an undo label it carries "SELECT Undo". Returns 0
- * once it is gone. */
+/* f = frames since it was shown. Returns 0 once it is gone. */
 int ui_toast(const char *text, u16 edge, const char *undo, int f)
 {
   return ui_toast_at(text, edge, undo, f, 214);
 }
 
-/* At y: 214 bottom right in menus, 6 top right on the pause screen and over
- * a running game. The right edge is 466 either way. */
 int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y)
 {
   int w, x, right = 466, out;
 
   if(f < 0)
     return 0;
-  /* 12 px in, the text, then 10 px, the SELECT pill, 4 px and the bold
-     undo word; 12 px clear at the end */
   w = 12 + body_width(text, 0) + 12;
   if(undo)
     w += 10 + ui_glyph_width(PSP_CTRL_SELECT) + 4 + small_width(undo) + 1;
@@ -377,8 +342,6 @@ int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y)
   else
     return 0;
 
-  /* cream, so it stands out from the cards and tiles it sits on
-     (maintainer, 2026-11-16) */
   ui_round_fill(x + 3, y + 3, w, 26, 2, UI_COL_SHADE);
   ui_round_fill(x, y, w, 26, 2, UI_COL_CREAM);
   ui_fill(x, y + 3, 4, 20, edge);
@@ -396,11 +359,7 @@ int ui_toast_at(const char *text, u16 edge, const char *undo, int f, int y)
   return 1;
 }
 
-/* A toast over the running game, after the pause screen closes: top
- * right (y 6, right edge 466), so it stays clear of the text boxes most
- * games draw at the bottom; no button, since every key belongs to the
- * game. It is drawn once into the GE overlay (gu.c), which slides it. */
-#define GAME_TOAST_KEY 0x7C1F  /* drawn nowhere: see-through */
+#define GAME_TOAST_KEY 0x7C1F
 static int game_toast_f, game_toast_w;
 
 static int game_toast_tick(int *x, int *y, int *w, int *h)
@@ -416,7 +375,7 @@ static int game_toast_tick(int *x, int *y, int *w, int *h)
   else
     return 0;
   *y = 6;
-  *w = game_toast_w + 3;  /* the shadow */
+  *w = game_toast_w + 3;
   *h = 29;
   return 1;
 }
@@ -431,8 +390,6 @@ void ui_game_toast(const char *text, u16 edge)
     w = OSD_W - 3;
   for(i = 0; i < OSD_W * OSD_H; i++)
     osd_pixels[i] = GAME_TOAST_KEY;
-  /* ui_toast() draws its resting position, x0..x0+w+3 and 212..241, so
-     the frame pointer is moved for that to land at the overlay's origin */
   x0 = 460 - w;
   ui_fb = osd_pixels - (x0 + 212 * OSD_W);
   ui_fb_pitch = OSD_W;
@@ -447,9 +404,6 @@ void ui_game_toast(const char *text, u16 edge)
   osd_tick = game_toast_tick;
 }
 
-/* In a game the battery shows only at 10 % or less, on battery: a pink
- * chip bottom right (the 4 % save to Last says the rest). Called once a
- * second while a game runs; it redraws the chip only when it changes. */
 void ui_game_battery(int level, int on_battery)
 {
   static int shown = -1;
@@ -465,7 +419,7 @@ void ui_game_battery(int level, int on_battery)
     return;
   }
   sprintf(pct, "%d%%", level);
-  w = ui_text_width(pct) + 18;  /* 3 px clear after the % */
+  w = ui_text_width(pct) + 18;
   if(w > OSD_CHIP_W)
     w = OSD_CHIP_W;
   if(level != shown)
@@ -476,7 +430,6 @@ void ui_game_battery(int level, int on_battery)
     ui_fb = osd_chip_pixels;
     ui_fb_pitch = OSD_CHIP_W;
     ui_round_fill(0, 0, w, 16, 2, UI_COL_PINK);
-    /* an 8 x 6 battery outline with its nub, then the % */
     ui_fill(4, 5, 8, 1, UI_COL_PLUM);
     ui_fill(4, 10, 8, 1, UI_COL_PLUM);
     ui_fill(4, 5, 1, 6, UI_COL_PLUM);
@@ -489,27 +442,16 @@ void ui_game_battery(int level, int on_battery)
       osd_chip_pixels[i] = (osd_chip_pixels[i] == GAME_TOAST_KEY) ? 0 : (osd_chip_pixels[i] | 0x8000);
   }
 
-  /* centred in the right side bar when it is wide enough (Fit), so it never
-     covers the game; else 6 px from the PSP screen's bottom-right corner */
   get_game_rect(&gx, &gy, &gw, &gh);
   bar = UI_SCREEN_W - (gx + gw);
   osd_chip_rect[0] = (bar >= w) ? gx + gw + (bar - w) / 2 : 474 - w;
   osd_chip_rect[1] = 250;
   osd_chip_rect[3] = 16;
-  osd_chip_rect[2] = w;  /* last: the chip shows from here */
+  osd_chip_rect[2] = w;
 }
 
-/* The in-game status chip (spec: Show FPS and fast forward), in the PSP
- * screen's top left, never on the game picture's corner: centred in the
- * side bar when it is narrower than 60 px (Fit), else 6 px in from the
- * corner. 28 px wide. Show FPS: the number on shade, cream, pink below 50.
- * Fast forward: a tangerine part under the number (a square join) or alone,
- * with the speed ("3×") in plum, or arrows on Max. Called every frame; it redraws only on a change.
- * fps < 0: Show FPS is off. */
 #define STATUS_W 28
 
-/* The fast-forward part, h px high (16 alone, 14 under the number): the
- * speed or the arrows centred in it. */
 static void status_foot(int y, int h, int ff)
 {
   int a, i;
@@ -517,14 +459,13 @@ static void status_foot(int y, int h, int ff)
   if(ff >= 2)
   {
     const char *t = (ff == 2) ? "2\xC3\x97" : "3\xC3\x97";
-    /* the 14 px text line, centred in the part */
     /* centred on the ink: the advance of "×" ends in a blank column */
     ui_print((STATUS_W - ui_print_width(t, UI_FONT_SMALL, 0)) / 2 + 1, y + (h - 14) / 2, t, UI_COL_PLUM,
      UI_FONT_SMALL, 0);
     return;
   }
 
-  for(a = 0; a < 2; a++)  /* two heads 6 px apart, centred: 10 px */
+  for(a = 0; a < 2; a++)
     for(i = 0; i < 4; i++)
       ui_fill((STATUS_W - 10) / 2 + a * 6 + i, y + (h - 8) / 2 + i, 1, 8 - 2 * i, UI_COL_PLUM);
 }
@@ -563,7 +504,7 @@ void ui_game_status(int fps, int ff)
     if(ff)
     {
       ui_round_fill(0, 0, STATUS_W, h, 2, UI_COL_TANGERINE);
-      ui_fill(0, 8, STATUS_W, 8, UI_COL_SHADE);  /* the square join */
+      ui_fill(0, 8, STATUS_W, 8, UI_COL_SHADE);
       status_foot(16, 14, ff);
     }
     ui_round_fill(0, 0, STATUS_W, ff ? 12 : 16, 2, UI_COL_SHADE);
@@ -585,25 +526,19 @@ void ui_game_status(int fps, int ff)
   osd_fps_rect[0] = x;
   osd_fps_rect[1] = 6;
   osd_fps_rect[3] = h;
-  osd_fps_rect[2] = STATUS_W;  /* last: the chip shows from here */
+  osd_fps_rect[2] = STATUS_W;
 }
 
 static const u16 icon_battery[11] = { 0x000, 0x000, 0x3FE, 0x203, 0x203, 0x203, 0x3FE, 0x000, 0x000, 0x000, 0x000 };
 
-/* The status chip, top right and as wide as its content: the clock (the
- * PSP's 12/24-hour setting), then the battery: lime, tangerine at 20 % or
- * less, pink with the % at 10 % or less, sky with a bolt while charging. */
 static const u8 bolt[7] = { 0x03, 0x06, 0x0C, 0x1F, 0x06, 0x0C, 0x18 };
 
-/* The battery and clock are read once a second, not every frame: each
-   scePower call asks the power chip and costs milliseconds (measured: the
-   header and chip took 10.5 ms of a 16 ms frame). */
+/* Each scePower call asks the power chip and costs milliseconds. */
 static int status_age;
 
 static ScePspDateTime status_now;
 static int status_level, status_format, status_battery, status_charging;
 
-/* Everything at once: when the screen opens, before its first frame. */
 void ui_status_read(void)
 {
   status_level = scePowerGetBatteryLifePercent();
@@ -620,8 +555,6 @@ void ui_status_chip(void)
   ui_status_chip_at(8);
 }
 
-/* At y: 8 on most screens, 10 on the pause screen (centred on the header's
- * row there). */
 void ui_status_chip_at(int y)
 {
   int shown_level;
@@ -629,12 +562,10 @@ void ui_status_chip_at(int y)
   int w, x, tx, i, j, critical = 0;
   u16 color = UI_COL_LIME;
 
-  /* one call a frame, spread over the second, so no frame takes them all
-     (a frame with every call still missed its vblank) */
   if(status_age <= 0)
   {
-    /* the 12/24-hour setting is read in ui_status_read() only: reading the
-       system settings cost a frame 10-20 ms (PERF run) */
+    /* reading the system settings costs 10-20 ms: the 12/24-hour setting
+       is read in ui_status_read() only */
     status_age = 60;
     sceRtcGetCurrentClockLocalTime(&status_now);
   }
@@ -682,19 +613,16 @@ void ui_status_chip_at(int y)
           ui_fill(tx + i, y + 4 + j, 1, 1, UI_COL_SKY);
     tx += 7;
   }
-  /* the bitmap's first column is empty: one to the left */
   draw_icon(tx - 1, y + 3, icon_battery, color);
   ui_fill(tx + 1, y + 6, 7 * shown_level / 100, 3, color);
 }
 
 
-/* Is the toast still up (Undo works while it is)? */
 int ui_toast_up(int f)
 {
   return (f >= 0) && (f < UI_F_TOAST_IN + UI_F_TOAST_HOLD + UI_F_TOAST_OUT);
 }
 
-/* Hold bar: 6 px, filled to p/256 in color over plum-2. */
 void ui_hold_bar(int x, int y, int w, int p, u16 color)
 {
   ui_fill(x, y, w, 6, UI_COL_PLUM_2);
@@ -703,10 +631,7 @@ void ui_hold_bar(int x, int y, int w, int p, u16 color)
     ui_fill(x, y, w * p / 256, 6, color);
 }
 
-/* Hold progress in 1/256: fills while the key is down (UI_F_HOLD frames),
- * drains in UI_F_HOLD_DRAIN after an early release. Once the hold has done
- * its job the bar goes at once, even while the key is still down. Call once
- * a frame. */
+/* Call once a frame. */
 int ui_hold_step(ui_hold_t *h, u32 key)
 {
   u32 frames = ui_hold_frames(key);
@@ -726,7 +651,7 @@ int ui_hold_step(ui_hold_t *h, u32 key)
       }
       else
       {
-        h->p = 0;  /* done: no full bar left waiting for the release */
+        h->p = 0;
         h->shown = 0;
       }
     }
@@ -748,8 +673,6 @@ int ui_hold_step(ui_hold_t *h, u32 key)
   return h->p;
 }
 
-/* The tip line (spec section 2, Tip line): "▸ " and the text in 10 px at
- * y 231, k of 8 frames into its fade (plum to mute, rising 6 px). */
 void ui_tip_line(const char *text, int k)
 {
   char line[200];
@@ -769,7 +692,6 @@ void ui_tip_line(const char *text, int k)
    UI_FONT_SMALL, 0, UI_SCREEN_W - 2 * UI_MARGIN);
 }
 
-/* The code point at s (UTF-8). */
 static u32 wrap_cp(const char *s)
 {
   const u8 *u = (const u8 *)s;
@@ -789,7 +711,6 @@ static int wrap_cjk(u32 c)
    ((c >= 0xFF00) && (c <= 0xFFEF));
 }
 
-/* closing punctuation, small kana and the long mark never start a line */
 static int wrap_no_start(u32 c)
 {
   static const u16 no[] =
@@ -806,12 +727,8 @@ static int wrap_no_start(u32 c)
   return 0;
 }
 
-/* Word wrap: copies line n of text (fitting max_width in font) into out.
- * A line may break at a space, and before or after a CJK character, so a
- * Latin run stops where CJK starts (as the design's wrap); never before
- * closing punctuation, small kana or the long mark. A word wider than the
- * line breaks between characters. Lines are measured without their
- * trailing spaces. Returns 0 past the end. */
+/* Copies line n of text (fitting max_width in font) into out. Returns 0
+ * past the end. */
 int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, int out_size)
 {
   const char *p = text;
@@ -828,7 +745,6 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
     if(!*p)
       break;
     q = end = p;
-    /* grow the line one UTF-8 character at a time */
     while(*q && (*q != '\n'))
     {
       const char *next = q + 1;
@@ -847,7 +763,6 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
         prev = cp;
         continue;
       }
-      /* before this character, after a CJK one or before a CJK one */
       if((q > p) && (prev != ' ') && (wrap_cjk(cp) || wrap_cjk(prev)) && !wrap_no_start(cp))
         brk = q;
       memcpy(buf, p, len);
@@ -860,13 +775,12 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
     }
     if(*q && (*q != '\n') && brk && (brk > p))
       end = brk;
-    if(end == p)  /* one character wider than the line */
+    if(end == p)
     {
       end = p + 1;
       while((*end & 0xC0) == 0x80)
         end++;
     }
-    /* trailing spaces stay off the line */
     {
       int len = end - p;
       while((len > 0) && (p[len - 1] == ' '))
@@ -888,11 +802,6 @@ int ui_wrap_line(const char *text, int n, int max_width, int font, char *out, in
   return 0;
 }
 
-/* Dialog card, only for errors and questions that need one (spec section
- * 4): 360 x 132 in cream with a group-colour edge, a 2x title, up to three
- * lines of body and one or two buttons (the selected one filled). It drops
- * in over UI_F_DIALOG_IN frames (f) and leaves over UI_F_DIALOG_OUT when
- * closing. */
 void ui_dialog(const char *title, const char *body, const char **buttons,
  int button_count, int selected, u16 edge, int f, int closing)
 {
@@ -901,7 +810,7 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
 
   ui_door(0, 0, UI_SCREEN_W, UI_SCREEN_H);
   if(closing)
-    y = 66 + ui_ease_in_cubic(0, UI_SCREEN_H - 66, f, UI_F_DIALOG_OUT);  /* off the bottom edge */
+    y = 66 + ui_ease_in_cubic(0, UI_SCREEN_H - 66, f, UI_F_DIALOG_OUT);
   else
     y = 66 - ui_ease_out_back(24, 0, f, UI_F_DIALOG_IN);
 
@@ -939,9 +848,6 @@ void ui_dialog(const char *title, const char *body, const char **buttons,
   }
 }
 
-/* ---- lines and discs (the Controls drawings; drawn into the ground) ---- */
-
-/* A 1 px line, Bresenham. */
 void ui_line(int x0, int y0, int x1, int y1, u16 color)
 {
   int dx = (x1 > x0) ? x1 - x0 : x0 - x1, sx = (x0 < x1) ? 1 : -1;
@@ -953,13 +859,12 @@ void ui_line(int x0, int y0, int x1, int y1, u16 color)
     ui_fill(x0, y0, 1, 1, color);
     if((x0 == x1) && (y0 == y1))
       break;
-    e2 = 2 * err;  /* taken once: both steps test the same error */
+    e2 = 2 * err;
     if(e2 >= dy) { err += dy; x0 += sx; }
     if(e2 <= dx) { err += dx; y0 += sy; }
   }
 }
 
-/* The half-width of a disc of radius r at row offset y. */
 static int disc_span(int r, int y)
 {
   int w = 0;
@@ -980,7 +885,6 @@ void ui_disc(int cx, int cy, int r, u16 color)
   }
 }
 
-/* A ring t px thick whose outer radius is r. */
 void ui_ring(int cx, int cy, int r, int t, u16 color)
 {
   int y;
@@ -999,12 +903,7 @@ void ui_ring(int cx, int cy, int r, int t, u16 color)
   }
 }
 
-/* ---- the 5:3 box filter ---------------------------------------------------- */
-
-/* The big picture is the selected slot's screenshot box-filtered once to
- * 144 x 96 (5:3, every output pixel the area-weighted average of the
- * pixels it covers) and then drawn 1:1, never nearest-sampled. */
-static u8 box_i[144][3], box_w[144][3];  /* source index and weight in thirds */
+static u8 box_i[144][3], box_w[144][3];
 
 static void box_tables(void)
 {
@@ -1024,9 +923,6 @@ static void box_tables(void)
   }
 }
 
-/* 240-wide rows to 180, 3:4 (the Continue card's save picture): every 4
- * source pixels make 3, each weighted by the area it covers, across and
- * down. rows is a multiple of 4; dst gets rows * 3 / 4 rows. */
 static u32 mix43(u16 a, u16 b, int wa, int wb)
 {
   u32 r = (a & 31) * wa + (b & 31) * wb, g = ((a >> 5) & 31) * wa + ((b >> 5) & 31) * wb;
@@ -1045,6 +941,7 @@ static void shrink43_line(const u16 *s, u16 *d)
   }
 }
 
+/* rows is a multiple of 4; dst gets rows * 3 / 4 rows. */
 void ui_shrink_43_rows(const u16 *src, int rows, u16 *dst)
 {
   static u16 a[180], b[180], c[180], e[180];
@@ -1069,7 +966,7 @@ void ui_shrink_43_rows(const u16 *src, int rows, u16 *dst)
    a 144-wide picture: the pause screen's big picture, the Continue card */
 void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
 {
-  static u16 sum[3][3][144];  /* the three source rows, 5x horizontal sums */
+  static u16 sum[3][3][144];
   int y, x, k, c;
 
   if(!box_i[143][0])
@@ -1114,12 +1011,6 @@ void ui_shrink_53_rows(const u16 *src, int rows, u16 *dst)
   }
 }
 
-/* ---- the help card (the square key) (spec section 4, Help; r5 help_text) -------------------------------
- * A 440 px cream card with a 6 px group-colour edge over a screen door: the
- * title at 2x, the text in 12 px on 16 px lines, 36 px narrower than the
- * card; 50 px high plus 16 per line. In: 10 f out-back up from +30 px;
- * out: 8 f in-cubic, off the bottom edge. The hint strip reads "Close" after
- * (either key closes). f counts frames since it opened or began closing. */
 void ui_help_card(const char *title, const char *body, u16 edge, int f, int closing)
 {
   ui_hint_t h[2];
@@ -1133,7 +1024,7 @@ void ui_help_card(const char *title, const char *body, u16 edge, int f, int clos
     y = 26 + ui_ease_in_cubic(0, UI_SCREEN_H - 26, f, UI_F_HELP_OUT);
   else
     y = 26 + 30 - ui_ease_out_back(0, 30, f, UI_F_HELP_IN);
-  if(!(closing && (f >= UI_F_HELP_OUT)))  /* the door goes with the last frame */
+  if(!(closing && (f >= UI_F_HELP_OUT)))
     ui_door(0, 0, UI_SCREEN_W, UI_STRIP_Y);
   ui_round_fill(x + 4, y + 4, w, hgt, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, hgt, 3, UI_COL_CREAM);
@@ -1142,7 +1033,6 @@ void ui_help_card(const char *title, const char *body, u16 edge, int f, int clos
   for(j = 0; j < lines; j++)
     if(ui_wrap_line(body, j, w - 36, UI_FONT_BODY, line, sizeof(line)))
       ui_print(x + 18, y + 38 + j * 16, line, UI_COL_PLUM, UI_FONT_BODY, 0);
-  /* keys that share a verb sit together */
   h[0].keys = PSP_CTRL_SQUARE;
   h[0].verb = "";
   h[1].keys = ui_key_back;
@@ -1150,12 +1040,6 @@ void ui_help_card(const char *title, const char *body, u16 edge, int f, int clos
   ui_hint_packed(h, 2, 14);
 }
 
-/* ---- error cards (spec section 4, Errors; motion: dialog in / out) ---------------------
- * An error over whatever is on screen: it comes in over 12 f (out-back,
- * from 24 px higher) and leaves over 8 f (in-cubic, off the bottom edge).
- * × takes the first button, ○ always closes (the second button when there
- * is one). The screen behind is kept for the frames in between. Returns
- * 1 for the first button, 0 for close. */
 int ui_error_card(const char *title, const char *body, const char *ok, const char *cancel,
  u16 edge)
 {
@@ -1171,7 +1055,6 @@ int ui_error_card(const char *title, const char *body, const char *ok, const cha
   h[1].keys = ui_key_back;    h[1].verb = (char *)(cancel ? cancel : "Close");
   if(under)
   {
-    /* the frame on screen now: both buffers hold it after the last flips */
     u16 *src = (u16 *)((u32)screen_address | 0x40000000);
     for(y = 0; y < UI_SCREEN_H; y++)
       memcpy(under + y * UI_SCREEN_W, src + y * screen_pitch, UI_SCREEN_W * 2);
@@ -1208,7 +1091,7 @@ int ui_error_card(const char *title, const char *body, const char *ok, const cha
     else if(closing)
       break;
     if(!under && !closing && (f >= UI_F_DIALOG_IN))
-      f = UI_F_DIALOG_IN;  /* without the copy it stays still */
+      f = UI_F_DIALOG_IN;
   }
   ui_pool_release(mark);
   return result;

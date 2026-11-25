@@ -1,5 +1,3 @@
-/* game_name.h - a game's name from its file name (game_name.c) */
-
 #ifndef GAME_NAME_H
 #define GAME_NAME_H
 

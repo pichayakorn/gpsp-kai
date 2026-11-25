@@ -1,6 +1,4 @@
-/* UI text: Fusion Pixel (OFL) in kai's .fbm format, drawn into the frame.
- *
- * .fbm layout (tools/fonts/bdf2fbm.py), little-endian: a 9-byte header
+/* .fbm layout (tools/fonts/bdf2fbm.py), little-endian: a 9-byte header
  * (u16 glyph count, u16 map count, u16 default glyph, u8 cell width, u8 cell
  * height, u8 bytes per glyph), maps of (u16 first, u16 last, u16 distance)
  * where code point c in [first, last] is glyph c - distance, then per glyph
@@ -17,7 +15,6 @@ typedef struct
   u8 width, height, glyph_bytes, row_bytes;
 } ui_fbm_t;
 
-/* [size][0 = Latin, 1 = CJK] */
 static ui_fbm_t fonts[2][2];
 static int fonts_loaded = 0;
 static u32 fonts_bytes = 0;
@@ -58,9 +55,6 @@ static int load_fbm(ui_fbm_t *font, const char *name)
 
 u32 ui_font_init(u32 language)
 {
-  /* kai's language order: 0 Japanese ... 9 Korean, 10 Chinese (traditional),
-   * 11 Chinese (simplified). Other languages load the Japanese 12 px set
-   * for game titles. */
   static const char *cjk[12] =
     { "ja", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "ko", "zh_hant", "zh_hans" };
   const char *set = (language < 12) ? cjk[language] : NULL;
@@ -112,8 +106,6 @@ static const u8 *find_in(const ui_fbm_t *font, u32 c)
   return NULL;
 }
 
-/* The glyph for c: this size's Latin, then its CJK set, then the other
- * size's CJK set (a Latin-script menu has CJK only at 12 px). */
 static const u8 *find_glyph(u32 c, int size, const ui_fbm_t **font)
 {
   const u8 *g;
@@ -148,7 +140,6 @@ static u32 next_utf8(const char **s)
   return c;
 }
 
-/* Bold only where it reads as bold: Latin, Greek, Cyrillic. */
 static int boldable(u32 c)
 {
   return c < 0x0530;
@@ -160,7 +151,6 @@ static void put(int x, int y, u16 color)
     ui_fb[y * ui_fb_pitch + x] = color;
 }
 
-/* Draw one glyph's set pixels; scale is 1, 2 or 3. */
 static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, int scale)
 {
   int j, inside = (x >= ui_clip_x0) && (y >= ui_clip_y0) && (x + font->width * scale <= ui_clip_x1) &&
@@ -201,16 +191,12 @@ static void blit(const ui_fbm_t *font, const u8 *bits, int x, int y, u16 color, 
   }
 }
 
-/* Advance of c in pixels, drawing it when draw is set. A character the
- * fonts don't have is a hollow box. */
 static int glyph(int x, int y, u32 c, u16 color, int size, int flags, int draw)
 {
   const ui_fbm_t *font = NULL;
   const u8 *g = find_glyph(c, size, &font);
   int scale = (flags & UI_TEXT_3X) ? 3 : (flags & UI_TEXT_2X) ? 2 : 1;
   int bold = (flags & UI_TEXT_BOLD) && boldable(c);
-  /* bold advances 1 px per glyph; the "…" is not struck (its dots would
-     run into a bar) but advances the same (spec section 1, Type) */
   int wider = bold || ((flags & UI_TEXT_BOLD) && (c == 0x2026));
   int advance;
 
@@ -249,7 +235,6 @@ int ui_print_width(const char *s, int font, int flags)
   return w;
 }
 
-/* Print, cutting the text with "…" when it is wider than max_width. */
 int ui_print_fit(int x, int y, const char *s, u16 color, int font, int flags, int max_width)
 {
   const char *p = s;

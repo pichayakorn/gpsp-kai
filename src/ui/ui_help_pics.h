@@ -1,6 +1,3 @@
-/* The Smoothing help card's three samples (spec section 4, Help), 41 x 27
- * each in COLOR16: Off (nearest), Smooth (bilinear), Sharp (2x nearest,
- * then bilinear), made from the design's help5 code (round5_details.py). */
 #define HELP_PIC_W 41
 #define HELP_PIC_H 27
 static const u16 help_smooth_pics[3][HELP_PIC_W * HELP_PIC_H] =

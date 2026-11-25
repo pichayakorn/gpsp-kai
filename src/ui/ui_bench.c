@@ -1,12 +1,8 @@
-/* Step 1 benchmark screen (UI4=1 builds only; hold R while kai starts).
- * Draws a full frame of typical UI every frame and shows how long the
- * drawing takes, at 222, 266 or 333 MHz, plus the memory left. */
 #include "../common.h"
 #include "ui.h"
 
 #define BENCH_ROWS 9
 
-/* Per-part timing: MARK(n) adds the time since the last mark to part n. */
 enum { PART_GROUND, PART_ROWS, PART_GAME, PART_TEXT, PART_TOAST, PART_STATS,
        PART_HINTS, PART_COUNT };
 static const char *part_names[PART_COUNT] =
@@ -15,29 +11,28 @@ static u32 part_sum[PART_COUNT], part_avg[PART_COUNT], part_t;
 #define MARK(n) do { u32 now_ = sceKernelGetSystemTimeLow(); \
                      part_sum[n] += now_ - part_t; part_t = now_; } while(0)
 
-
 /* Through a volatile pointer: GCC removes a malloc() whose result is only
  * tested and freed, and assumes it succeeded. */
 static void *volatile probe_block;
 
 static u32 largest_malloc_kb(void)
 {
-  u32 lo = 0, hi = 64 * 1024;  /* KB */
+  u32 lo_kb = 0, hi_kb = 64 * 1024;
 
-  while(hi - lo > 16)
+  while(hi_kb - lo_kb > 16)
   {
-    u32 mid = (lo + hi) / 2;
+    u32 mid = (lo_kb + hi_kb) / 2;
     probe_block = malloc(mid * 1024);
     if(probe_block != NULL)
     {
       free(probe_block);
-      lo = mid;
+      lo_kb = mid;
     }
     else
-      hi = mid;
+      hi_kb = mid;
   }
   probe_block = NULL;
-  return lo;
+  return lo_kb;
 }
 
 static void draw_game_stand_in(int x, int y)
@@ -93,7 +88,6 @@ void ui_bench(void)
     }
     if(ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     {
-      /* re-target from where the frame is now, mid-move or not */
       cursor_from = ui_ease_out_back(cursor_from, 40 + cursor * UI_ROW_PITCH,
        cursor_frame, UI_F_CURSOR);
       cursor = (cursor + (ui_repeat(PSP_CTRL_DOWN) ? 1 : BENCH_ROWS - 1)) % BENCH_ROWS;
@@ -118,7 +112,6 @@ void ui_bench(void)
     sprintf(line, "%d MHz (set %d)", scePowerGetCpuClockFrequency(), (int)clocks[clock]);
     ui_text(UI_SCREEN_W - UI_MARGIN - ui_text_width(line), 12, line, UI_COL_MUTE);
 
-    /* rows with a lifted selection and the cursor frame flying to it */
     if(cursor_frame < UI_F_CURSOR)
       cursor_frame++;
     for(i = 0; i < BENCH_ROWS; i++)
@@ -148,14 +141,12 @@ void ui_bench(void)
 
     MARK(PART_ROWS);
 
-    /* the game behind, with the screen door */
     draw_game_stand_in(220, 40);
     if(door)
       ui_door(220, 40, 240, 160);
     MARK(PART_GAME);
     if(heavy)
     {
-      /* the menu language's script, or Japanese for game titles */
       static const char *cjk_sample[12] =
       {
         "セーブして終了します", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -172,7 +163,6 @@ void ui_bench(void)
 
     MARK(PART_TEXT);
 
-    /* toast: in 12 f, held 120 f, out 8 f */
     if(toast_frame >= 0)
     {
       int f = toast_frame++, tx;
@@ -192,7 +182,6 @@ void ui_bench(void)
       ui_text(tx + 6, 208 - UI_LIFT + 9, "Saved to slot 3", UI_COL_CREAM);
     }
 
-    /* hold bar: fills in UI_F_HOLD frames while SELECT is down */
     {
       u32 held = ui_hold_frames(PSP_CTRL_SELECT);
       if(held > UI_F_HOLD) held = UI_F_HOLD;
@@ -203,7 +192,6 @@ void ui_bench(void)
 
     MARK(PART_TOAST);
 
-    /* per-part averages, in hundredths of a ms */
     x = UI_MARGIN;
     for(i = 0; i < PART_COUNT; i++)
     {
