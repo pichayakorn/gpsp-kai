@@ -7,7 +7,7 @@
 
 /* GNU gettext .po files (lang/<code>.po), read once at start. Only the
  * translations are kept, each found by the FNV-1a hash of its English text;
- * tools/po_check.py makes sure no two English texts share a hash. */
+ * tools/po.py check makes sure no two English texts share a hash. */
 
 #define TR_MAX 2048
 
@@ -178,7 +178,10 @@ void ui_tr_init(u32 language)
     {
       field = 0;
       if(!strncmp(line, "#,", 2))
-        fuzzy = strstr(line, "fuzzy") != NULL;
+      {
+        if(strstr(line, "fuzzy"))
+          fuzzy = 1;
+      }
       else if(!strncmp(line, "msgctxt ", 8) && (n < TR_MAX))
         fuzzy = 1;  /* translations with a context aren't used */
       else if(!strncmp(line, "msgid ", 6) && (n < TR_MAX))
