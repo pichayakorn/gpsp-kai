@@ -78,12 +78,12 @@ typedef struct
 
 static const tile_t tiles[TILE_COUNT] =
 {
-  { "Settings",   icon20_gear,    UI_COL_LIME },
-  { "Cheats",     icon20_cheats,  UI_COL_LIME },
-  { "Screenshot", icon20_camera,  UI_COL_SKY },
-  { "Restart",    icon20_restart, UI_COL_TANGERINE },
-  { "Library",    icon20_folder,  UI_COL_TANGERINE },
-  { "Exit",       icon20_exit,    UI_COL_PINK },
+  { TN("Settings"),   icon20_gear,    UI_COL_LIME },
+  { TN("Cheats"),     icon20_cheats,  UI_COL_LIME },
+  { TN("Screenshot"), icon20_camera,  UI_COL_SKY },
+  { TN("Restart"),    icon20_restart, UI_COL_TANGERINE },
+  { TN("Library"),    icon20_folder,  UI_COL_TANGERINE },
+  { TN("Exit"),       icon20_exit,    UI_COL_PINK },
 };
 
 enum { UNDO_NONE, UNDO_SAVE, UNDO_SAVE_NEW, UNDO_DELETE };
@@ -102,7 +102,7 @@ static struct
   int cur, pos, pos_from, pos_f;
   int row, tile, tile_from, tile_f;
   int open_f, close_f, closing;
-  char toast[64];
+  char toast[128];
   u16 toast_edge;
   int toast_f, toast_undo;
   int title_f;
@@ -121,7 +121,7 @@ static struct
   int busy;
   u32 busy_start;
   char hold_line[48];
-  char game_toast[64];
+  char game_toast[128];
   int changed;
   int layer_full;
 } p;
@@ -418,12 +418,12 @@ static void load_big_picture(void)
   }
 }
 
-static void slot_name(int slot, char *out)
+static void slot_name(int slot, char *out, u32 size)
 {
   if(slot == LAST_SLOT)
-    strcpy(out, "Last");
+    snprintf(out, size, "%s", T("Last"));
   else
-    sprintf(out, "Slot %d", slot);
+    snprintf(out, size, T("Slot %d"), slot);
 }
 
 /* RTC ticks in UTC. */
@@ -572,7 +572,7 @@ static void build_layer(int full)
 
 static int header_width(const char *title, int *full)
 {
-  int pw = ui_text_width("Paused"), maxw = 380 - 14 - 34 - pw;
+  int pw = ui_text_width((char *)T("Paused")), maxw = 380 - 14 - 34 - pw;
 
   *full = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD);
   return (*full < maxw) ? *full : maxw;
@@ -585,7 +585,7 @@ static void draw_header_shift(int hy, int shift)
 
   ui_display_name(gamepak_filename, title);
   tw = header_width(title, &full);
-  ui_round_fill(14, hy, tw + ui_text_width("Paused") + 34, 24, 3, UI_COL_PLUM);
+  ui_round_fill(14, hy, tw + ui_text_width((char *)T("Paused")) + 34, 24, 3, UI_COL_PLUM);
   if((shift <= 0) || (full <= tw))
     ui_print_fit(22, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD, tw);
   else
@@ -594,7 +594,7 @@ static void draw_header_shift(int hy, int shift)
     ui_print(22 - shift, hy + 4, title, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
     ui_clip_reset();
   }
-  ui_text(30 + tw, hy + 6, "Paused", UI_COL_MUTE);
+  ui_text(30 + tw, hy + 6, (char *)T("Paused"), UI_COL_MUTE);
 }
 
 static void draw_header(int hy)
@@ -627,7 +627,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
 {
   int big = (dd > -128) && (dd < 128), ad = dd < 0 ? -dd : dd;
   int w = big ? BIG_W : SMALL_W, h = big ? BIG_H : SMALL_H, x, y;
-  char label[16];
+  char label[48];
 
   if(ad > 922)
     return;
@@ -666,18 +666,18 @@ static void draw_slot(int slot, int dd, int dy, int selected)
     ui_checker(x, y, w, h, UI_COL_CARD);
     if(big)
     {
-      int gw = ui_glyph_width(ui_key_confirm) + 4 + ui_print_width("Save", UI_FONT_BODY, 0);
+      int gw = ui_glyph_width(ui_key_confirm) + 4 + ui_print_width(T("Save"), UI_FONT_BODY, 0);
       int gx = ui_glyph(x + (w - gw) / 2, y + h / 2 - 6, ui_key_confirm) + 4;
-      ui_print(gx, y + h / 2 - 8, "Save", UI_COL_CREAM, UI_FONT_BODY, 0);
+      ui_print(gx, y + h / 2 - 8, T("Save"), UI_COL_CREAM, UI_FONT_BODY, 0);
     }
   }
 
   if(big && p.has[slot] && (p.hold.shown || p.load_hold.shown))
   {
     ui_hold_t *hd = p.hold.shown ? &p.hold : &p.load_hold;
-    const char *verb = p.hold.shown ? "Delete (hold)" :
-     (p.hold_line[0] ? p.hold_line : "Load (hold)");
-    int cw = ((p.hold_line[0] && (ui_text_width(p.hold_line) > ui_text_width("Load (hold)"))) ?
+    const char *verb = p.hold.shown ? T("Delete (hold)") :
+     (p.hold_line[0] ? p.hold_line : T("Load (hold)"));
+    int cw = ((p.hold_line[0] && (ui_text_width(p.hold_line) > ui_text_width((char *)T("Load (hold)")))) ?
      ui_text_width(p.hold_line) : ui_text_width((char *)verb)) + 20, cx, cy;
 
     if(cw < 96)
@@ -697,7 +697,7 @@ static void draw_slot(int slot, int dd, int dy, int selected)
   }
 
   if(slot == LAST_SLOT)
-    strcpy(label, "Last");
+    snprintf(label, sizeof(label), "%s", T("Last"));
   else
     sprintf(label, "%d", slot);
   ui_round_fill(x + 2, y + h - 14, ui_text_width(label) + 8, 13, 2, UI_COL_PLUM);
@@ -719,7 +719,7 @@ static void draw_tile(int i, int ty, int selected)
   ui_round_fill(tx + 21, ty + 10, 28, 28, 2, selected ? UI_COL_CREAM : tiles[i].color);
   draw_icon20(tx + 24, ty + 13, tiles[i].icon, selected ? tiles[i].color : UI_COL_CREAM);
   for(j = 0; j < 2; j++)
-    if(ui_wrap_line(tiles[i].label, j, 66, UI_FONT_SMALL, line[j], sizeof(line[j])))
+    if(ui_wrap_line(T(tiles[i].label), j, 66, UI_FONT_SMALL, line[j], sizeof(line[j])))
       lines++;
   for(j = 0; j < lines; j++)
     ui_text(tx + TILE_W / 2 - ui_text_width(line[j]) / 2, ty + 41 + j * 12 - ((lines == 2) ? 6 : 0),
@@ -760,8 +760,8 @@ static int tile_needs_hold(int i)
 static const char *tile_verb(void)
 {
   if(!tile_needs_hold(p.tile))
-    return "Open";
-  return (p.tile == TILE_EXIT) ? "Hold: quit" : ((p.tile == TILE_RESTART) ? "Hold: restart" : "Hold: leave");
+    return T("Open");
+  return (p.tile == TILE_EXIT) ? T("Hold: quit") : ((p.tile == TILE_RESTART) ? T("Hold: restart") : T("Hold: leave"));
 }
 
 static void draw_hints(int done)
@@ -777,19 +777,19 @@ static void draw_hints(int done)
   }
 
   n = 0;
-  c[n].keys = resume_keys; c[n++].verb = "Resume";
+  c[n].keys = resume_keys; c[n++].verb = (char *)T("Resume");
   if(p.row == 0)
   {
-    c[n].keys = PSP_CTRL_LTRIGGER; c[n++].verb = "Last";
-    c[n].keys = PSP_CTRL_RTRIGGER; c[n++].verb = "Slot 0";
+    c[n].keys = PSP_CTRL_LTRIGGER; c[n++].verb = (char *)T("Last");
+    c[n].keys = PSP_CTRL_RTRIGGER; c[n++].verb = (char *)T("Slot 0");
     c[n].keys = PSP_CTRL_SELECT;
-    c[n++].verb = undo_offered() ? "Undo" : "Save \xC2\xB7 Hold: delete";
+    c[n++].verb = (char *)(undo_offered() ? T("Undo") : T("Save \xC2\xB7 Hold: delete"));
     c[n].keys = ui_key_confirm;
-    c[n++].verb = !full ? "Save" : (g_gpsp_config.save_on_leave ? "Load" : "Hold: load");
+    c[n++].verb = (char *)(!full ? T("Save") : (g_gpsp_config.save_on_leave ? T("Load") : T("Hold: load")));
   }
   else
   {
-    c[n].keys = PSP_CTRL_UP;    c[n++].verb = "Savestates";
+    c[n].keys = PSP_CTRL_UP;    c[n++].verb = (char *)T("Savestates");
     c[n].keys = ui_key_confirm; c[n++].verb = (char *)tile_verb();
   }
   ui_hint_packed(c, n, 10);
@@ -821,8 +821,8 @@ static void draw_tile_hold(void)
 {
   int w = 312, x = 462 - w, y = 88, gx;
   u16 col = (p.tile == TILE_RESTART) ? UI_COL_TANGERINE : UI_COL_PINK;
-  const char *line = (p.tile == TILE_EXIT) ? "Hold to quit without saving" :
-   ((p.tile == TILE_RESTART) ? "Hold to restart without saving" : "Hold to leave without saving");
+  const char *line = (p.tile == TILE_EXIT) ? T("Hold to quit without saving") :
+   ((p.tile == TILE_RESTART) ? T("Hold to restart without saving") : T("Hold to leave without saving"));
 
   if(!p.exit_hold.shown || (p.exit_hold.p <= 0))
     return;
@@ -832,7 +832,7 @@ static void draw_tile_hold(void)
   gx = ui_glyph(x + 14, y + 9, ui_key_confirm) + 6;
   ui_print_fit(gx, y + 7, line, UI_COL_CREAM, UI_FONT_BODY, 0, x + w - 10 - gx);
   ui_hold_bar(x + 14, y + 28, w - 28, p.exit_hold.p, col);
-  ui_print_fit(x + 14, y + 38, "'Save when leaving a game' is off.", UI_COL_MUTE, UI_FONT_SMALL, 0, w - 28);
+  ui_print_fit(x + 14, y + 38, T("'Save when leaving a game' is off."), UI_COL_MUTE, UI_FONT_SMALL, 0, w - 28);
 }
 
 #ifdef UI_PERF
@@ -846,7 +846,7 @@ static u32 perf_sec[PERF_SECTIONS], perf_mark;
 static void draw_screen(int bar_fill)
 {
   int hy, dy, tile_dy[TILE_COUNT], done, i;
-  char info[48], when[16];
+  char info[128], when[32];
 
 #ifdef UI_PERF
   perf_mark = sceKernelGetSystemTimeLow();
@@ -895,7 +895,7 @@ static void draw_screen(int bar_fill)
   PERF_SECTION(2);
   if(done && !p.closing)
   {
-    slot_name(cur_slot(), info);
+    slot_name(cur_slot(), info, sizeof(info));
     if(p.has[cur_slot()])
     {
       format_time(p.time[cur_slot()], when);
@@ -930,7 +930,7 @@ static void draw_screen(int bar_fill)
     draw_tile_hold();
   if(p.toast_f >= 0)
   {
-    if(!ui_toast_at(p.toast, p.toast_edge, p.toast_undo ? "Undo" : NULL, p.toast_f, 6))
+    if(!ui_toast_at(p.toast, p.toast_edge, p.toast_undo ? T("Undo") : NULL, p.toast_f, 6))
       p.toast_f = -1;
   }
   if(p.bar_text)
@@ -1014,35 +1014,35 @@ static void take_loaded_picture(void)
 
 static void action_save(int slot)
 {
-  char name[MAX_FILE], text[48];
+  char name[MAX_FILE], text[64];
   int had = p.has[slot];
 
   shot_wait();
   get_savestate_filename_noshot(slot, name);
-  slot_name(slot, text);
-  run_with_bar("Saving\xE2\x80\xA6", NULL, UI_COL_SKY);
+  slot_name(slot, text, sizeof(text));
+  run_with_bar(T("Saving\xE2\x80\xA6"), NULL, UI_COL_SKY);
   save_state(name, p.game, slot);
   end_bar();
   read_slot(slot);
   if(p.has[slot])
   {
-    char msg_text[64];
+    char msg_text[128];
     if(p.big)
     {
       ui_shrink_53_rows(p.game, 160, p.big);
       p.big_slot = slot;
     }
-    sprintf(msg_text, "Saved to %s", (slot == LAST_SLOT) ? "Last" : text);
+    snprintf(msg_text, sizeof(msg_text), T("Saved to %s"), (slot == LAST_SLOT) ? T("Last") : text);
     show_toast(msg_text, UI_COL_SKY, had ? UNDO_SAVE : UNDO_SAVE_NEW, slot);
     g_game_config.last_slot = slot;
   }
   else
-    show_toast(state_error_text ? state_error_text : "Saving failed", UI_COL_PINK, UNDO_NONE, 0);
+    show_toast(state_error_text ? state_error_text : T("Saving failed"), UI_COL_PINK, UNDO_NONE, 0);
 }
 
 static void action_delete(int slot)
 {
-  char path[MAX_PATH], text[48], msg_text[64];
+  char path[MAX_PATH], text[64], msg_text[128];
 
   shot_wait();
   if(slot == LAST_SLOT)
@@ -1053,8 +1053,8 @@ static void action_delete(int slot)
     delete_state_files(path);
   }
   read_slot(slot);
-  slot_name(slot, text);
-  sprintf(msg_text, "%s deleted", text);
+  slot_name(slot, text, sizeof(text));
+  snprintf(msg_text, sizeof(msg_text), T("%s deleted"), text);
   show_toast(msg_text, UI_COL_PINK, UNDO_DELETE, slot);
 }
 
@@ -1079,7 +1079,7 @@ static u32 load_slot(int slot)
 
 static int action_load(int slot)
 {
-  char text[48], bar[48];
+  char text[128], bar[128];
   int keep = g_gpsp_config.save_on_leave, swap = keep && (slot == LAST_SLOT);
   u32 ok;
 
@@ -1087,9 +1087,9 @@ static int action_load(int slot)
   if(!p.has[slot])
     return 0;
   if(slot == LAST_SLOT)
-    strcpy(bar, "Loading Last\xE2\x80\xA6");
+    snprintf(bar, sizeof(bar), "%s", T("Loading Last\xE2\x80\xA6"));
   else
-    sprintf(bar, "Loading slot %d\xE2\x80\xA6", slot);
+    snprintf(bar, sizeof(bar), T("Loading slot %d\xE2\x80\xA6"), slot);
   if(keep)
     run_with_bar(bar, NULL, UI_COL_SKY);
   else
@@ -1129,9 +1129,9 @@ static int action_load(int slot)
       char who[256], body[400], play[300];
       ui_display_name(state_error_game, who);
       snprintf(body, sizeof(body),
-       "This savestate file was made while playing %s. It only loads in that game.", who);
-      snprintf(play, sizeof(play), "Play %s", who);
-      if(ui_error_card("Made by another game", body, play, "Cancel", UI_COL_SKY))
+       T("This savestate file was made while playing %s. It only loads in that game."), who);
+      snprintf(play, sizeof(play), T("Play %s"), who);
+      if(ui_error_card(T("Made by another game"), body, play, T("Cancel"), UI_COL_SKY))
       {
         if(ui_library_has_rom(state_error_game))
         {
@@ -1142,7 +1142,7 @@ static int action_load(int slot)
         ui_input_init();
         {
           char t[64];
-          snprintf(t, sizeof(t), "%.36s isn't in your games folder", who);
+          snprintf(t, sizeof(t), T("%.36s isn't in your games folder"), who);
           show_toast(t, UI_COL_PINK, UNDO_NONE, 0);
         }
         return 0;
@@ -1151,22 +1151,22 @@ static int action_load(int slot)
       ui_input_init();
       return 0;
     }
-    show_toast(state_error_text ? state_error_text : "Loading failed", UI_COL_PINK, UNDO_NONE, 0);
+    show_toast(state_error_text ? state_error_text : T("Loading failed"), UI_COL_PINK, UNDO_NONE, 0);
     return 0;
   }
   p.changed = 1;
   take_loaded_picture();
   g_game_config.last_slot = slot;
   if(slot == LAST_SLOT)
-    strcpy(text, "Last");
+    snprintf(text, sizeof(text), "%s", T("Last"));
   else
-    sprintf(text, "slot %d", slot);
+    snprintf(text, sizeof(text), T("slot %d"), slot);
   if(swap)
-    strcpy(p.game_toast, "Swapped with Last");
+    snprintf(p.game_toast, sizeof(p.game_toast), "%s", T("Swapped with Last"));
   else if(keep)
-    snprintf(p.game_toast, sizeof(p.game_toast), "Loaded %s \xC2\xB7 the game before is in Last", text);
+    snprintf(p.game_toast, sizeof(p.game_toast), T("Loaded %s \xC2\xB7 the game before is in Last"), text);
   else
-    snprintf(p.game_toast, sizeof(p.game_toast), "Loaded %s", text);
+    snprintf(p.game_toast, sizeof(p.game_toast), T("Loaded %s"), text);
   p.closing = 1;
   return 1;
 }
@@ -1186,7 +1186,7 @@ static void action_undo(void)
       if(slot == LAST_SLOT)
         load_last_state();
       read_slot(slot);
-      show_toast((p.undo == UNDO_SAVE) ? "The old savestate is back" : "The savestate is back",
+      show_toast((p.undo == UNDO_SAVE) ? T("The old savestate is back") : T("The savestate is back"),
        UI_COL_SKY, UNDO_NONE, 0);
       break;
     case UNDO_SAVE_NEW:
@@ -1195,7 +1195,7 @@ static void action_undo(void)
       if(slot == LAST_SLOT)
         load_last_state();
       read_slot(slot);
-      show_toast("The slot is empty again", UI_COL_SKY, UNDO_NONE, 0);
+      show_toast(T("The slot is empty again"), UI_COL_SKY, UNDO_NONE, 0);
       break;
   }
 }
@@ -1205,7 +1205,7 @@ static int action_exit(void)
   shot_wait();
   if(!g_gpsp_config.save_on_leave)
     return 1;
-  run_with_bar("Saving to Last\xE2\x80\xA6", "Then kai closes. Continue picks up here.", UI_COL_PINK);
+  run_with_bar(T("Saving to Last\xE2\x80\xA6"), T("Then kai closes. Continue picks up here."), UI_COL_PINK);
   save_last_state(p.game);
   end_bar();
   return 1;
@@ -1216,12 +1216,12 @@ static void action_restart_game(void)
   shot_wait();
   if(g_gpsp_config.save_on_leave)
   {
-    run_with_bar("Saving to Last\xE2\x80\xA6", "Then the game starts again from the beginning.",
+    run_with_bar(T("Saving to Last\xE2\x80\xA6"), T("Then the game starts again from the beginning."),
      UI_COL_TANGERINE);
     save_last_state(p.game);
     end_bar();
     read_slot(LAST_SLOT);
-    strcpy(p.game_toast, "Restarted \xC2\xB7 the game before is in Last");
+    snprintf(p.game_toast, sizeof(p.game_toast), "%s", T("Restarted \xC2\xB7 the game before is in Last"));
   }
   reset_gba();
   cheat_engine_restarted();
@@ -1235,7 +1235,7 @@ static void action_library(void)
   shot_wait();
   if(!g_gpsp_config.save_on_leave)
     return;
-  run_with_bar("Saving to Last\xE2\x80\xA6", NULL, UI_COL_TANGERINE);
+  run_with_bar(T("Saving to Last\xE2\x80\xA6"), NULL, UI_COL_TANGERINE);
   save_last_state(p.game);
   end_bar();
 }
@@ -1249,18 +1249,18 @@ static void quit_kai(void)
 
 static void restart_kai(void)
 {
-  static const char then[] = "Then kai starts again and brings you back here.";
+  const char *then = T("Then kai starts again and brings you back here.");
   int tab, row, save = g_gpsp_config.save_on_leave;
 
   ui_settings_where(&tab, &row);
   build_layer(1);
   if(save)
   {
-    run_with_bar("Saving to Last\xE2\x80\xA6", then, UI_COL_SKY);
+    run_with_bar(T("Saving to Last\xE2\x80\xA6"), then, UI_COL_SKY);
     save_last_state(p.game);
     end_bar();
   }
-  p.bar_text = "Restarting kai\xE2\x80\xA6";
+  p.bar_text = T("Restarting kai\xE2\x80\xA6");
   p.bar_note = then;
   p.bar_col = UI_COL_SKY;
   p.bar_f = UI_F_CARD_RISE;
@@ -1537,7 +1537,7 @@ u32 ui_pause(u16 *game_picture)
     if(ui_woke)
     {
       ui_woke = 0;
-      show_toast("Paused while the PSP slept", UI_COL_SKY, UNDO_NONE, 0);
+      show_toast(T("Paused while the PSP slept"), UI_COL_SKY, UNDO_NONE, 0);
     }
 
     if(opened && !p.closing)
@@ -1671,7 +1671,7 @@ u32 ui_pause(u16 *game_picture)
             case TILE_SHOT:
               shot_wait();
               save_ss_bmp(p.game);
-              show_toast("Screenshot saved", UI_COL_SKY, UNDO_NONE, 0);
+              show_toast(T("Screenshot saved"), UI_COL_SKY, UNDO_NONE, 0);
               break;
             case TILE_RESTART:
               action_restart_game();

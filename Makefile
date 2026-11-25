@@ -42,6 +42,7 @@ package: all
 	cp data/cfg/* $(PACKAGE_DIR)/cfg/
 	cp $(addprefix data/font/,$(PACKAGE_FONTS)) $(PACKAGE_DIR)/font/
 	$(if $(filter 1,$(UI4)),cp -r data/font/ui $(PACKAGE_DIR)/font/)
+	$(if $(filter 1,$(UI4)),mkdir -p $(PACKAGE_DIR)/lang && cp data/lang/*.po $(PACKAGE_DIR)/lang/ 2>/dev/null || true)
 	cp data/game_config.txt $(PACKAGE_DIR)/
 	cp COPYING $(PACKAGE_DIR)/licenses/
 	cp -r docs/licenses/. $(PACKAGE_DIR)/licenses/
@@ -61,6 +62,7 @@ main: systembuttons_prx homehookprx
 # Check the UI message files against the code (entry order, printf codes)
 check:
 	python3 tools/check_messages.py
+	python3 -I tools/po.py check
 
 # Package plus a zip named after the version: out/gpSP-kai-3.5.2.zip for a
 # release, out/gpSP-kai-3.5.2-dev+<commit>.zip for any other build

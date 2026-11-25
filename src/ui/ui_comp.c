@@ -582,7 +582,7 @@ void ui_status_chip_at(int y)
   status_age--;
   shown_level = (status_level < 0) ? 0 : ((status_level > 100) ? 100 : status_level);
   if(status_format == PSP_SYSTEMPARAM_TIME_FORMAT_12HR)
-    sprintf(clock, "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? "AM" : "PM");
+    snprintf(clock, sizeof(clock), "%d:%02d %s", (status_now.hour + 11) % 12 + 1, status_now.minute, (status_now.hour < 12) ? T("AM") : T("PM"));
   else
     sprintf(clock, "%02d:%02d", status_now.hour, status_now.minute);
   if(status_charging)
@@ -1040,7 +1040,7 @@ void ui_help_card(const char *title, const char *body, u16 edge, int f, int clos
   h[0].keys = PSP_CTRL_SQUARE;
   h[0].verb = "";
   h[1].keys = ui_key_back;
-  h[1].verb = "Close";
+  h[1].verb = (char *)T("Close");
   ui_hint_packed(h, 2, 14);
 }
 
@@ -1056,7 +1056,7 @@ int ui_error_card(const char *title, const char *body, const char *ok, const cha
   buttons[0] = ok;
   buttons[1] = cancel;
   h[0].keys = ui_key_confirm; h[0].verb = (char *)ok;
-  h[1].keys = ui_key_back;    h[1].verb = (char *)(cancel ? cancel : "Close");
+  h[1].keys = ui_key_back;    h[1].verb = (char *)(cancel ? cancel : T("Close"));
   if(under)
   {
     u16 *src = (u16 *)((u32)screen_address | 0x40000000);

@@ -46,6 +46,15 @@ extern u32 ui_key_back;
 #define UI_TEXT_3X    4
 u32 ui_font_init(u32 language);
 int ui_font_loaded(void);
+
+/* Translations: T("English") gives the loaded language's text, or the
+ * English when there is none. TN() only marks a text for translation (in a
+ * table, say) without looking it up: pass it through T() where it shows.
+ * tools/po_extract.py collects both into data/lang/kai.pot. */
+void ui_tr_init(u32 language);
+const char *ui_tr(const char *en);
+#define T(s)  ui_tr(s)
+#define TN(s) (s)
 u32 ui_font_bytes(void);
 int ui_print(int x, int y, const char *utf8, u16 color, int font, int flags);
 int ui_print_width(const char *utf8, int font, int flags);

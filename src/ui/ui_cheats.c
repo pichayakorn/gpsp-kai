@@ -46,7 +46,7 @@ static struct
   int lock_f, lock_row;
   int rest;
   int toast_f;
-  char toast[80];
+  char toast[128];
   int undo, undo_cheat;
   int help, help_f, help_out;
   int restart;
@@ -215,15 +215,15 @@ static int limit_chip(int x)
 
   if(cheat_total() <= cheat_count())
     return x;
-  snprintf(s, sizeof(s), "first %d of %d", (int)cheat_count(), (int)cheat_total());
+  snprintf(s, sizeof(s), T("first %d of %d"), (int)cheat_count(), (int)cheat_total());
   return chip(x, s, UI_COL_MUTE);
 }
 
 static void draw_header(void)
 {
-  const char *title = (on_list() || !cheat_count()) ? "Cheats" :
-   (c.page == ON_NOW) ? "On now" : cheat_group_name(c.page);
-  char s1[32], s2[32];
+  const char *title = (on_list() || !cheat_count()) ? T("Cheats") :
+   (c.page == ON_NOW) ? T("On now") : cheat_group_name(c.page);
+  char s1[64], s2[64];
   int x, w = ui_print_width(title, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
 
   if(w > 300)
@@ -234,22 +234,22 @@ static void draw_header(void)
     return;
   if(on_list())
   {
-    snprintf(s1, sizeof(s1), "%d cheats", (int)cheat_count());
+    snprintf(s1, sizeof(s1), T("%d cheats"), (int)cheat_count());
     x = chip(x, s1, UI_COL_LIME);
     x = limit_chip(x);
     if(count_cant_all())
     {
-      snprintf(s2, sizeof(s2), "%d can't run", count_cant_all());
+      snprintf(s2, sizeof(s2), T("%d can't run"), count_cant_all());
       chip(x, s2, UI_COL_MUTE);
     }
   }
   else if(c.page == ON_NOW)
   {
-    snprintf(s1, sizeof(s1), "%d on", count_on_all());
+    snprintf(s1, sizeof(s1), T("%d on"), count_on_all());
     x = chip(x, s1, UI_COL_LIME);
     if(count_ready_all())
     {
-      snprintf(s2, sizeof(s2), "%d ready", count_ready_all());
+      snprintf(s2, sizeof(s2), T("%d ready"), count_ready_all());
       chip(x, s2, UI_COL_SKY);
     }
   }
@@ -259,20 +259,20 @@ static void draw_header(void)
     group_counts(c.page, &on, &cant);
     for(i = cheat_group_first(c.page); i < (int)(cheat_group_first(c.page) + cheat_group_size(c.page)); i++)
       on -= is_ready(i);
-    snprintf(s1, sizeof(s1), "%d of %d on", on, (int)cheat_group_size(c.page));
+    snprintf(s1, sizeof(s1), T("%d of %d on"), on, (int)cheat_group_size(c.page));
     if(rule != CE_RULE_ONCE)
       x = chip(x, s1, UI_COL_LIME);
     if(c.single)
       x = limit_chip(x);
     switch(rule)
     {
-      case CE_RULE_ONE:     x = chip(x, "One at a time", UI_COL_SKY); break;
-      case CE_RULE_ONCE:    x = chip(x, "Runs once", UI_COL_SKY); break;
-      case CE_RULE_RESTART: x = chip(x, "Needs a restart", UI_COL_TANGERINE); break;
+      case CE_RULE_ONE:     x = chip(x, T("One at a time"), UI_COL_SKY); break;
+      case CE_RULE_ONCE:    x = chip(x, T("Runs once"), UI_COL_SKY); break;
+      case CE_RULE_RESTART: x = chip(x, T("Needs a restart"), UI_COL_TANGERINE); break;
     }
     if(cant)
     {
-      snprintf(s2, sizeof(s2), "%d can't run", cant);
+      snprintf(s2, sizeof(s2), T("%d can't run"), cant);
       chip(x, s2, UI_COL_MUTE);
     }
   }
@@ -295,15 +295,15 @@ static int pill_r(int xr, int y, const char *s, u16 fill, u16 ink)
 
 static void draw_row(int r, int y, int sel)
 {
-  static const char *const rule_words[] = { "", "one at a time", "runs once", "needs a restart" };
+  static const char *const rule_words[] = { "", TN("one at a time"), TN("runs once"), TN("needs a restart") };
   int kind = row_kind(r), lift = sel ? UI_LIFT : 0, x = UI_MARGIN - lift, yy = y - lift;
   int lx = x + 8, xr = x + 440 - 8;
   int i = (on_list() || (kind == R_FOLD) || (kind == R_ON_NOW)) ? -1 : cheat_at(r);
   int cant = (kind == R_CANT) || (kind == R_FOLD);
-  char fold[32];
+  char fold[64];
   u16 ink = sel ? UI_COL_PLUM : (cant ? UI_COL_MUTE : UI_COL_CREAM);
   u16 note = sel ? UI_COL_PLUM : UI_COL_MUTE;
-  char meta[64];
+  char meta[128];
   const char *label;
 
   if(sel)
@@ -317,11 +317,14 @@ static void draw_row(int r, int y, int sel)
     if(kind == R_ON_NOW)
     {
       draw_icon11(lx, yy + 4, icon_star, sel ? UI_COL_PLUM : UI_COL_LIME, 1);
-      label = "On now";
-      snprintf(meta, sizeof(meta), "%d on", count_on_all());
+      label = T("On now");
+      snprintf(meta, sizeof(meta), T("%d on"), count_on_all());
       if(count_ready_all())
-        snprintf(meta + strlen(meta), sizeof(meta) - strlen(meta), " \xC2\xB7 %d ready",
-         count_ready_all());
+      {
+        char ready[64];
+        snprintf(ready, sizeof(ready), T("%d ready"), count_ready_all());
+        snprintf(meta + strlen(meta), sizeof(meta) - strlen(meta), " \xC2\xB7 %s", ready);
+      }
     }
     else
     {
@@ -329,14 +332,16 @@ static void draw_row(int r, int y, int sel)
       draw_icon11(lx, yy + 4, icon_folder, sel ? UI_COL_PLUM : UI_COL_TANGERINE, 1);
       label = cheat_group_name(g);
       group_counts(g, &on, &n);
-      snprintf(meta, sizeof(meta), "%d of %d on%s%s", on, (int)cheat_group_size(g),
-       cheat_group_rule(g) ? " \xC2\xB7 " : "", rule_words[cheat_group_rule(g) & 3]);
+      snprintf(meta, sizeof(meta), T("%d of %d on"), on, (int)cheat_group_size(g));
+      if(cheat_group_rule(g))
+        snprintf(meta + strlen(meta), sizeof(meta) - strlen(meta), " \xC2\xB7 %s",
+         T(rule_words[cheat_group_rule(g) & 3]));
     }
     lx += 22;
   }
   else if(kind == R_FOLD)
   {
-    snprintf(fold, sizeof(fold), "Can't run (%d)", c.n_cant);
+    snprintf(fold, sizeof(fold), T("Can't run (%d)"), c.n_cant);
     label = fold;
     xr = print_r(xr, yy + 3, c.fold_open ? "\xE2\x96\xBE" : "\xE2\x96\xB8", note) - 10;
   }
@@ -366,10 +371,10 @@ static void draw_row(int r, int y, int sel)
       }
       case R_ONCE:
         if(cheat_is_on(i))
-          xr = pill_r(xr, yy + 3, "Ready", sel ? UI_COL_PLUM : UI_COL_LIME,
+          xr = pill_r(xr, yy + 3, T("Ready"), sel ? UI_COL_PLUM : UI_COL_LIME,
            sel ? UI_COL_LIME : UI_COL_PLUM) - 8;
         else
-          xr = print_r(xr, yy + 3, "\xE2\x96\xB6 Apply", sel ? UI_COL_PLUM : UI_COL_LIME) - 8;
+          xr = print_r(xr, yy + 3, T("\xE2\x96\xB6 Apply"), sel ? UI_COL_PLUM : UI_COL_LIME) - 8;
         break;
       default:
         xr = print_r(xr, yy + 3, "\xE2\x80\x94", note) - 10;
@@ -381,7 +386,7 @@ static void draw_row(int r, int y, int sel)
       xr -= 20;
     }
     if(cheat_waits_restart(i))
-      xr = pill_r(xr, yy + 3, "next start", sel ? UI_COL_PLUM : UI_COL_SKY,
+      xr = pill_r(xr, yy + 3, T("next start"), sel ? UI_COL_PLUM : UI_COL_SKY,
        sel ? UI_COL_SKY : UI_COL_PLUM) - 8;
   }
   if(meta[0])
@@ -408,8 +413,8 @@ static void draw_hints(void)
   ui_hint_t h[6];
   int n = 0, kind;
 
-  h[n].keys = ui_key_back; h[n++].verb = "Back";
-  h[n].keys = PSP_CTRL_SQUARE; h[n++].verb = "Help";
+  h[n].keys = ui_key_back; h[n++].verb = (char *)T("Back");
+  h[n].keys = PSP_CTRL_SQUARE; h[n++].verb = (char *)T("Help");
   if(c.n == 0)
   {
     ui_hint_packed(h, n, 14);
@@ -418,48 +423,48 @@ static void draw_hints(void)
   kind = row_kind(c.cur);
   if(c.marks)
   {
-    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Jump";
+    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = (char *)T("Jump");
   }
   if(c.undo != UNDO_NONE)
   {
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = "Undo";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = (char *)T("Undo");
   }
   else if(!on_list() && lockable(c.cur))
   {
     h[n].keys = PSP_CTRL_SELECT;
-    h[n++].verb = cheat_is_locked(cheat_at(c.cur)) ? "Unlock" : "Lock";
+    h[n++].verb = (char *)(cheat_is_locked(cheat_at(c.cur)) ? T("Unlock") : T("Lock"));
   }
   if(all_off_here())
   {
-    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "All off";
+    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = (char *)T("All off");
   }
   h[n].keys = ui_key_confirm;
   switch(kind)
   {
     case R_ON_NOW:
-    case R_GROUP:  h[n++].verb = "Open"; break;
-    case R_FOLD:   h[n++].verb = c.fold_open ? "Close" : "Open"; break;
+    case R_GROUP:  h[n++].verb = (char *)T("Open"); break;
+    case R_FOLD:   h[n++].verb = (char *)(c.fold_open ? T("Close") : T("Open")); break;
     case R_SWITCH:
       if(!cheat_is_locked(cheat_at(c.cur)))
-        h[n++].verb = "Switch";
+        h[n++].verb = (char *)T("Switch");
       break;
     case R_RADIO:
       if(!cheat_is_locked(cheat_at(c.cur)))
-        h[n++].verb = cheat_is_on(cheat_at(c.cur)) ? "Switch" : "Choose";
+        h[n++].verb = (char *)(cheat_is_on(cheat_at(c.cur)) ? T("Switch") : T("Choose"));
       break;
-    case R_ONCE:   h[n++].verb = cheat_is_on(cheat_at(c.cur)) ? "Clear" : "Apply"; break;
+    case R_ONCE:   h[n++].verb = (char *)(cheat_is_on(cheat_at(c.cur)) ? T("Clear") : T("Apply")); break;
   }
   ui_hint_packed(h, n, 14);
 }
 
 static void draw_empty(void)
 {
-  static const char t[] = "No cheats for this game";
+  const char *t = T("No cheats for this game");
   char b[MAX_PATH + 32], folder[MAX_PATH];
   int w;
 
   cheat_engine_folder(folder, sizeof(folder));
-  snprintf(b, sizeof(b), "Put .cht files in %s", folder);
+  snprintf(b, sizeof(b), T("Put .cht files in %s"), folder);
   ui_round_fill(208, 82, 64, 52, 3, UI_COL_CARD);
   draw_icon11(224, 92, icon_cheats, UI_COL_LIME, 3);
   ui_print(240 - ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) / 2, 146, t, UI_COL_CREAM,
@@ -555,21 +560,21 @@ static const char *tip_text(void)
   if(c.n == 0)
     return NULL;
   if(on_list())
-    return "Each file in the game's cheat folder is a group.";
+    return T("Each file in the game's cheat folder is a group.");
   if(rows[c.cur] == ON_ROW)
     return NULL;
   if(rows[c.cur] == FOLD)
-    return "Cheats kai can't run, folded away: \xC3\x97 shows them.";
+    return T("Cheats kai can't run, folded away: \xC3\x97 shows them.");
   i = cheat_at(c.cur);
   if(cheat_status(i) != CE_OK)
-    return cheat_why(i);
+    return T(cheat_why(i));
   if(cheat_is_locked(i))
-    return "Locked cheats stay on: All off skips them. SELECT unlocks.";
+    return T("Locked cheats stay on: All off skips them. SELECT unlocks.");
   switch(rule_of(i))
   {
-    case CE_RULE_ONE:     return "Switching one on switches the others off.";
-    case CE_RULE_ONCE:    return "Runs once when you go back to the game, then switches itself off.";
-    case CE_RULE_RESTART: return "Works from the game's start: it needs a restart.";
+    case CE_RULE_ONE:     return T("Switching one on switches the others off.");
+    case CE_RULE_ONCE:    return T("Runs once when you go back to the game, then switches itself off.");
+    case CE_RULE_RESTART: return T("Works from the game's start: it needs a restart.");
   }
   return NULL;
 }
@@ -583,9 +588,9 @@ static void help_text(const char **t, const char **b)
     int i = cheat_at(c.cur);
     if((rows[c.cur] == FOLD) || (cheat_status(i) != CE_OK))
     {
-      *t = "Can't run";
-      *b = "kai checks every code when the file loads. A greyed cheat can't be switched on; "
-       "the tip line says why. Master codes (\"must be on\") are hidden: kai doesn't need them.";
+      *t = T("Can't run");
+      *b = T("kai checks every code when the file loads. A greyed cheat can't be switched on; "
+       "the tip line says why. Master codes (\"must be on\") are hidden: kai doesn't need them.");
       return;
     }
     rule = rule_of(i);
@@ -593,23 +598,23 @@ static void help_text(const char **t, const char **b)
   switch(rule)
   {
     case CE_RULE_ONE:
-      *t = "One at a time";
-      *b = "These cheats replace each other: switching one on switches the one before off.";
+      *t = T("One at a time");
+      *b = T("These cheats replace each other: switching one on switches the one before off.");
       break;
     case CE_RULE_ONCE:
-      *t = "Runs once";
-      *b = "\xC3\x97 gets it ready; it runs once when you go back to the game, then switches "
-       "itself off.";
+      *t = T("Runs once");
+      *b = T("\xC3\x97 gets it ready; it runs once when you go back to the game, then switches "
+       "itself off.");
       break;
     case CE_RULE_RESTART:
-      *t = "Needs a restart";
-      *b = "This cheat changes the game as it starts, so the game has to start again for it "
-       "to work.";
+      *t = T("Needs a restart");
+      *b = T("This cheat changes the game as it starts, so the game has to start again for it "
+       "to work.");
       break;
     default:
-      *t = "Cheat groups";
-      *b = "Each .cht file in the game's cheat folder is a group. On now lists every cheat that "
-       "is on, from all groups.";
+      *t = T("Cheat groups");
+      *b = T("Each .cht file in the game's cheat folder is a group. On now lists every cheat that "
+       "is on, from all groups.");
       break;
   }
 }
@@ -724,7 +729,7 @@ static int ask(const char *title, const char *body, const char *b0, const char *
     {
       ui_dialog(title, body, buttons, 2, sel, edge, f, closing);
       h[0].keys = ui_key_back;                    h[0].verb = (char *)back_verb;
-      h[1].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[1].verb = "Move";
+      h[1].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[1].verb = (char *)T("Move");
       h[2].keys = ui_key_confirm;
       h[2].verb = (char *)(ok_verb ? ok_verb : buttons[sel]);
       ui_hint_packed(h, closing ? 0 : 3, 14);
@@ -746,10 +751,10 @@ static int ask(const char *title, const char *body, const char *b0, const char *
 static void ask_restart(void)
 {
   const char *body = g_gpsp_config.save_on_leave ?
-   "This cheat works from the game's start. kai saves to Last, then starts the game again." :
-   "The game starts again from its beginning. Your save file is kept.";
+   T("This cheat works from the game's start. kai saves to Last, then starts the game again.") :
+   T("The game starts again from its beginning. Your save file is kept.");
 
-  if(ask("Restart the game?", body, "Restart now", "Later", UI_COL_TANGERINE, "Later", NULL) == 0)
+  if(ask(T("Restart the game?"), body, T("Restart now"), T("Later"), UI_COL_TANGERINE, T("Later"), NULL) == 0)
     c.restart = 1;
 }
 
@@ -1076,7 +1081,7 @@ static void press_confirm(void)
     if(before >= 0)
     {
       char t[80];
-      snprintf(t, sizeof(t), "%s switched off", cheat_name(before));
+      snprintf(t, sizeof(t), T("%s switched off"), cheat_name(before));
       c.undo_cheat = before;
       show_toast(t, UNDO_CHOICE);
     }
@@ -1148,7 +1153,7 @@ static void press_all_off(void)
   for(i = 0; i < (int)cheat_count(); i++)
     if(undo_on[i])
       cheat_set_on(i, 0);
-  show_toast("All cheats off", UNDO_ALL_OFF);
+  show_toast(T("All cheats off"), UNDO_ALL_OFF);
 }
 
 int ui_cheats(void)
@@ -1234,7 +1239,7 @@ int ui_cheats(void)
     draw_selection();
     if(c.toast_f >= 0)
     {
-      if(!ui_toast_at(c.toast, UI_COL_LIME, c.undo ? "Undo" : NULL, c.toast_f, TOAST_Y))
+      if(!ui_toast_at(c.toast, UI_COL_LIME, c.undo ? T("Undo") : NULL, c.toast_f, TOAST_Y))
       {
         c.toast_f = -1;
         c.undo = UNDO_NONE;

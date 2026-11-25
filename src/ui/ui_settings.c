@@ -53,68 +53,68 @@ static const char *language_names[12] =
 static row_t rows[TABS][MAX_ROWS] =
 {
   {
-    { "Screen size", "Original keeps the GBA's pixels exact; Fit fills the height; Full fills the screen.",
-      K_SCREEN, 0, 3, { "Original", "Fit", "Full" }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
-    { "Smoothing", "Sharp keeps pixels crisp when the picture is scaled; Smooth softens them.",
-      K_SEG, 0, 3, { "Off", "Smooth", "Sharp" }, &g_gpsp_config.screen_filter, NULL, filter_sharp_bilinear },
-    { "Side bars", "What fills the space beside the picture in 3:2 sizes.",
-      K_SEG, 0, 3, { "Black", "Pattern", "Game colours" }, &g_gpsp_config.side_bars, NULL, SIDE_BARS_BLACK },
-    { "Frameskip", "Auto skips frames only when the game would slow down.",
-      K_SEG, 1, 3, { "Off", "Auto", "Fixed" }, &g_game_config.frameskip_type, map_frameskip, auto_frameskip },
-    { "Skip up to", "The most frames Auto skips in a row; Fixed skips this many.",
-      K_CYCLE, 1, 0, { NULL }, &g_game_config.frameskip_value, NULL, 9, 0, 99, "%d frames" },
-    { "Picture scale", "Below 100 % the picture shrinks inside its screen size.",
+    { TN("Screen size"), TN("Original keeps the GBA's pixels exact; Fit fills the height; Full fills the screen."),
+      K_SCREEN, 0, 3, { TN("Original"), TN("Fit"), TN("Full") }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
+    { TN("Smoothing"), TN("Sharp keeps pixels crisp when the picture is scaled; Smooth softens them."),
+      K_SEG, 0, 3, { TN("Off"), TN("Smooth"), TN("Sharp") }, &g_gpsp_config.screen_filter, NULL, filter_sharp_bilinear },
+    { TN("Side bars"), TN("What fills the space beside the picture in 3:2 sizes."),
+      K_SEG, 0, 3, { TN("Black"), TN("Pattern"), TN("Game colours") }, &g_gpsp_config.side_bars, NULL, SIDE_BARS_BLACK },
+    { TN("Frameskip"), TN("Auto skips frames only when the game would slow down."),
+      K_SEG, 1, 3, { TN("Off"), TN("Auto"), TN("Fixed") }, &g_game_config.frameskip_type, map_frameskip, auto_frameskip },
+    { TN("Skip up to"), TN("The most frames Auto skips in a row; Fixed skips this many."),
+      K_CYCLE, 1, 0, { NULL }, &g_game_config.frameskip_value, NULL, 9, 0, 99, TN("%d frames") },
+    { TN("Picture scale"), TN("Below 100 % the picture shrinks inside its screen size."),
       K_CYCLE, 0, 0, { NULL }, &g_gpsp_config.screen_scale, NULL, 100, 50, 200, "%d%%" },
   },
   {
-    { "Sound", "Off mutes the game and runs a little faster.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
-    { "Sound delay", "Less delay feels faster; more delay stops crackles in busy games.",
+    { TN("Sound"), TN("Off mutes the game and runs a little faster."), K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
+    { TN("Sound delay"), TN("Less delay feels faster; more delay stops crackles in busy games."),
       K_BLOCKS, 1, 11, { NULL }, &g_game_config.audio_buffer_size_number, NULL, 2 },
   },
   {
-    { "Use the stick", "The stick works like the d-pad, or does what you pick for each direction.",
+    { TN("Use the stick"), TN("The stick works like the d-pad, or does what you pick for each direction."),
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
-    { "Sensitivity", "The ring shows where a push starts to count.",
+    { TN("Sensitivity"), TN("The ring shows where a push starts to count."),
       K_BLOCKS, 0, 10, { NULL }, &g_gpsp_config.analog_sensitivity_level, map_sens, 4, 0, 0, "%d" },
-    { "Tilt sensor", "For tilt-cartridge games: the stick stands in for tilting.",
+    { TN("Tilt sensor"), TN("For tilt-cartridge games: the stick stands in for tilting."),
       K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
   {
-    { "Save when leaving a game", "Continue on the Home screen picks up exactly here.",
+    { TN("Save when leaving a game"), TN("Continue on the Home screen picks up exactly here."),
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.save_on_leave, NULL, YES },
-    { "Fast forward", "Hold: fast while the button is down. Toggle: one press on, one press off.",
-      K_SEG, 0, 2, { "Hold", "Toggle" }, &g_gpsp_config.fast_forward_mode, map_ff, FF_TOGGLE },
-    { "Fast forward speed", "Max runs as fast as the PSP can, so its speed changes with each game.",
-      K_SEG, 0, 3, { "2\xC3\x97", "3\xC3\x97", "Max" }, &g_gpsp_config.ff_speed, NULL, FF_SPEED_3X },
-    { "Sound while fast", "Off keeps fast forward quiet.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
-    { "Rapid-fire speed", "How fast a rapid-fire button presses while you hold it.", K_SEG, 1, 3, { "Slow", "Medium", "Fast" },
+    { TN("Fast forward"), TN("Hold: fast while the button is down. Toggle: one press on, one press off."),
+      K_SEG, 0, 2, { TN("Hold"), TN("Toggle") }, &g_gpsp_config.fast_forward_mode, map_ff, FF_TOGGLE },
+    { TN("Fast forward speed"), TN("Max runs as fast as the PSP can, so its speed changes with each game."),
+      K_SEG, 0, 3, { "2\xC3\x97", "3\xC3\x97", TN("Max") }, &g_gpsp_config.ff_speed, NULL, FF_SPEED_3X },
+    { TN("Sound while fast"), TN("Off keeps fast forward quiet."), K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.fast_forward_sound, NULL, YES },
+    { TN("Rapid-fire speed"), TN("How fast a rapid-fire button presses while you hold it."), K_SEG, 1, 3, { TN("Slow"), TN("Medium"), TN("Fast") },
       &g_game_config.rapidfire_speed, NULL, RAPIDFIRE_FAST },
-    { "Show FPS", "Shows the frames per second in the top-left corner.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_fps, NULL, NO },
+    { TN("Show FPS"), TN("Shows the frames per second in the top-left corner."), K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_fps, NULL, NO },
   },
   {
-    { "Language", "The language comes from your PSP until you pick one.",
+    { TN("Language"), TN("The language comes from your PSP until you pick one."),
       K_CYCLE, 0, 12, { NULL }, &g_gpsp_config.language, NULL, 1, 0, 0, NULL, language_names },
-    { "CPU speed", "333 MHz runs every game at full speed; lower saves battery.",
-      K_SEG, 1, 3, { "222", "266", "333 MHz" }, &g_game_config.clock_speed_number, map_clock, 9 },
-    { "Write game saves", "Right away writes the game's save at once; On exit waits until you leave.",
-      K_SEG, 1, 2, { "On exit", "Right away" }, &g_game_config.update_backup_flag, NULL, YES },
-    { "Start games with", "GBA BIOS shows the GBA's start-up logo first; Game Cart skips it.", K_SEG, 0, 2, { "Game Cart", "GBA BIOS" }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
-    { "No-BIOS notice", "Shows a line in the library each time kai starts without a GBA BIOS.",
+    { TN("CPU speed"), TN("333 MHz runs every game at full speed; lower saves battery."),
+      K_SEG, 1, 3, { "222", "266", TN("333 MHz") }, &g_game_config.clock_speed_number, map_clock, 9 },
+    { TN("Write game saves"), TN("Right away writes the game's save at once; On exit waits until you leave."),
+      K_SEG, 1, 2, { TN("On exit"), TN("Right away") }, &g_game_config.update_backup_flag, NULL, YES },
+    { TN("Start games with"), TN("GBA BIOS shows the GBA's start-up logo first; Game Cart skips it."), K_SEG, 0, 2, { TN("Game Cart"), TN("GBA BIOS") }, &g_gpsp_config.boot_mode, NULL, GAME_CART },
+    { TN("No-BIOS notice"), TN("Shows a line in the library each time kai starts without a GBA BIOS."),
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.bios_note, NULL, YES },
-    { "Show Recent tab", "Off: the library opens on All.",
+    { TN("Show Recent tab"), TN("Off: the library opens on All."),
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_recent, NULL, YES },
-    { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models.",
-      K_SEG, 0, 3, { "PSP setting", UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
-    { "Restart kai", "Saves like Exit, starts kai again and brings you back here.",
+    { TN("Confirm button"), TN("PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models."),
+      K_SEG, 0, 3, { TN("PSP setting"), UI_SEG_CROSS, UI_SEG_CIRCLE }, &g_gpsp_config.confirm_button, NULL, CONFIRM_SYSTEM },
+    { TN("Restart kai"), TN("Saves like Exit, starts kai again and brings you back here."),
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESTART },
-    { "Quit kai", "Saves like Exit, then closes kai.",
+    { TN("Quit kai"), TN("Saves like Exit, then closes kai."),
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_QUIT },
-    { "Reset all settings", "Puts kai's and this game's settings back to their defaults.",
+    { TN("Reset all settings"), TN("Puts kai's and this game's settings back to their defaults."),
       K_ACTION, 0, 0, { NULL }, NULL, NULL, ACT_RESET_ALL },
   },
 };
 
-static const char *tab_labels[TABS] = { "Display", "Sound", "Controls", "Play", "System" };
+static const char *tab_labels[TABS] = { TN("Display"), TN("Sound"), TN("Controls"), TN("Play"), TN("System") };
 
 static int row_count(int tab)
 {
@@ -175,7 +175,7 @@ static struct
   ui_hold_t action_hold;
   u32 undo[TABS][MAX_ROWS];
   int undo_all;
-  char toast[48];
+  char toast[128];
   int toast_f, toast_undo;
   u16 toast_edge;
   int restart;
@@ -271,13 +271,14 @@ static void draw_screen_choices(const row_t *r, int x, int y, int selected, u16 
 
   for(j = 2; j >= 0; j--)
   {
-    int tw = ui_text_width((char *)r->opts[j]), bx, by = y + 11;
+    const char *opt = T(r->opts[j]);
+    int tw = ui_text_width((char *)opt), bx, by = y + 11;
     int on = (j == k);
 
     xr -= tw + 8;
     if(on)
       ui_round_fill(xr - 4, y + 10, tw + 8, 15, 2, selected ? UI_COL_PLUM : UI_COL_LIME);
-    ui_text(xr, y + 11, (char *)r->opts[j], on ? (selected ? UI_COL_CREAM : UI_COL_PLUM) :
+    ui_text(xr, y + 11, (char *)opt, on ? (selected ? UI_COL_CREAM : UI_COL_PLUM) :
      (selected ? UI_COL_PLUM : UI_COL_MUTE));
     xr -= 6 + 34;
     bx = xr;
@@ -294,13 +295,13 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   row_t *r = &rows[tab][i];
   u16 g = UI_COL_LIME;
   int vx, vy, flags = 0, k;
-  char text[32];
+  char text[64];
   int rx = row_x(tab), rw = row_w(tab);
 
   if(r->kind == K_OFF)
   {
-    ui_card_row(rx, y, rw, r->label, 0, g, UI_ROW_DISABLED, &vx, &vy);
-    ui_row_note(vx, vy, r->opts[0]);
+    ui_card_row(rx, y, rw, T(r->label), 0, g, UI_ROW_DISABLED, &vx, &vy);
+    ui_row_note(vx, vy, T(r->opts[0]));
     return;
   }
   if(row_changed(r))
@@ -316,27 +317,33 @@ static void draw_row(int tab, int i, int y, int selected, int f)
     ui_round_fill(rx - lift, y - lift, rw, SCREEN_ROW_H, 2, selected ? g : UI_COL_CARD);
     if(flags & UI_ROW_CHANGED)
       ui_fill(rx - 9, y + 18, 4, 4, UI_COL_TANGERINE);
-    ui_print(rx + 8 - lift, y + 12 - lift, r->label, selected ? UI_COL_PLUM : UI_COL_CREAM,
+    ui_print(rx + 8 - lift, y + 12 - lift, T(r->label), selected ? UI_COL_PLUM : UI_COL_CREAM,
      UI_FONT_BODY, 0);
     draw_screen_choices(r, rx + rw - 8 - lift, y - lift, selected, g);
     return;
   }
 
-  ui_card_row(rx, y, rw, r->label, selected, g, flags, &vx, &vy);
+  ui_card_row(rx, y, rw, T(r->label), selected, g, flags, &vx, &vy);
   if(is_lang_row(tab, i) && lang_pending())
   {
     int lift = selected ? UI_LIFT : 0;
-    int px = rx + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 10;
-    int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 14;
+    int px = rx + 8 - lift + ui_print_width(T(r->label), UI_FONT_BODY, 0) + 10;
+    int pw = ui_print_width(T("next start"), UI_FONT_SMALL, 0) + 14;
     ui_round_fill(px, y + 3 - lift, pw, 14, 2, UI_COL_SKY);
-    ui_print(px + 7, y + 3 - lift, "next start", UI_COL_PLUM, UI_FONT_SMALL, 0);
+    ui_print(px + 7, y + 3 - lift, T("next start"), UI_COL_PLUM, UI_FONT_SMALL, 0);
   }
   k = (r->value) ? row_index(r) : 0;
   switch(r->kind)
   {
     case K_SEG:
-      ui_row_segments(vx, vy, r->opts, r->count, k, selected ? s.value_from : k, f, selected, g);
+    {
+      const char *opts[4];
+      int j;
+      for(j = 0; j < 4; j++)
+        opts[j] = r->opts[j] ? T(r->opts[j]) : NULL;
+      ui_row_segments(vx, vy, opts, r->count, k, selected ? s.value_from : k, f, selected, g);
       break;
+    }
     case K_SWITCH:
       ui_row_switch(vx, vy, ui_switch_pos(*r->value != 0, selected ? f : UI_F_VALUE), selected);
       break;
@@ -357,7 +364,7 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       if(r->names)
         snprintf(text, sizeof(text), "%s", r->names[(k >= 0) && (k < r->count) ? k : 0]);
       else
-        snprintf(text, sizeof(text), r->fmt, (int)*r->value);
+        snprintf(text, sizeof(text), T(r->fmt), (int)*r->value);
       ui_row_cycle(vx, vy, text, selected, g, selected ? f : UI_F_VALUE);
       break;
     case K_ACTION:
@@ -416,13 +423,13 @@ static const char *action_name(u32 id)
 {
   static const char *names[PAD_ACTIONS] =
   {
-    "Up", "Down", "Left", "Right", "A", "B", "L", "R", "START", "SELECT", "Pause screen",
-    "Fast forward", "Quick load", "Quick save", "Rapid A", "Rapid B", "Rapid L", "Rapid R",
-    "None", "None", "Show FPS", "None"
+    TN("Up"), TN("Down"), TN("Left"), TN("Right"), "A", "B", "L", "R", "START", "SELECT", TN("Pause screen"),
+    TN("Fast forward"), TN("Quick load"), TN("Quick save"), TN("Rapid A"), TN("Rapid B"), TN("Rapid L"), TN("Rapid R"),
+    TN("None"), TN("None"), TN("Show FPS"), TN("None")
   };
   if(id == BUTTON_ID_CHEATS)
-    return "Cheats";
-  return names[(id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1];
+    return T("Cheats");
+  return T(names[(id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1]);
 }
 
 static int pick_cell(u32 id)
@@ -534,8 +541,8 @@ static int chip_step(int i, u32 dir)
   return i;
 }
 
-#define PAD_TIP "Confirm picks what this button does in this game."
-#define STICK_DIR_TIP "Confirm picks what this direction does in this game."
+#define PAD_TIP TN("Confirm picks what this button does in this game.")
+#define STICK_DIR_TIP TN("Confirm picks what this direction does in this game.")
 
 #define PICK_W 400
 #define PICK_H 176
@@ -586,7 +593,7 @@ static void picker_input(void)
     int m = s.pick_map;
     if(!menu_reachable_without(m, pick_ids[s.pcur]))
     {
-      show_toast("One button has to open the menu", 0, UI_COL_PINK);
+      show_toast(T("One button has to open the menu"), 0, UI_COL_PINK);
       return;
     }
     if(gamepad_config_map[m] != pick_ids[s.pcur])
@@ -642,7 +649,7 @@ static int draw_picker(void)
   ui_round_fill(PICK_X + 4, top + 4, PICK_W, PICK_H, 3, UI_COL_SHADE);
   ui_round_fill(PICK_X, top, PICK_W, PICK_H, 3, UI_COL_CREAM);
   ui_fill(PICK_X, top + 4, 6, PICK_H - 8, UI_COL_LIME);
-  n = ui_print(PICK_X + 16, top + 6, "Button action \xC2\xB7 ", UI_COL_PLUM, UI_FONT_BODY, 0);
+  n = ui_print(PICK_X + 16, top + 6, T("Button action \xC2\xB7 "), UI_COL_PLUM, UI_FONT_BODY, 0);
   ui_glyph(n, top + 8, ui_key_confirm);
   for(i = 0; i < PICKS; i++)
   {
@@ -666,8 +673,8 @@ static int draw_picker(void)
   fy = ui_ease_out_back(ay, by, s.pcur_f, UI_F_CURSOR);
   ui_round_frame(fx - 4, fy - 4, PICK_CW + 4, PICK_CH + 6, 2, UI_COL_PLUM);
 
-  hints[0].keys = ui_key_back;    hints[0].verb = "Back";
-  hints[1].keys = ui_key_confirm; hints[1].verb = "Pick";
+  hints[0].keys = ui_key_back;    hints[0].verb = (char *)T("Back");
+  hints[1].keys = ui_key_confirm; hints[1].verb = (char *)T("Pick");
   ui_hint_packed(hints, 2, 14);
   return 1;
 }
@@ -678,15 +685,16 @@ static int draw_picker(void)
 
 static void draw_page_switch(void)
 {
-  static const char *names[2] = { "Buttons", "Stick" };
+  static const char *names[2] = { TN("Buttons"), TN("Stick") };
   int x = UI_MARGIN, i;
 
   for(i = 0; i < 2; i++)
   {
-    int w = ui_print_width(names[i], UI_FONT_SMALL, 0) + 16;
+    const char *name = T(names[i]);
+    int w = ui_print_width(name, UI_FONT_SMALL, 0) + 16;
     if(i == s.page)
       ui_round_fill(x, 38, w, 16, 2, UI_COL_LIME);
-    ui_print(x + 8, 39, names[i], (i == s.page) ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
+    ui_print(x + 8, 39, name, (i == s.page) ? UI_COL_PLUM : UI_COL_MUTE, UI_FONT_SMALL, 0);
     x += w;
   }
   ui_glyph(x + 6, 40, PSP_CTRL_SELECT);
@@ -763,37 +771,37 @@ static void pad_undo(void)
 
 static const char *const help_copy[][2] =
 {
-  { "Screen size", "Original shows the GBA's pixels at their own size. Fit fills the height and keeps the shape. Full stretches to the whole screen." },
-  { "Smoothing", "How the GBA picture is drawn when it is scaled up to the PSP screen." },
-  { "Side bars", "What fills the space beside the picture in Original and Fit: plain black, kai's pattern, or colours taken from the game." },
-  { "Frameskip", "When the PSP can't draw every frame, skipping some keeps the game at full speed. Auto skips only when the game would slow down; Fixed always skips the number set in Skip up to." },
-  { "Skip up to", "The most frames in a row that Auto may skip; Fixed always skips this many. Lower looks smoother, higher keeps the speed." },
-  { "Picture scale", "Shrinks the picture inside its screen size, for a TV that cuts off the edges of the picture." },
-  { "Sound", "Off mutes the game. With no sound to make, the PSP has a little more time for the picture." },
-  { "Sound delay", "If the sound crackles in a busy game, add a block. If the sound feels late, take one away." },
-  { "Use the stick", "On: the stick works like the d-pad, or does what you pick for each direction. Off: the stick does nothing." },
-  { "Sensitivity", "How light a push counts. Higher reacts to a lighter push; lower ignores small wobbles." },
-  { "Tilt sensor", "For games made for a tilt cartridge: the stick stands in for tilting, with the centre as level. Use the stick must be on." },
-  { "Save when leaving a game", "On: leaving a game saves to Last, so Continue picks up exactly where you were. Off: Last stays as it was." },
-  { "Fast forward", "Hold: the game runs fast while you hold the button. Toggle: one press turns it on, the next turns it off." },
-  { "Fast forward speed", "2\xC3\x97 and 3\xC3\x97 are steady. Max runs as fast as the PSP can, so its speed changes with each game." },
-  { "Sound while fast", "Off keeps fast forward quiet. On plays the game's sound, sped up." },
-  { "Rapid-fire speed", "How fast a rapid-fire button presses while you hold it. Choose which buttons fire rapidly in Controls." },
-  { "Show FPS", "Shows the frames per second in the top-left corner. 60 is full speed." },
-  { "Language", "The language comes from your PSP until you pick one here. A new language applies after a restart." },
-  { "CPU speed", "333 MHz runs every game at full speed. 222 and 266 save battery, but some games slow down." },
-  { "Write game saves", "Right away writes the game's own save as soon as the game saves. On exit waits until you leave the game." },
-  { "Start games with", "GBA BIOS shows the GBA's start-up logo first, as on a real GBA. Game Cart skips it and works without a BIOS." },
-  { "No-BIOS notice", "Off hides the No GBA BIOS line in the library, for when you play without a BIOS." },
-  { "Show Recent tab", "Off hides the Recent tab and its Continue card; the library opens on All. \xC3\x97 Play still picks up where you left off." },
-  { "Confirm button", "PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models. Or choose one here." },
-  { "Restart kai", "Saves like Exit, then starts kai again and brings you back here." },
-  { "Quit kai", "Saves like Exit, then closes kai and goes back to the PSP's home menu." },
-  { "Reset all settings", "Puts kai's settings and this game's own settings back to their defaults. Savestates, game saves and other games' settings stay." },
+  { "Screen size", TN("Original shows the GBA's pixels at their own size. Fit fills the height and keeps the shape. Full stretches to the whole screen.") },
+  { "Smoothing", TN("How the GBA picture is drawn when it is scaled up to the PSP screen.") },
+  { "Side bars", TN("What fills the space beside the picture in Original and Fit: plain black, kai's pattern, or colours taken from the game.") },
+  { "Frameskip", TN("When the PSP can't draw every frame, skipping some keeps the game at full speed. Auto skips only when the game would slow down; Fixed always skips the number set in Skip up to.") },
+  { "Skip up to", TN("The most frames in a row that Auto may skip; Fixed always skips this many. Lower looks smoother, higher keeps the speed.") },
+  { "Picture scale", TN("Shrinks the picture inside its screen size, for a TV that cuts off the edges of the picture.") },
+  { "Sound", TN("Off mutes the game. With no sound to make, the PSP has a little more time for the picture.") },
+  { "Sound delay", TN("If the sound crackles in a busy game, add a block. If the sound feels late, take one away.") },
+  { "Use the stick", TN("On: the stick works like the d-pad, or does what you pick for each direction. Off: the stick does nothing.") },
+  { "Sensitivity", TN("How light a push counts. Higher reacts to a lighter push; lower ignores small wobbles.") },
+  { "Tilt sensor", TN("For games made for a tilt cartridge: the stick stands in for tilting, with the centre as level. Use the stick must be on.") },
+  { "Save when leaving a game", TN("On: leaving a game saves to Last, so Continue picks up exactly where you were. Off: Last stays as it was.") },
+  { "Fast forward", TN("Hold: the game runs fast while you hold the button. Toggle: one press turns it on, the next turns it off.") },
+  { "Fast forward speed", TN("2\xC3\x97 and 3\xC3\x97 are steady. Max runs as fast as the PSP can, so its speed changes with each game.") },
+  { "Sound while fast", TN("Off keeps fast forward quiet. On plays the game's sound, sped up.") },
+  { "Rapid-fire speed", TN("How fast a rapid-fire button presses while you hold it. Choose which buttons fire rapidly in Controls.") },
+  { "Show FPS", TN("Shows the frames per second in the top-left corner. 60 is full speed.") },
+  { "Language", TN("The language comes from your PSP until you pick one here. A new language applies after a restart.") },
+  { "CPU speed", TN("333 MHz runs every game at full speed. 222 and 266 save battery, but some games slow down.") },
+  { "Write game saves", TN("Right away writes the game's own save as soon as the game saves. On exit waits until you leave the game.") },
+  { "Start games with", TN("GBA BIOS shows the GBA's start-up logo first, as on a real GBA. Game Cart skips it and works without a BIOS.") },
+  { "No-BIOS notice", TN("Off hides the No GBA BIOS line in the library, for when you play without a BIOS.") },
+  { "Show Recent tab", TN("Off hides the Recent tab and its Continue card; the library opens on All. \xC3\x97 Play still picks up where you left off.") },
+  { "Confirm button", TN("PSP setting follows the console: \xC3\x97 on most PSPs, \xE2\x97\x8B on Japanese models. Or choose one here.") },
+  { "Restart kai", TN("Saves like Exit, then starts kai again and brings you back here.") },
+  { "Quit kai", TN("Saves like Exit, then closes kai and goes back to the PSP's home menu.") },
+  { "Reset all settings", TN("Puts kai's settings and this game's own settings back to their defaults. Savestates, game saves and other games' settings stay.") },
   { NULL, NULL }
 };
 
-#define HELP_PAD "Pick what this button does in this game: a GBA button, rapid fire, fast forward, quick save or load, the pause screen, or Show FPS."
+#define HELP_PAD TN("Pick what this button does in this game: a GBA button, rapid fire, fast forward, quick save or load, the pause screen, or Show FPS.")
 
 static int help_topic(const char **title, const char **body)
 {
@@ -803,12 +811,12 @@ static int help_topic(const char **title, const char **body)
 
   if((s.tab == PAD_TAB) && (s.page == 0))
   {
-    t = "Buttons";
+    t = TN("Buttons");
     b = HELP_PAD;
   }
   else if((s.tab == PAD_TAB) && (s.dir >= 0))
   {
-    t = "Stick";
+    t = TN("Stick");
     b = HELP_PAD;
   }
   else
@@ -832,9 +840,9 @@ static int help_topic(const char **title, const char **body)
 
 static void draw_smooth_help(int f, int closing)
 {
-  static const char *names[3] = { "Off", "Smooth", "Sharp" };
-  static const char *lines[3] = { "Pixels stay hard but uneven.", "Soft, a little blurry.",
-   "Crisp and even. Best for most games." };
+  static const char *names[3] = { TN("Off"), TN("Smooth"), TN("Sharp") };
+  static const char *lines[3] = { TN("Pixels stay hard but uneven."), TN("Soft, a little blurry."),
+   TN("Crisp and even. Best for most games.") };
   int w = 440, h = 214, x = (UI_SCREEN_W - w) / 2, y, i, j, r, c;
   ui_hint_t hh[2];
   char line[96];
@@ -848,8 +856,8 @@ static void draw_smooth_help(int f, int closing)
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CREAM);
   ui_fill(x, y + 4, 6, h - 8, UI_COL_LIME);
-  ui_print(x + 18, y + 4, "Smoothing", UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
-  ui_print_fit(x + 18, y + 38, help_copy[1][1], UI_COL_PLUM, UI_FONT_SMALL, 0, w - 36);
+  ui_print(x + 18, y + 4, T("Smoothing"), UI_COL_PLUM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+  ui_print_fit(x + 18, y + 38, T(help_copy[1][1]), UI_COL_PLUM, UI_FONT_SMALL, 0, w - 36);
   for(i = 0; i < 3; i++)
   {
     int px = x + 27 + i * 134, py = y + 60, on = (i == 2);
@@ -857,12 +865,12 @@ static void draw_smooth_help(int f, int closing)
     for(r = 0; r < HELP_PIC_H; r++)
       for(c = 0; c < HELP_PIC_W; c++)
         ui_fill(px + c * 3, py + r * 3, 3, 3, help_smooth_pics[i][r * HELP_PIC_W + c]);
-    ui_print(px, py + 88, names[i], UI_COL_PLUM, UI_FONT_BODY, on ? UI_TEXT_BOLD : 0);
-    for(j = 0; (j < 3) && ui_wrap_line(lines[i], j, 123, UI_FONT_SMALL, line, sizeof(line)); j++)
+    ui_print(px, py + 88, T(names[i]), UI_COL_PLUM, UI_FONT_BODY, on ? UI_TEXT_BOLD : 0);
+    for(j = 0; (j < 3) && ui_wrap_line(T(lines[i]), j, 123, UI_FONT_SMALL, line, sizeof(line)); j++)
       ui_print(px, py + 106 + j * 13, line, UI_COL_PLUM, UI_FONT_SMALL, 0);
   }
   hh[0].keys = PSP_CTRL_SQUARE; hh[0].verb = "";
-  hh[1].keys = ui_key_back;     hh[1].verb = "Close";
+  hh[1].keys = ui_key_back;     hh[1].verb = (char *)T("Close");
   ui_hint_packed(hh, 2, 14);
 }
 
@@ -871,18 +879,18 @@ static void draw_hints(void)
   ui_hint_t hints[6];
   int n = 0;
 
-  hints[n].keys = PSP_CTRL_START; hints[n++].verb = "Hold: reset tab";
+  hints[n].keys = PSP_CTRL_START; hints[n++].verb = (char *)T("Hold: reset tab");
   if(help_topic(NULL, NULL))
   {
-    hints[n].keys = PSP_CTRL_SQUARE; hints[n++].verb = "Help";
+    hints[n].keys = PSP_CTRL_SQUARE; hints[n++].verb = (char *)T("Help");
   }
-  hints[n].keys = ui_key_back;    hints[n++].verb = "Back";
+  hints[n].keys = ui_key_back;    hints[n++].verb = (char *)T("Back");
   if(s.tab == PAD_TAB)
   {
-    hints[n].keys = PSP_CTRL_SELECT; hints[n++].verb = s.page ? "Buttons" : "Stick";
+    hints[n].keys = PSP_CTRL_SELECT; hints[n++].verb = (char *)(s.page ? T("Buttons") : T("Stick"));
     if((s.page == 0) || (s.dir >= 0))
     {
-      hints[n].keys = ui_key_confirm; hints[n++].verb = "Pick";
+      hints[n].keys = ui_key_confirm; hints[n++].verb = (char *)T("Pick");
       ui_hint_packed(hints, n, 14);
       return;
     }
@@ -890,26 +898,26 @@ static void draw_hints(void)
   switch(action_of(s.tab, s.cur))
   {
     case ACT_RESET_ALL:
-      hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: reset all";
+      hints[n].keys = ui_key_confirm; hints[n++].verb = (char *)T("Hold: reset all");
       break;
     case ACT_RESTART:
       hints[n].keys = ui_key_confirm;
-      hints[n++].verb = "Hold: restart";
+      hints[n++].verb = (char *)T("Hold: restart");
       break;
     case ACT_QUIT:
       hints[n].keys = ui_key_confirm;
-      hints[n++].verb = "Hold: quit";
+      hints[n++].verb = (char *)T("Hold: quit");
       break;
     default:
       if(rows[s.tab][s.cur].kind == K_SWITCH)
       {
-        hints[n].keys = ui_key_confirm; hints[n++].verb = "Switch";
+        hints[n].keys = ui_key_confirm; hints[n++].verb = (char *)T("Switch");
         break;
       }
-      hints[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[n++].verb = "Change";
+      hints[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; hints[n++].verb = (char *)T("Change");
       if(is_lang_row(s.tab, s.cur) && lang_pending())
       {
-        hints[n].keys = ui_key_confirm; hints[n++].verb = "Hold: restart now";
+        hints[n].keys = ui_key_confirm; hints[n++].verb = (char *)T("Hold: restart now");
       }
       break;
   }
@@ -950,7 +958,7 @@ static void build_ground(void)
   if(per_game && (s.tab != PAD_TAB))
   {
     ui_per_game_mark(UI_MARGIN, 40, UI_COL_TANGERINE);
-    ui_text(UI_MARGIN + 16, 39, "Saved for this game only", UI_COL_MUTE);
+    ui_text(UI_MARGIN + 16, 39, (char *)T("Saved for this game only"), UI_COL_MUTE);
   }
   top = top_now();
   ui_clip_set(0, VIEW_T, UI_SCREEN_W, list_bottom(top) - VIEW_T);
@@ -1036,7 +1044,7 @@ static void draw_tip_line(void)
     tip = (s.page == 0) ? PAD_TIP : ((s.dir >= 0) ? STICK_DIR_TIP : rows[s.tab][s.cur].tip);
   else if(is_lang_row(s.tab, s.cur) && lang_pending())
   {
-    snprintf(text, sizeof(text), "Applies after a restart: hold %s to restart now, or it waits for the next start.",
+    snprintf(text, sizeof(text), T("Applies after a restart: hold %s to restart now, or it waits for the next start."),
      (ui_key_confirm == PSP_CTRL_CIRCLE) ? "\xE2\x97\x8B" : "\xC3\x97");
     tip = text;
   }
@@ -1046,7 +1054,7 @@ static void draw_tip_line(void)
     return;
   if(tip != text)
   {
-    snprintf(text, sizeof(text), "%s", tip);
+    snprintf(text, sizeof(text), "%s", T(tip));
     tip = text;
   }
   {
@@ -1107,7 +1115,7 @@ static void undo_reset(void)
       if(rows[t][i].value)
         *rows[t][i].value = s.undo[t][i];
   }
-  show_toast("Settings are back as they were", 0, UI_COL_LIME);
+  show_toast(T("Settings are back as they were"), 0, UI_COL_LIME);
   s.dirty = 1;
 }
 
@@ -1489,11 +1497,11 @@ int ui_settings(int tab, int row)
     ui_hold_step(&s.reset_hold, PSP_CTRL_START);
     if(s.reset_hold.done)
     {
-      char text[48];
+      char text[128];
       remember_tab(s.tab);
       s.undo_all = 0;
       reset_tab(s.tab);
-      snprintf(text, sizeof(text), "%s reset", tab_labels[s.tab]);
+      snprintf(text, sizeof(text), T("%s reset"), T(tab_labels[s.tab]));
       show_toast(text, 1, UI_COL_LIME);
       s.reset_hold.p = 0;
       s.reset_hold.shown = 0;
@@ -1537,7 +1545,7 @@ int ui_settings(int tab, int row)
         s.undo_all = 1;
         for(t = 0; t < TABS; t++)
           reset_tab(t);
-        show_toast("Every setting reset", 1, UI_COL_PINK);
+        show_toast(T("Every setting reset"), 1, UI_COL_PINK);
         s.action_hold.p = 0;
         s.dirty = 1;
       }
@@ -1561,7 +1569,13 @@ int ui_settings(int tab, int row)
     ui_frame_begin();
     ui_ground();
     if(s.tab_f < UI_F_TAB) s.tab_f++;
-    ui_tabs(UI_MARGIN, tab_labels, TABS, s.tab, s.tab_prev, s.tab_f);
+    {
+      const char *tl[TABS];
+      int i;
+      for(i = 0; i < TABS; i++)
+        tl[i] = T(tab_labels[i]);
+      ui_tabs(UI_MARGIN, tl, TABS, s.tab, s.tab_prev, s.tab_f);
+    }
     ui_status_chip();
     if(s.value_f < UI_F_VALUE) s.value_f++;
     if(s.cursor_f < UI_F_CURSOR) s.cursor_f++;
@@ -1580,7 +1594,7 @@ int ui_settings(int tab, int row)
         if(!strcmp(t, "Smoothing"))
           draw_smooth_help(s.help_f, s.help_out);
         else
-          ui_help_card(t, b, UI_COL_LIME, s.help_f, s.help_out);
+          ui_help_card(T(t), T(b), UI_COL_LIME, s.help_f, s.help_out);
       }
       if(s.help_f < (s.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
         s.help_f++;
@@ -1589,7 +1603,7 @@ int ui_settings(int tab, int row)
     }
     if(s.toast_f >= 0)
     {
-      if(!ui_toast(s.toast, s.toast_edge, s.toast_undo ? "Undo" : NULL, s.toast_f))
+      if(!ui_toast(s.toast, s.toast_edge, s.toast_undo ? T("Undo") : NULL, s.toast_f))
         s.toast_f = -1;
       else
         s.toast_f++;

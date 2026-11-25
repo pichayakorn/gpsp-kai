@@ -1,0 +1,1287 @@
+# Texts of the gpSP kai 4.0 interface. Made by tools/po.py extract;
+# do not edit: translations go in <code>.po beside it.
+
+msgid ""
+msgstr ""
+"Project-Id-Version: gpSP kai\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/ui/ui_cheats.c:218
+#, c-format
+msgid "first %d of %d"
+msgstr ""
+
+#: src/ui/ui_cheats.c:224 src/ui/ui_pause.c:82 src/ui/ui_settings.c:431
+msgid "Cheats"
+msgstr ""
+
+#: src/ui/ui_cheats.c:225 src/ui/ui_cheats.c:320
+msgid "On now"
+msgstr ""
+
+#: src/ui/ui_cheats.c:237
+#, c-format
+msgid "%d cheats"
+msgstr ""
+
+#: src/ui/ui_cheats.c:242 src/ui/ui_cheats.c:275
+#, c-format
+msgid "%d can't run"
+msgstr ""
+
+#: src/ui/ui_cheats.c:248 src/ui/ui_cheats.c:321
+#, c-format
+msgid "%d on"
+msgstr ""
+
+#: src/ui/ui_cheats.c:252 src/ui/ui_cheats.c:325
+#, c-format
+msgid "%d ready"
+msgstr ""
+
+#: src/ui/ui_cheats.c:262 src/ui/ui_cheats.c:335
+#, c-format
+msgid "%d of %d on"
+msgstr ""
+
+#: src/ui/ui_cheats.c:269 src/ui/ui_cheats.c:601
+msgid "One at a time"
+msgstr ""
+
+#: src/ui/ui_cheats.c:270 src/ui/ui_cheats.c:605
+msgid "Runs once"
+msgstr ""
+
+#: src/ui/ui_cheats.c:271 src/ui/ui_cheats.c:610
+msgid "Needs a restart"
+msgstr ""
+
+#: src/ui/ui_cheats.c:298
+msgid "one at a time"
+msgstr ""
+
+#: src/ui/ui_cheats.c:298
+msgid "runs once"
+msgstr ""
+
+#: src/ui/ui_cheats.c:298
+msgid "needs a restart"
+msgstr ""
+
+#: src/ui/ui_cheats.c:344
+#, c-format
+msgid "Can't run (%d)"
+msgstr ""
+
+#: src/ui/ui_cheats.c:374
+msgid "Ready"
+msgstr ""
+
+#: src/ui/ui_cheats.c:377
+msgid "▶ Apply"
+msgstr ""
+
+#: src/ui/ui_cheats.c:389 src/ui/ui_settings.c:331 src/ui/ui_settings.c:333
+msgid "next start"
+msgstr ""
+
+#: src/ui/ui_cheats.c:416 src/ui/ui_library.c:2793 src/ui/ui_settings.c:676 src/ui/ui_settings.c:887
+msgid "Back"
+msgstr ""
+
+#: src/ui/ui_cheats.c:417 src/ui/ui_library.c:1792 src/ui/ui_library.c:1800 src/ui/ui_library.c:2651 src/ui/ui_library.c:2657 src/ui/ui_settings.c:885
+msgid "Help"
+msgstr ""
+
+#: src/ui/ui_cheats.c:426 src/ui/ui_library.c:2859
+msgid "Jump"
+msgstr ""
+
+#: src/ui/ui_cheats.c:430 src/ui/ui_cheats.c:1242 src/ui/ui_library.c:2797 src/ui/ui_library.c:3543 src/ui/ui_pause.c:786 src/ui/ui_pause.c:933 src/ui/ui_settings.c:1606
+msgid "Undo"
+msgstr ""
+
+#: src/ui/ui_cheats.c:435
+msgid "Unlock"
+msgstr ""
+
+#: src/ui/ui_cheats.c:435
+msgid "Lock"
+msgstr ""
+
+#: src/ui/ui_cheats.c:439
+msgid "All off"
+msgstr ""
+
+#: src/ui/ui_cheats.c:445 src/ui/ui_cheats.c:446 src/ui/ui_library.c:2844 src/ui/ui_pause.c:763
+msgid "Open"
+msgstr ""
+
+#: src/ui/ui_cheats.c:446 src/ui/ui_comp.c:1043 src/ui/ui_comp.c:1059 src/ui/ui_library.c:2812 src/ui/ui_settings.c:873
+msgid "Close"
+msgstr ""
+
+#: src/ui/ui_cheats.c:449 src/ui/ui_cheats.c:453 src/ui/ui_settings.c:914
+msgid "Switch"
+msgstr ""
+
+#: src/ui/ui_cheats.c:453
+msgid "Choose"
+msgstr ""
+
+#: src/ui/ui_cheats.c:455
+msgid "Clear"
+msgstr ""
+
+#: src/ui/ui_cheats.c:455
+msgid "Apply"
+msgstr ""
+
+#: src/ui/ui_cheats.c:462
+msgid "No cheats for this game"
+msgstr ""
+
+#: src/ui/ui_cheats.c:467
+#, c-format
+msgid "Put .cht files in %s"
+msgstr ""
+
+#: src/ui/ui_cheats.c:563
+msgid "Each file in the game's cheat folder is a group."
+msgstr ""
+
+#: src/ui/ui_cheats.c:567
+msgid "Cheats kai can't run, folded away: × shows them."
+msgstr ""
+
+#: src/ui/ui_cheats.c:572
+msgid "Locked cheats stay on: All off skips them. SELECT unlocks."
+msgstr ""
+
+#: src/ui/ui_cheats.c:575
+msgid "Switching one on switches the others off."
+msgstr ""
+
+#: src/ui/ui_cheats.c:576
+msgid "Runs once when you go back to the game, then switches itself off."
+msgstr ""
+
+#: src/ui/ui_cheats.c:577
+msgid "Works from the game's start: it needs a restart."
+msgstr ""
+
+#: src/ui/ui_cheats.c:591
+msgid "Can't run"
+msgstr ""
+
+#: src/ui/ui_cheats.c:592
+msgid "kai checks every code when the file loads. A greyed cheat can't be switched on; the tip line says why. Master codes (\"must be on\") are hidden: kai doesn't need them."
+msgstr ""
+
+#: src/ui/ui_cheats.c:602
+msgid "These cheats replace each other: switching one on switches the one before off."
+msgstr ""
+
+#: src/ui/ui_cheats.c:606
+msgid "× gets it ready; it runs once when you go back to the game, then switches itself off."
+msgstr ""
+
+#: src/ui/ui_cheats.c:611
+msgid "This cheat changes the game as it starts, so the game has to start again for it to work."
+msgstr ""
+
+#: src/ui/ui_cheats.c:615
+msgid "Cheat groups"
+msgstr ""
+
+#: src/ui/ui_cheats.c:616
+msgid "Each .cht file in the game's cheat folder is a group. On now lists every cheat that is on, from all groups."
+msgstr ""
+
+#: src/ui/ui_cheats.c:732 src/ui/ui_library.c:2809
+msgid "Move"
+msgstr ""
+
+#: src/ui/ui_cheats.c:754
+msgid "This cheat works from the game's start. kai saves to Last, then starts the game again."
+msgstr ""
+
+#: src/ui/ui_cheats.c:755
+msgid "The game starts again from its beginning. Your save file is kept."
+msgstr ""
+
+#: src/ui/ui_cheats.c:757
+msgid "Restart the game?"
+msgstr ""
+
+#: src/ui/ui_cheats.c:757
+msgid "Restart now"
+msgstr ""
+
+#: src/ui/ui_cheats.c:757 src/ui/ui_cheats.c:757
+msgid "Later"
+msgstr ""
+
+#: src/ui/ui_cheats.c:1084
+#, c-format
+msgid "%s switched off"
+msgstr ""
+
+#: src/ui/ui_cheats.c:1156
+msgid "All cheats off"
+msgstr ""
+
+#: src/ui/ui_comp.c:585
+msgid "AM"
+msgstr ""
+
+#: src/ui/ui_comp.c:585
+msgid "PM"
+msgstr ""
+
+#: src/ui/ui_first.c:58
+msgid "Welcome to gpSP kai"
+msgstr ""
+
+#: src/ui/ui_first.c:59
+msgid "Pause any time"
+msgstr ""
+
+#: src/ui/ui_first.c:59
+msgid "Confirm and back"
+msgstr ""
+
+#: src/ui/ui_first.c:59
+msgid "Help in Settings"
+msgstr ""
+
+#: src/ui/ui_first.c:69
+#, c-format
+msgid "Same as your PSP: %s confirms, %s goes back."
+msgstr ""
+
+#: src/ui/ui_first.c:72
+msgid "△ or HOME opens and closes the pause screen."
+msgstr ""
+
+#: src/ui/ui_first.c:74
+msgid "□ explains the selected setting."
+msgstr ""
+
+#: src/ui/ui_first.c:99
+msgid "Start"
+msgstr ""
+
+#: src/ui/ui_first.c:102
+#, c-format
+msgid "Language: %s, from your PSP"
+msgstr ""
+
+#: src/ui/ui_library.c:1044
+#, c-format
+msgid "%u KB"
+msgstr ""
+
+#: src/ui/ui_library.c:1046
+#, c-format
+msgid "%u MB"
+msgstr ""
+
+#: src/ui/ui_library.c:1094 src/ui/ui_library.c:1109 src/ui/ui_library.c:1349 src/ui/ui_library.c:1759
+msgid "Not played yet"
+msgstr ""
+
+#: src/ui/ui_library.c:1096
+#, c-format
+msgid "Played %u min"
+msgstr ""
+
+#: src/ui/ui_library.c:1098
+#, c-format
+msgid "Played %u h"
+msgstr ""
+
+#: src/ui/ui_library.c:1250
+#, c-format
+msgid "Today %02d:%02d"
+msgstr ""
+
+#: src/ui/ui_library.c:1252
+#, c-format
+msgid "Yesterday %02d:%02d"
+msgstr ""
+
+#: src/ui/ui_library.c:1254
+#, c-format
+msgid "%d days ago"
+msgstr ""
+
+#: src/ui/ui_library.c:1723
+msgid "CONTINUE"
+msgstr ""
+
+#: src/ui/ui_library.c:1747 src/ui/ui_library.c:2184 src/ui/ui_pause.c:424 src/ui/ui_pause.c:700 src/ui/ui_pause.c:783 src/ui/ui_pause.c:1035 src/ui/ui_pause.c:1161
+msgid "Last"
+msgstr ""
+
+#: src/ui/ui_library.c:1749 src/ui/ui_library.c:2186 src/ui/ui_pause.c:426
+#, c-format
+msgid "Slot %d"
+msgstr ""
+
+#: src/ui/ui_library.c:1790 src/ui/ui_library.c:2650
+msgid "No GBA BIOS: games start in Game Cart mode."
+msgstr ""
+
+#: src/ui/ui_library.c:1907
+msgid "No favourites yet"
+msgstr ""
+
+#: src/ui/ui_library.c:1908
+msgid "△ on a game, then △ again, to add it here"
+msgstr ""
+
+#: src/ui/ui_library.c:2025
+#, c-format
+msgid "Cheats: %u / %u"
+msgstr ""
+
+#: src/ui/ui_library.c:2027
+msgid "Cheats: none"
+msgstr ""
+
+#: src/ui/ui_library.c:2029
+#, c-format
+msgid "Settings: %d saved for this game"
+msgstr ""
+
+#: src/ui/ui_library.c:2031
+msgid "Settings: none saved for this game"
+msgstr ""
+
+#: src/ui/ui_library.c:2182
+msgid "Start fresh"
+msgstr ""
+
+#: src/ui/ui_library.c:2240 src/ui/ui_library.c:2246 src/ui/ui_library.c:2794
+msgid "Favourite"
+msgstr ""
+
+#: src/ui/ui_library.c:2251 src/ui/ui_pause.c:792
+msgid "Savestates"
+msgstr ""
+
+#: src/ui/ui_library.c:2288 src/ui/ui_pause.c:678
+msgid "Delete (hold)"
+msgstr ""
+
+#: src/ui/ui_library.c:2362 src/ui/ui_pause.c:1189
+msgid "The savestate is back"
+msgstr ""
+
+#: src/ui/ui_library.c:2380 src/ui/ui_pause.c:1057
+#, c-format
+msgid "%s deleted"
+msgstr ""
+
+#: src/ui/ui_library.c:2542 src/ui/ui_library.c:2830
+msgid "Up a folder"
+msgstr ""
+
+#: src/ui/ui_library.c:2544
+#, c-format
+msgid "%d games"
+msgstr ""
+
+#: src/ui/ui_library.c:2560
+msgid "This folder is empty"
+msgstr ""
+
+#: src/ui/ui_library.c:2561
+msgid "Only .gba and .zip files show here."
+msgstr ""
+
+#: src/ui/ui_library.c:2662
+msgid "Panel"
+msgstr ""
+
+#: src/ui/ui_library.c:2662
+msgid "Shelf"
+msgstr ""
+
+#: src/ui/ui_library.c:2662
+msgid "Grid"
+msgstr ""
+
+#: src/ui/ui_library.c:2669
+msgid "Name"
+msgstr ""
+
+#: src/ui/ui_library.c:2669
+msgid "Recently played"
+msgstr ""
+
+#: src/ui/ui_library.c:2669
+msgid "Size"
+msgstr ""
+
+#: src/ui/ui_library.c:2690
+msgid "View & sort"
+msgstr ""
+
+#: src/ui/ui_library.c:2690 src/ui/ui_library.c:2838 src/ui/ui_library.c:2849 src/ui/ui_library.c:2855
+msgid "Sort"
+msgstr ""
+
+#: src/ui/ui_library.c:2699
+msgid "Sort by"
+msgstr ""
+
+#: src/ui/ui_library.c:2699 src/ui/ui_library.c:2838 src/ui/ui_library.c:2849 src/ui/ui_library.c:2855
+msgid "View"
+msgstr ""
+
+#: src/ui/ui_library.c:2718
+msgid "Recent"
+msgstr ""
+
+#: src/ui/ui_library.c:2718
+msgid "All"
+msgstr ""
+
+#: src/ui/ui_library.c:2718
+msgid "♥ Favourites"
+msgstr ""
+
+#: src/ui/ui_library.c:2718
+msgid "Folders"
+msgstr ""
+
+#: src/ui/ui_library.c:2801
+msgid "Hold: delete"
+msgstr ""
+
+#: src/ui/ui_library.c:2803 src/ui/ui_library.c:2823 src/ui/ui_library.c:2844 src/ui/ui_library.c:2861 src/ui/ui_settings.c:117
+msgid "Play"
+msgstr ""
+
+#: src/ui/ui_library.c:2811 src/ui/ui_settings.c:917
+msgid "Change"
+msgstr ""
+
+#: src/ui/ui_library.c:2816
+msgid "Look again"
+msgstr ""
+
+#: src/ui/ui_library.c:2817 src/ui/ui_library.c:2822 src/ui/ui_library.c:2840 src/ui/ui_library.c:2850 src/ui/ui_library.c:2856 src/ui/ui_pause.c:81
+msgid "Settings"
+msgstr ""
+
+#: src/ui/ui_library.c:2821 src/ui/ui_library.c:2834 src/ui/ui_library.c:2854
+msgid "Game card"
+msgstr ""
+
+#: src/ui/ui_library.c:2823
+msgid "Continue"
+msgstr ""
+
+#: src/ui/ui_library.c:2876
+msgid "Copy .gba or .zip files to ms0:/GBA/ on the Memory Stick, then look again."
+msgstr ""
+
+#: src/ui/ui_library.c:2883 src/ui/ui_library.c:2884
+msgid "No games yet"
+msgstr ""
+
+#: src/ui/ui_library.c:3297
+msgid "Loading"
+msgstr ""
+
+#: src/ui/ui_library.c:3322
+msgid "This game won't open"
+msgstr ""
+
+#: src/ui/ui_library.c:3322
+msgid "The file is damaged, or it is not a GBA game."
+msgstr ""
+
+#: src/ui/ui_library.c:3323
+msgid "OK"
+msgstr ""
+
+#: src/ui/ui_library.c:3586
+msgid "Add a GBA BIOS"
+msgstr ""
+
+#: src/ui/ui_library.c:3586
+msgid "Copy gba_bios.bin into kai's folder, then restart kai."
+msgstr ""
+
+#: src/ui/ui_pause.c:83
+msgid "Screenshot"
+msgstr ""
+
+#: src/ui/ui_pause.c:84
+msgid "Restart"
+msgstr ""
+
+#: src/ui/ui_pause.c:85
+msgid "Library"
+msgstr ""
+
+#: src/ui/ui_pause.c:86
+msgid "Exit"
+msgstr ""
+
+#: src/ui/ui_pause.c:575 src/ui/ui_pause.c:588 src/ui/ui_pause.c:597
+msgid "Paused"
+msgstr ""
+
+#: src/ui/ui_pause.c:669 src/ui/ui_pause.c:671 src/ui/ui_pause.c:788
+msgid "Save"
+msgstr ""
+
+#: src/ui/ui_pause.c:679 src/ui/ui_pause.c:680
+msgid "Load (hold)"
+msgstr ""
+
+#: src/ui/ui_pause.c:764 src/ui/ui_settings.c:909
+msgid "Hold: quit"
+msgstr ""
+
+#: src/ui/ui_pause.c:764 src/ui/ui_settings.c:905
+msgid "Hold: restart"
+msgstr ""
+
+#: src/ui/ui_pause.c:764
+msgid "Hold: leave"
+msgstr ""
+
+#: src/ui/ui_pause.c:780
+msgid "Resume"
+msgstr ""
+
+#: src/ui/ui_pause.c:784
+msgid "Slot 0"
+msgstr ""
+
+#: src/ui/ui_pause.c:786
+msgid "Save · Hold: delete"
+msgstr ""
+
+#: src/ui/ui_pause.c:788
+msgid "Load"
+msgstr ""
+
+#: src/ui/ui_pause.c:788
+msgid "Hold: load"
+msgstr ""
+
+#: src/ui/ui_pause.c:824
+msgid "Hold to quit without saving"
+msgstr ""
+
+#: src/ui/ui_pause.c:825
+msgid "Hold to restart without saving"
+msgstr ""
+
+#: src/ui/ui_pause.c:825
+msgid "Hold to leave without saving"
+msgstr ""
+
+#: src/ui/ui_pause.c:835
+msgid "'Save when leaving a game' is off."
+msgstr ""
+
+#: src/ui/ui_pause.c:1023
+msgid "Saving…"
+msgstr ""
+
+#: src/ui/ui_pause.c:1035
+#, c-format
+msgid "Saved to %s"
+msgstr ""
+
+#: src/ui/ui_pause.c:1040
+msgid "Saving failed"
+msgstr ""
+
+#: src/ui/ui_pause.c:1090
+msgid "Loading Last…"
+msgstr ""
+
+#: src/ui/ui_pause.c:1092
+#, c-format
+msgid "Loading slot %d…"
+msgstr ""
+
+#: src/ui/ui_pause.c:1132
+#, c-format
+msgid "This savestate file was made while playing %s. It only loads in that game."
+msgstr ""
+
+#: src/ui/ui_pause.c:1133
+#, c-format
+msgid "Play %s"
+msgstr ""
+
+#: src/ui/ui_pause.c:1134
+msgid "Made by another game"
+msgstr ""
+
+#: src/ui/ui_pause.c:1134
+msgid "Cancel"
+msgstr ""
+
+#: src/ui/ui_pause.c:1145
+#, c-format
+msgid "%.36s isn't in your games folder"
+msgstr ""
+
+#: src/ui/ui_pause.c:1154
+msgid "Loading failed"
+msgstr ""
+
+#: src/ui/ui_pause.c:1163
+#, c-format
+msgid "slot %d"
+msgstr ""
+
+#: src/ui/ui_pause.c:1165
+msgid "Swapped with Last"
+msgstr ""
+
+#: src/ui/ui_pause.c:1167
+#, c-format
+msgid "Loaded %s · the game before is in Last"
+msgstr ""
+
+#: src/ui/ui_pause.c:1169
+#, c-format
+msgid "Loaded %s"
+msgstr ""
+
+#: src/ui/ui_pause.c:1189
+msgid "The old savestate is back"
+msgstr ""
+
+#: src/ui/ui_pause.c:1198
+msgid "The slot is empty again"
+msgstr ""
+
+#: src/ui/ui_pause.c:1208 src/ui/ui_pause.c:1219 src/ui/ui_pause.c:1238 src/ui/ui_pause.c:1259
+msgid "Saving to Last…"
+msgstr ""
+
+#: src/ui/ui_pause.c:1208
+msgid "Then kai closes. Continue picks up here."
+msgstr ""
+
+#: src/ui/ui_pause.c:1219
+msgid "Then the game starts again from the beginning."
+msgstr ""
+
+#: src/ui/ui_pause.c:1224
+msgid "Restarted · the game before is in Last"
+msgstr ""
+
+#: src/ui/ui_pause.c:1252
+msgid "Then kai starts again and brings you back here."
+msgstr ""
+
+#: src/ui/ui_pause.c:1263
+msgid "Restarting kai…"
+msgstr ""
+
+#: src/ui/ui_pause.c:1540
+msgid "Paused while the PSP slept"
+msgstr ""
+
+#: src/ui/ui_pause.c:1674
+msgid "Screenshot saved"
+msgstr ""
+
+#: src/ui/ui_settings.c:56
+msgid "Screen size"
+msgstr ""
+
+#: src/ui/ui_settings.c:56
+msgid "Original keeps the GBA's pixels exact; Fit fills the height; Full fills the screen."
+msgstr ""
+
+#: src/ui/ui_settings.c:57
+msgid "Original"
+msgstr ""
+
+#: src/ui/ui_settings.c:57
+msgid "Fit"
+msgstr ""
+
+#: src/ui/ui_settings.c:57
+msgid "Full"
+msgstr ""
+
+#: src/ui/ui_settings.c:58 src/ui/ui_settings.c:859
+msgid "Smoothing"
+msgstr ""
+
+#: src/ui/ui_settings.c:58
+msgid "Sharp keeps pixels crisp when the picture is scaled; Smooth softens them."
+msgstr ""
+
+#: src/ui/ui_settings.c:59 src/ui/ui_settings.c:63 src/ui/ui_settings.c:843
+msgid "Off"
+msgstr ""
+
+#: src/ui/ui_settings.c:59 src/ui/ui_settings.c:843
+msgid "Smooth"
+msgstr ""
+
+#: src/ui/ui_settings.c:59 src/ui/ui_settings.c:843
+msgid "Sharp"
+msgstr ""
+
+#: src/ui/ui_settings.c:60
+msgid "Side bars"
+msgstr ""
+
+#: src/ui/ui_settings.c:60
+msgid "What fills the space beside the picture in 3:2 sizes."
+msgstr ""
+
+#: src/ui/ui_settings.c:61
+msgid "Black"
+msgstr ""
+
+#: src/ui/ui_settings.c:61
+msgid "Pattern"
+msgstr ""
+
+#: src/ui/ui_settings.c:61
+msgid "Game colours"
+msgstr ""
+
+#: src/ui/ui_settings.c:62
+msgid "Frameskip"
+msgstr ""
+
+#: src/ui/ui_settings.c:62
+msgid "Auto skips frames only when the game would slow down."
+msgstr ""
+
+#: src/ui/ui_settings.c:63
+msgid "Auto"
+msgstr ""
+
+#: src/ui/ui_settings.c:63
+msgid "Fixed"
+msgstr ""
+
+#: src/ui/ui_settings.c:64
+msgid "Skip up to"
+msgstr ""
+
+#: src/ui/ui_settings.c:64
+msgid "The most frames Auto skips in a row; Fixed skips this many."
+msgstr ""
+
+#: src/ui/ui_settings.c:65
+#, c-format
+msgid "%d frames"
+msgstr ""
+
+#: src/ui/ui_settings.c:66
+msgid "Picture scale"
+msgstr ""
+
+#: src/ui/ui_settings.c:66
+msgid "Below 100 % the picture shrinks inside its screen size."
+msgstr ""
+
+#: src/ui/ui_settings.c:70 src/ui/ui_settings.c:117
+msgid "Sound"
+msgstr ""
+
+#: src/ui/ui_settings.c:70
+msgid "Off mutes the game and runs a little faster."
+msgstr ""
+
+#: src/ui/ui_settings.c:71
+msgid "Sound delay"
+msgstr ""
+
+#: src/ui/ui_settings.c:71
+msgid "Less delay feels faster; more delay stops crackles in busy games."
+msgstr ""
+
+#: src/ui/ui_settings.c:75
+msgid "Use the stick"
+msgstr ""
+
+#: src/ui/ui_settings.c:75
+msgid "The stick works like the d-pad, or does what you pick for each direction."
+msgstr ""
+
+#: src/ui/ui_settings.c:77
+msgid "Sensitivity"
+msgstr ""
+
+#: src/ui/ui_settings.c:77
+msgid "The ring shows where a push starts to count."
+msgstr ""
+
+#: src/ui/ui_settings.c:79
+msgid "Tilt sensor"
+msgstr ""
+
+#: src/ui/ui_settings.c:79
+msgid "For tilt-cartridge games: the stick stands in for tilting."
+msgstr ""
+
+#: src/ui/ui_settings.c:83
+msgid "Save when leaving a game"
+msgstr ""
+
+#: src/ui/ui_settings.c:83
+msgid "Continue on the Home screen picks up exactly here."
+msgstr ""
+
+#: src/ui/ui_settings.c:85 src/ui/ui_settings.c:427
+msgid "Fast forward"
+msgstr ""
+
+#: src/ui/ui_settings.c:85
+msgid "Hold: fast while the button is down. Toggle: one press on, one press off."
+msgstr ""
+
+#: src/ui/ui_settings.c:86
+msgid "Hold"
+msgstr ""
+
+#: src/ui/ui_settings.c:86
+msgid "Toggle"
+msgstr ""
+
+#: src/ui/ui_settings.c:87
+msgid "Fast forward speed"
+msgstr ""
+
+#: src/ui/ui_settings.c:87
+msgid "Max runs as fast as the PSP can, so its speed changes with each game."
+msgstr ""
+
+#: src/ui/ui_settings.c:88
+msgid "Max"
+msgstr ""
+
+#: src/ui/ui_settings.c:89
+msgid "Sound while fast"
+msgstr ""
+
+#: src/ui/ui_settings.c:89
+msgid "Off keeps fast forward quiet."
+msgstr ""
+
+#: src/ui/ui_settings.c:90
+msgid "Rapid-fire speed"
+msgstr ""
+
+#: src/ui/ui_settings.c:90
+msgid "How fast a rapid-fire button presses while you hold it."
+msgstr ""
+
+#: src/ui/ui_settings.c:90
+msgid "Slow"
+msgstr ""
+
+#: src/ui/ui_settings.c:90
+msgid "Medium"
+msgstr ""
+
+#: src/ui/ui_settings.c:90
+msgid "Fast"
+msgstr ""
+
+#: src/ui/ui_settings.c:92 src/ui/ui_settings.c:428
+msgid "Show FPS"
+msgstr ""
+
+#: src/ui/ui_settings.c:92
+msgid "Shows the frames per second in the top-left corner."
+msgstr ""
+
+#: src/ui/ui_settings.c:95
+msgid "Language"
+msgstr ""
+
+#: src/ui/ui_settings.c:95
+msgid "The language comes from your PSP until you pick one."
+msgstr ""
+
+#: src/ui/ui_settings.c:97
+msgid "CPU speed"
+msgstr ""
+
+#: src/ui/ui_settings.c:97
+msgid "333 MHz runs every game at full speed; lower saves battery."
+msgstr ""
+
+#: src/ui/ui_settings.c:98
+msgid "333 MHz"
+msgstr ""
+
+#: src/ui/ui_settings.c:99
+msgid "Write game saves"
+msgstr ""
+
+#: src/ui/ui_settings.c:99
+msgid "Right away writes the game's save at once; On exit waits until you leave."
+msgstr ""
+
+#: src/ui/ui_settings.c:100
+msgid "On exit"
+msgstr ""
+
+#: src/ui/ui_settings.c:100
+msgid "Right away"
+msgstr ""
+
+#: src/ui/ui_settings.c:101
+msgid "Start games with"
+msgstr ""
+
+#: src/ui/ui_settings.c:101
+msgid "GBA BIOS shows the GBA's start-up logo first; Game Cart skips it."
+msgstr ""
+
+#: src/ui/ui_settings.c:101
+msgid "Game Cart"
+msgstr ""
+
+#: src/ui/ui_settings.c:101
+msgid "GBA BIOS"
+msgstr ""
+
+#: src/ui/ui_settings.c:102
+msgid "No-BIOS notice"
+msgstr ""
+
+#: src/ui/ui_settings.c:102
+msgid "Shows a line in the library each time kai starts without a GBA BIOS."
+msgstr ""
+
+#: src/ui/ui_settings.c:104
+msgid "Show Recent tab"
+msgstr ""
+
+#: src/ui/ui_settings.c:104
+msgid "Off: the library opens on All."
+msgstr ""
+
+#: src/ui/ui_settings.c:106
+msgid "Confirm button"
+msgstr ""
+
+#: src/ui/ui_settings.c:106
+msgid "PSP setting follows the console: × on most PSPs, ○ on Japanese models."
+msgstr ""
+
+#: src/ui/ui_settings.c:107
+msgid "PSP setting"
+msgstr ""
+
+#: src/ui/ui_settings.c:108
+msgid "Restart kai"
+msgstr ""
+
+#: src/ui/ui_settings.c:108
+msgid "Saves like Exit, starts kai again and brings you back here."
+msgstr ""
+
+#: src/ui/ui_settings.c:110
+msgid "Quit kai"
+msgstr ""
+
+#: src/ui/ui_settings.c:110
+msgid "Saves like Exit, then closes kai."
+msgstr ""
+
+#: src/ui/ui_settings.c:112
+msgid "Reset all settings"
+msgstr ""
+
+#: src/ui/ui_settings.c:112
+msgid "Puts kai's and this game's settings back to their defaults."
+msgstr ""
+
+#: src/ui/ui_settings.c:117
+msgid "Display"
+msgstr ""
+
+#: src/ui/ui_settings.c:117
+msgid "Controls"
+msgstr ""
+
+#: src/ui/ui_settings.c:117
+msgid "System"
+msgstr ""
+
+#: src/ui/ui_settings.c:426
+msgid "Up"
+msgstr ""
+
+#: src/ui/ui_settings.c:426
+msgid "Down"
+msgstr ""
+
+#: src/ui/ui_settings.c:426
+msgid "Left"
+msgstr ""
+
+#: src/ui/ui_settings.c:426
+msgid "Right"
+msgstr ""
+
+#: src/ui/ui_settings.c:426
+msgid "Pause screen"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Quick load"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Quick save"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Rapid A"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Rapid B"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Rapid L"
+msgstr ""
+
+#: src/ui/ui_settings.c:427
+msgid "Rapid R"
+msgstr ""
+
+#: src/ui/ui_settings.c:428 src/ui/ui_settings.c:428 src/ui/ui_settings.c:428
+msgid "None"
+msgstr ""
+
+#: src/ui/ui_settings.c:544
+msgid "Confirm picks what this button does in this game."
+msgstr ""
+
+#: src/ui/ui_settings.c:545
+msgid "Confirm picks what this direction does in this game."
+msgstr ""
+
+#: src/ui/ui_settings.c:596
+msgid "One button has to open the menu"
+msgstr ""
+
+#: src/ui/ui_settings.c:652
+msgid "Button action · "
+msgstr ""
+
+#: src/ui/ui_settings.c:677 src/ui/ui_settings.c:893
+msgid "Pick"
+msgstr ""
+
+#: src/ui/ui_settings.c:688 src/ui/ui_settings.c:814 src/ui/ui_settings.c:890
+msgid "Buttons"
+msgstr ""
+
+#: src/ui/ui_settings.c:688 src/ui/ui_settings.c:819 src/ui/ui_settings.c:890
+msgid "Stick"
+msgstr ""
+
+#: src/ui/ui_settings.c:774
+msgid "Original shows the GBA's pixels at their own size. Fit fills the height and keeps the shape. Full stretches to the whole screen."
+msgstr ""
+
+#: src/ui/ui_settings.c:775
+msgid "How the GBA picture is drawn when it is scaled up to the PSP screen."
+msgstr ""
+
+#: src/ui/ui_settings.c:776
+msgid "What fills the space beside the picture in Original and Fit: plain black, kai's pattern, or colours taken from the game."
+msgstr ""
+
+#: src/ui/ui_settings.c:777
+msgid "When the PSP can't draw every frame, skipping some keeps the game at full speed. Auto skips only when the game would slow down; Fixed always skips the number set in Skip up to."
+msgstr ""
+
+#: src/ui/ui_settings.c:778
+msgid "The most frames in a row that Auto may skip; Fixed always skips this many. Lower looks smoother, higher keeps the speed."
+msgstr ""
+
+#: src/ui/ui_settings.c:779
+msgid "Shrinks the picture inside its screen size, for a TV that cuts off the edges of the picture."
+msgstr ""
+
+#: src/ui/ui_settings.c:780
+msgid "Off mutes the game. With no sound to make, the PSP has a little more time for the picture."
+msgstr ""
+
+#: src/ui/ui_settings.c:781
+msgid "If the sound crackles in a busy game, add a block. If the sound feels late, take one away."
+msgstr ""
+
+#: src/ui/ui_settings.c:782
+msgid "On: the stick works like the d-pad, or does what you pick for each direction. Off: the stick does nothing."
+msgstr ""
+
+#: src/ui/ui_settings.c:783
+msgid "How light a push counts. Higher reacts to a lighter push; lower ignores small wobbles."
+msgstr ""
+
+#: src/ui/ui_settings.c:784
+msgid "For games made for a tilt cartridge: the stick stands in for tilting, with the centre as level. Use the stick must be on."
+msgstr ""
+
+#: src/ui/ui_settings.c:785
+msgid "On: leaving a game saves to Last, so Continue picks up exactly where you were. Off: Last stays as it was."
+msgstr ""
+
+#: src/ui/ui_settings.c:786
+msgid "Hold: the game runs fast while you hold the button. Toggle: one press turns it on, the next turns it off."
+msgstr ""
+
+#: src/ui/ui_settings.c:787
+msgid "2× and 3× are steady. Max runs as fast as the PSP can, so its speed changes with each game."
+msgstr ""
+
+#: src/ui/ui_settings.c:788
+msgid "Off keeps fast forward quiet. On plays the game's sound, sped up."
+msgstr ""
+
+#: src/ui/ui_settings.c:789
+msgid "How fast a rapid-fire button presses while you hold it. Choose which buttons fire rapidly in Controls."
+msgstr ""
+
+#: src/ui/ui_settings.c:790
+msgid "Shows the frames per second in the top-left corner. 60 is full speed."
+msgstr ""
+
+#: src/ui/ui_settings.c:791
+msgid "The language comes from your PSP until you pick one here. A new language applies after a restart."
+msgstr ""
+
+#: src/ui/ui_settings.c:792
+msgid "333 MHz runs every game at full speed. 222 and 266 save battery, but some games slow down."
+msgstr ""
+
+#: src/ui/ui_settings.c:793
+msgid "Right away writes the game's own save as soon as the game saves. On exit waits until you leave the game."
+msgstr ""
+
+#: src/ui/ui_settings.c:794
+msgid "GBA BIOS shows the GBA's start-up logo first, as on a real GBA. Game Cart skips it and works without a BIOS."
+msgstr ""
+
+#: src/ui/ui_settings.c:795
+msgid "Off hides the No GBA BIOS line in the library, for when you play without a BIOS."
+msgstr ""
+
+#: src/ui/ui_settings.c:796
+msgid "Off hides the Recent tab and its Continue card; the library opens on All. × Play still picks up where you left off."
+msgstr ""
+
+#: src/ui/ui_settings.c:797
+msgid "PSP setting follows the console: × on most PSPs, ○ on Japanese models. Or choose one here."
+msgstr ""
+
+#: src/ui/ui_settings.c:798
+msgid "Saves like Exit, then starts kai again and brings you back here."
+msgstr ""
+
+#: src/ui/ui_settings.c:799
+msgid "Saves like Exit, then closes kai and goes back to the PSP's home menu."
+msgstr ""
+
+#: src/ui/ui_settings.c:800
+msgid "Puts kai's settings and this game's own settings back to their defaults. Savestates, game saves and other games' settings stay."
+msgstr ""
+
+#: src/ui/ui_settings.c:804
+msgid "Pick what this button does in this game: a GBA button, rapid fire, fast forward, quick save or load, the pause screen, or Show FPS."
+msgstr ""
+
+#: src/ui/ui_settings.c:844
+msgid "Pixels stay hard but uneven."
+msgstr ""
+
+#: src/ui/ui_settings.c:844
+msgid "Soft, a little blurry."
+msgstr ""
+
+#: src/ui/ui_settings.c:845
+msgid "Crisp and even. Best for most games."
+msgstr ""
+
+#: src/ui/ui_settings.c:882
+msgid "Hold: reset tab"
+msgstr ""
+
+#: src/ui/ui_settings.c:901
+msgid "Hold: reset all"
+msgstr ""
+
+#: src/ui/ui_settings.c:920
+msgid "Hold: restart now"
+msgstr ""
+
+#: src/ui/ui_settings.c:961
+msgid "Saved for this game only"
+msgstr ""
+
+#: src/ui/ui_settings.c:1047
+#, c-format
+msgid "Applies after a restart: hold %s to restart now, or it waits for the next start."
+msgstr ""
+
+#: src/ui/ui_settings.c:1118
+msgid "Settings are back as they were"
+msgstr ""
+
+#: src/ui/ui_settings.c:1504
+#, c-format
+msgid "%s reset"
+msgstr ""
+
+#: src/ui/ui_settings.c:1548
+msgid "Every setting reset"
+msgstr ""
+
+#: src/cheat_engine.c:1792
+msgid "This code would write to the game's save."
+msgstr ""
+
+#: src/cheat_engine.c:1795
+msgid "This code is cut short or too long for kai."
+msgstr ""
+
+#: src/cheat_engine.c:1796
+msgid "This code writes to an odd address."
+msgstr ""
+
+#: src/cheat_engine.c:1797
+msgid "This code does too much each frame."
+msgstr ""
+
+#: src/cheat_engine.c:1799
+msgid "kai can't read this code."
+msgstr ""
+
+#: src/cheat_engine.c:1801
+msgid "This kind of code isn't supported."
+msgstr ""

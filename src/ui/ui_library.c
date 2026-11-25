@@ -126,10 +126,10 @@ static struct
   int card_first, card_first_from, card_first_f;
   int fav_flash, fav_changed, card_changed;
   ui_hold_t hold;
-  char toast[64];
+  char toast[128];
   u16 toast_edge;
   int toast_f, toast_undo;
-  char facts[96];
+  char facts[200];
   int help, help_f, help_out;
   int name_mode;
   char name_l1[256], name_l2[256];
@@ -917,7 +917,7 @@ static void played_info(int game, char *out, int n);
 static void grid_bar(void)
 {
   const game_t *g = &L.games[L.order[L.cur]];
-  char info[96];
+  char info[136];
   int iw;
 
   ui_round_fill(23, 223, 440, 22, 2, UI_COL_SHADE);
@@ -1041,9 +1041,9 @@ static void size_text(u32 bytes, char *out, int n)
   u32 mb = (bytes + (512 * 1024)) >> 20;
 
   if(mb == 0)
-    snprintf(out, n, "%u KB", (unsigned)((bytes + 1023) >> 10));
+    snprintf(out, n, T("%u KB"), (unsigned)((bytes + 1023) >> 10));
   else
-    snprintf(out, n, "%u MB", (unsigned)mb);
+    snprintf(out, n, T("%u MB"), (unsigned)mb);
 }
 
 typedef char play_pair_check[(offsetof(game_config_t, last_played) ==
@@ -1091,22 +1091,22 @@ static u32 game_played(int game)
 static void played_text(u32 seconds, char *out, int n)
 {
   if(seconds == 0)
-    snprintf(out, n, "Not played yet");
+    snprintf(out, n, "%s", T("Not played yet"));
   else if(seconds < 3600)
-    snprintf(out, n, "Played %u min", (unsigned)((seconds + 59) / 60));
+    snprintf(out, n, T("Played %u min"), (unsigned)((seconds + 59) / 60));
   else
-    snprintf(out, n, "Played %u h", (unsigned)(seconds / 3600));
+    snprintf(out, n, T("Played %u h"), (unsigned)(seconds / 3600));
 }
 
 static void played_info(int game, char *out, int n)
 {
-  char when[32], played[32];
+  char when[64], played[64];
   u32 seconds = game_played(game);
 
   last_text(L.last_played, when, sizeof(when));
   played_text(seconds, played, sizeof(played));
   if(!seconds && !when[0])
-    snprintf(out, n, "Not played yet");
+    snprintf(out, n, "%s", T("Not played yet"));
   else if(!when[0])
     snprintf(out, n, "%s", played);
   else
@@ -1131,7 +1131,7 @@ static void list_card(int i, int y, int o)
 {
   const game_t *g = &L.games[L.order[i]];
   int h = list_h(i), lift = (2 * o + 128) / 256;
-  char chip[32], size[16], played[32];
+  char chip[64], size[16], played[64];
   int cw;
 
   ui_round_fill(21, y + 1, 440, h, 2, UI_COL_SHADE);
@@ -1247,11 +1247,11 @@ static void last_text(u32 unix_time, char *out, int n)
   sceRtcGetCurrentClockLocalTime(&now);
   days = day_number(now.year, now.month, now.day) - day_number(t.year, t.month, t.day);
   if(days <= 0)
-    snprintf(out, n, "Today %02d:%02d", t.hour, t.minute);
+    snprintf(out, n, T("Today %02d:%02d"), t.hour, t.minute);
   else if(days == 1)
-    snprintf(out, n, "Yesterday %02d:%02d", t.hour, t.minute);
+    snprintf(out, n, T("Yesterday %02d:%02d"), t.hour, t.minute);
   else
-    snprintf(out, n, "%d days ago", days);
+    snprintf(out, n, T("%d days ago"), days);
 }
 
 static int panel_y0(void)
@@ -1307,7 +1307,7 @@ static void panel_card(void)
 {
   const game_t *g = &L.games[L.order[L.cur]];
   int py = panel_y0(), ph = 244 - py, art = ph - 86, ax, ny, w = PANEL_PW - 16;
-  char l1[256], l2[256], when[32], played[32];
+  char l1[256], l2[256], when[64], played[64];
   u32 seconds;
 
   if(art > PANEL_ART)
@@ -1346,7 +1346,7 @@ static void panel_card(void)
   seconds = game_played(L.order[L.cur]);
   last_text(L.last_played, when, sizeof(when));
   if(!when[0] && !seconds)
-    ui_print(PANEL_PX + 8, py + ph - 34, "Not played yet", UI_COL_CREAM, UI_FONT_SMALL, 0);
+    ui_print(PANEL_PX + 8, py + ph - 34, T("Not played yet"), UI_COL_CREAM, UI_FONT_SMALL, 0);
   else
   {
     if(when[0])
@@ -1719,8 +1719,8 @@ static void draw_continue(int hero)
 {
   int game = L.recent[0], lift = hero ? UI_LIFT : 0, x, y, w;
   u16 ink = hero ? UI_COL_PLUM : UI_COL_CREAM, bg = hero ? UI_COL_TANGERINE : UI_COL_CARD;
-  char line[96], when[32], played[32];
-  const char *chip = "CONTINUE";
+  char line[96], when[64], played[64];
+  const char *chip = T("CONTINUE");
   u32 seconds = game_played(game);
 
   ui_round_fill(CONT_X + 3, CONT_Y + 3, CONT_W, CONT_H, 3, UI_COL_SHADE);
@@ -1739,14 +1739,14 @@ static void draw_continue(int hero)
    CONT_W - 16);
   if(L.cont_slot >= 0)
   {
-    char slot[16];
+    char slot[32];
     when[0] = 0;
     if(L.cont_time > 62135596800000000ULL)
       last_text((u32)((L.cont_time - 62135596800000000ULL) / 1000000ULL), when, sizeof(when));
     if(L.cont_slot == 10)
-      snprintf(slot, sizeof(slot), "Last");
+      snprintf(slot, sizeof(slot), "%s", T("Last"));
     else
-      snprintf(slot, sizeof(slot), "Slot %d", L.cont_slot);
+      snprintf(slot, sizeof(slot), T("Slot %d"), L.cont_slot);
     if(when[0])
       snprintf(line, sizeof(line), "%s \xC2\xB7 %s", slot, when);
     else
@@ -1756,7 +1756,7 @@ static void draw_continue(int hero)
   {
     last_text(L.last_played, line, sizeof(line));
     if(!line[0] && !seconds)
-      snprintf(line, sizeof(line), "Not played yet");
+      snprintf(line, sizeof(line), "%s", T("Not played yet"));
   }
   ui_print_fit(x + 8, y + 164, line, ink, UI_FONT_SMALL, 0, CONT_W - 16);
   if(seconds)
@@ -1770,7 +1770,7 @@ static void draw_recent_row(int k, int sel)
 {
   int game = recent_game(1 + k), y = recent_row_y(k), l2 = sel ? UI_LIFT : 0;
   int x = REC_X - l2, yy = y - l2;
-  char info[96];
+  char info[136];
 
   ui_round_fill(REC_X + 3, y + 3, REC_W, REC_H, 2, UI_COL_SHADE);
   ui_round_fill(x, yy, REC_W, REC_H, 2, sel ? UI_COL_TANGERINE : UI_COL_CARD);
@@ -1787,9 +1787,9 @@ static void draw_recent_row(int k, int sel)
 
 static void draw_bios_row(int x, int y)
 {
-  static const char t[] = "No GBA BIOS: games start in Game Cart mode.";
+  const char *t = T("No GBA BIOS: games start in Game Cart mode.");
   char line[128];
-  int hw = ui_print_width("Help", UI_FONT_SMALL, UI_TEXT_BOLD), hx = x + REC_W - 8 - hw - 17, j;
+  int hw = ui_print_width(T("Help"), UI_FONT_SMALL, UI_TEXT_BOLD), hx = x + REC_W - 8 - hw - 17, j;
 
   ui_round_fill(x + 3, y + 3, REC_W, REC_H, 2, UI_COL_SHADE);
   ui_round_fill(x, y, REC_W, REC_H, 2, UI_COL_CREAM);
@@ -1797,7 +1797,7 @@ static void draw_bios_row(int x, int y)
   for(j = 0; (j < 2) && ui_wrap_line(t, j, REC_W - 20, UI_FONT_SMALL, line, sizeof(line)); j++)
     ui_print(x + 12, y + 5 + 14 * j, line, UI_COL_PLUM, UI_FONT_SMALL, 0);
   ui_glyph_inverted(hx, y + REC_H - 17, PSP_CTRL_SQUARE);
-  ui_print(hx + 17, y + REC_H - 18, "Help", UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+  ui_print(hx + 17, y + REC_H - 18, T("Help"), UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
 }
 
 static void recent_ground(void)
@@ -1904,8 +1904,8 @@ static void write_favourites(void)
 
 static void draw_no_favourites(void)
 {
-  static const char t[] = "No favourites yet";
-  static const char b[] = "\xE2\x96\xB3 on a game, then \xE2\x96\xB3 again, to add it here";
+  const char *t = T("No favourites yet");
+  const char *b = T("\xE2\x96\xB3 on a game, then \xE2\x96\xB3 again, to add it here");
 
   ui_round_fill(208, 82, 64, 52, 3, UI_COL_CARD);
   draw_icon11(224, 92, icon_heart, UI_COL_PINK, 3);
@@ -1997,7 +1997,7 @@ static void card_facts(int game)
   u32 on = 0, total = cheat_engine_peek(g->name, &on);
   int saved = 0;
   u32 mark = ui_pool_mark();
-  char ch[32], st[48];
+  char ch[64], st[128];
 
   if(gamepak_filename[0] && !strcasecmp(gamepak_filename, g->name) &&
    !strcasecmp(rom_path, L.dirs[g->dir]))
@@ -2022,13 +2022,13 @@ static void card_facts(int game)
   if(cfg)
     saved = ui_settings_saved_for_game(cfg);
   if(total)
-    snprintf(ch, sizeof(ch), "Cheats: %u / %u", (unsigned)on, (unsigned)total);
+    snprintf(ch, sizeof(ch), T("Cheats: %u / %u"), (unsigned)on, (unsigned)total);
   else
-    snprintf(ch, sizeof(ch), "Cheats: none");
+    snprintf(ch, sizeof(ch), "%s", T("Cheats: none"));
   if(saved)
-    snprintf(st, sizeof(st), "Settings: %d saved for this game", saved);
+    snprintf(st, sizeof(st), T("Settings: %d saved for this game"), saved);
   else
-    snprintf(st, sizeof(st), "Settings: none saved for this game");
+    snprintf(st, sizeof(st), "%s", T("Settings: none saved for this game"));
   snprintf(L.facts, sizeof(L.facts), "%s  \xC2\xB7  %s", ch, st);
   ui_pool_release(mark);
 }
@@ -2179,11 +2179,11 @@ static int card_first_px(void)
 static void slot_label(int slot, char *out, int n)
 {
   if(slot < 0)
-    snprintf(out, n, "Start fresh");
+    snprintf(out, n, "%s", T("Start fresh"));
   else if(slot == 10)
-    snprintf(out, n, "Last");
+    snprintf(out, n, "%s", T("Last"));
   else
-    snprintf(out, n, "Slot %d", slot);
+    snprintf(out, n, T("Slot %d"), slot);
 }
 
 static void tile_when(u64 tick, char *out, int n)
@@ -2197,7 +2197,7 @@ static void draw_card(void)
 {
   const game_t *g = &L.games[L.card_game];
   int x = CARD_X, y = card_y(), i, cx, first = card_first_px(), dy;
-  char chip[48], size[16], played[32];
+  char chip[96], size[16], played[64];
 
   ui_round_fill(x + 3, y + 3, CARD_W, CARD_H, 3, UI_COL_SHADE);
   ui_round_fill(x, y, CARD_W, CARD_H, 3, UI_COL_CARD);
@@ -2237,24 +2237,24 @@ static void draw_card(void)
   ui_print(cx + 6, y + 47 + dy, played, UI_COL_SKY, UI_FONT_SMALL, 0);
   cx += ui_print_width(played, UI_FONT_SMALL, 0) + 18;
   {
-    int w = 11 + 4 + ui_print_width("Favourite", UI_FONT_SMALL, 0) + 12;
+    int w = 11 + 4 + ui_print_width(T("Favourite"), UI_FONT_SMALL, 0) + 12;
     u16 ink = g->fav ? UI_COL_PINK : UI_COL_MUTE;
     u16 fill = (L.fav_flash < UI_F_FLASH) ? ((L.fav_flash < UI_F_FLASH / 2) ? UI_COL_CREAM :
      COLOR16(18, 16, 16)) : UI_COL_PLUM;
     ui_round_fill(cx, y + 46 + dy, w, 16, 2, fill);
     draw_icon11(cx + 5, y + 49 + dy, icon_heart, ink, 1);
-    ui_print(cx + 20, y + 47 + dy, "Favourite", ink, UI_FONT_SMALL, 0);
+    ui_print(cx + 20, y + 47 + dy, T("Favourite"), ink, UI_FONT_SMALL, 0);
   }
   ui_print_fit(x + 124, y + 68 + dy, L.facts,
    UI_COL_MUTE, UI_FONT_SMALL, 0, 300);
 
-  ui_print(x + 12, y + 118, "Savestates", UI_COL_MUTE, UI_FONT_SMALL, 0);
+  ui_print(x + 12, y + 118, T("Savestates"), UI_COL_MUTE, UI_FONT_SMALL, 0);
   ui_clip_set(x + 8, y + 130, CARD_W - 16, 90);
   for(i = 0; i < L.tile_count; i++)
   {
     int sx = x + 12 + i * TILE_PITCH - first, sy = y + 138, sel = (i == L.card_cur);
     int lift = sel ? UI_LIFT : 0;
-    char label[24], when[24];
+    char label[48], when[48];
     if((sx + TILE_W < x) || (sx > x + CARD_W))
       continue;
     if(sel)
@@ -2285,7 +2285,7 @@ static void draw_card(void)
 
   if(L.hold.shown && (L.tile_slot[L.card_cur] >= 0))
   {
-    static const char verb[] = "Delete (hold)";
+    const char *verb = T("Delete (hold)");
     int sx = x + 12 + L.card_cur * TILE_PITCH - first - UI_LIFT, sy = y + 138 - UI_LIFT;
     int cw = ui_print_width(verb, UI_FONT_SMALL, 0) + 20, c0, c1;
     if(cw < 96)
@@ -2359,7 +2359,7 @@ static int card_input(void)
       if(L.tile_slot[i] == slot)
         card_select(i);
     L.card_changed = 1;
-    card_toast("The savestate is back", UI_COL_SKY, -1);
+    card_toast(T("The savestate is back"), UI_COL_SKY, -1);
     memset(&L.hold, 0, sizeof(L.hold));
     return 0;
   }
@@ -2368,7 +2368,7 @@ static int card_input(void)
     ui_hold_step(&L.hold, PSP_CTRL_SELECT);
     if(L.hold.done)
     {
-      char path[MAX_PATH], text[48], label[24];
+      char path[MAX_PATH], text[128], label[48];
       int slot = L.tile_slot[L.card_cur];
       state_path(L.card_game, slot, path);
       delete_state_files(path);
@@ -2377,7 +2377,7 @@ static int card_input(void)
         L.card_cur = L.card_from = L.tile_count - 1;
       L.card_changed = 1;
       slot_label(slot, label, sizeof(label));
-      snprintf(text, sizeof(text), "%s deleted", label);
+      snprintf(text, sizeof(text), T("%s deleted"), label);
       card_toast(text, UI_COL_PINK, slot);
       return 0;
     }
@@ -2520,7 +2520,7 @@ static void fold_row(int i, int y, int sel)
 {
   int lift = sel ? UI_LIFT : 0, kind = L.fold_kind[i], item = L.fold_item[i];
   u16 ink = sel ? UI_COL_PLUM : UI_COL_CREAM;
-  char meta[24];
+  char meta[48];
   const char *name;
 
   if(sel)
@@ -2539,9 +2539,9 @@ static void fold_row(int i, int y, int sel)
      sel ? UI_COL_PLUM : UI_COL_TANGERINE, 1);
     name = (kind == ROW_UP) ? ".." : dir_name(item);
     if(kind == ROW_UP)
-      snprintf(meta, sizeof(meta), "Up a folder");
+      snprintf(meta, sizeof(meta), "%s", T("Up a folder"));
     else
-      snprintf(meta, sizeof(meta), "%d games", L.dir_games[item]);
+      snprintf(meta, sizeof(meta), T("%d games"), L.dir_games[item]);
   }
   ui_print_fit(46 - lift, y + 2 - lift, name, ink, UI_FONT_BODY, 0, 300);
   if((kind == ROW_GAME) && L.games[item].fav)
@@ -2557,8 +2557,8 @@ static void fold_ground(void)
   fold_breadcrumb();
   if((L.fold_count == 0) || ((L.fold_count == 1) && (L.fold_kind[0] == ROW_UP)))
   {
-    static const char t[] = "This folder is empty";
-    static const char b[] = "Only .gba and .zip files show here.";
+    const char *t = T("This folder is empty");
+    const char *b = T("Only .gba and .zip files show here.");
     ui_round_fill(208, 82, 64, 52, 3, UI_COL_CARD);
     draw_icon11(224, 92, icon_folder, UI_COL_TANGERINE, 3);
     ui_print(240 - ui_print_width(t, UI_FONT_BODY, UI_TEXT_BOLD) / 2, 146, t, UI_COL_CREAM,
@@ -2647,26 +2647,26 @@ static int list_banner(void)
 
 static void draw_banner_at(int y)
 {
-  static const char t[] = "No GBA BIOS: games start in Game Cart mode.";
-  int hw = ui_print_width("Help", UI_FONT_SMALL, UI_TEXT_BOLD), hx = 460 - 8 - hw - 17;
+  const char *t = T("No GBA BIOS: games start in Game Cart mode.");
+  int hw = ui_print_width(T("Help"), UI_FONT_SMALL, UI_TEXT_BOLD), hx = 460 - 8 - hw - 17;
 
   ui_round_fill(22, y + 2, 440, 16, 2, UI_COL_SHADE);
   ui_round_fill(20, y, 440, 16, 2, UI_COL_CREAM);
   ui_fill(20, y + 2, 4, 12, UI_COL_TANGERINE);
   ui_glyph_inverted(hx, y + 1, PSP_CTRL_SQUARE);
-  ui_print(hx + 17, y + 1, "Help", UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
+  ui_print(hx + 17, y + 1, T("Help"), UI_COL_PLUM, UI_FONT_SMALL, UI_TEXT_BOLD);
   ui_print_fit(30, y + 1, t, UI_COL_PLUM, UI_FONT_SMALL, 0, hx - 30 - 10);
 }
 
 static int tab_is(int id);
-static const char *view_labels[3] = { "Panel", "Shelf", "Grid" };
+static const char *view_labels[3] = { TN("Panel"), TN("Shelf"), TN("Grid") };
 static const int view_ids[3] = { VIEW_PANEL, VIEW_SHELF, VIEW_GRID };
 
 static int view_index(int view)
 {
   return (view == VIEW_SHELF) ? 1 : (view == VIEW_GRID) ? 2 : 0;
 }
-static const char *sort_labels[SORTS] = { "Name", "Recently played", "Size" };
+static const char *sort_labels[SORTS] = { TN("Name"), TN("Recently played"), TN("Size") };
 
 static int has_view_row(void)
 {
@@ -2687,7 +2687,7 @@ static void draw_popup(void)
   ui_round_fill(x + 3, y + 3, POP_W, POP_H, 3, UI_COL_SHADE);
   ui_round_fill(x, y, POP_W, POP_H, 3, UI_COL_CREAM);
   ui_fill(x, y + 4, 6, POP_H - 8, UI_COL_SKY);
-  ui_print(x + 16, y + 6, has_view_row() ? "View & sort" : "Sort", UI_COL_PLUM,
+  ui_print(x + 16, y + 6, has_view_row() ? T("View & sort") : T("Sort"), UI_COL_PLUM,
    UI_FONT_BODY, UI_TEXT_BOLD);
   for(j = POP_FIRST_ROW; j < 2; j++)
   {
@@ -2696,10 +2696,10 @@ static void draw_popup(void)
     const char **labels = j ? sort_labels : view_labels;
     if(j == L.pop_row)
       ui_round_fill(x + 10, ry - 4, POP_W - 20, 28, 2, COLOR16(21, 26, 27));
-    ui_print(x + 16, ry + 2, j ? "Sort by" : "View", UI_COL_PLUM, UI_FONT_SMALL, 0);
+    ui_print(x + 16, ry + 2, j ? T("Sort by") : T("View"), UI_COL_PLUM, UI_FONT_SMALL, 0);
     for(i = 0; i < n; i++)
     {
-      int ow = ui_print_width(labels[i], UI_FONT_SMALL, 0) + 14;
+      int ow = ui_print_width(T(labels[i]), UI_FONT_SMALL, 0) + 14;
       if(i == k)
       {
         int g = (L.pop_flash < UI_F_VALUE) && (j == L.pop_row) ?
@@ -2708,13 +2708,14 @@ static void draw_popup(void)
       }
       else
         ui_round_frame(sx, ry, ow, 18, 2, COLOR16(22, 20, 19));
-      ui_print(sx + 7, ry + 2, labels[i], UI_COL_PLUM, UI_FONT_SMALL, 0);
+      ui_print(sx + 7, ry + 2, T(labels[i]), UI_COL_PLUM, UI_FONT_SMALL, 0);
       sx += ow + 4;
     }
   }
 }
 
-static const char *tab_names[4] = { "Recent", "All", "\xE2\x99\xA5 Favourites", "Folders" };
+static const char *tab_names[4] =
+ { TN("Recent"), TN("All"), TN("\xE2\x99\xA5 Favourites"), TN("Folders") };
 
 static int tab_is(int id)
 {
@@ -2785,80 +2786,82 @@ static void turn_tab(int d)
 static void draw_hints(void)
 {
   ui_hint_t h[5];
-  int n = 0;
+  int n = 0, i;
 
   if(L.card && !L.card_out)
   {
-    h[n].keys = ui_key_back;        h[n++].verb = "Back";
-    h[n].keys = PSP_CTRL_TRIANGLE;  h[n++].verb = "Favourite";
+    h[n].keys = ui_key_back;        h[n++].verb = TN("Back");
+    h[n].keys = PSP_CTRL_TRIANGLE;  h[n++].verb = TN("Favourite");
     if((L.toast_f >= 0) && (L.toast_undo >= 0))
     {
-      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = "Undo";
+      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = TN("Undo");
     }
     else if(L.tile_slot[L.card_cur] >= 0)
     {
-      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = "Hold: delete";
+      h[n].keys = PSP_CTRL_SELECT;  h[n++].verb = TN("Hold: delete");
     }
-    h[n].keys = ui_key_confirm;     h[n++].verb = "Play";
+    h[n].keys = ui_key_confirm;     h[n++].verb = TN("Play");
   }
   else if(L.pop && !L.pop_out)
   {
     if(has_view_row())
     {
-      h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;  h[n++].verb = "Move";
+      h[n].keys = PSP_CTRL_UP | PSP_CTRL_DOWN;  h[n++].verb = TN("Move");
     }
-    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Change";
-    h[n].keys = ui_key_back;                    h[n++].verb = "Close";
+    h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = TN("Change");
+    h[n].keys = ui_key_back;                    h[n++].verb = TN("Close");
   }
   else if(L.count == 0)
   {
-    h[n].keys = ui_key_confirm;  h[n++].verb = "Look again";
-    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+    h[n].keys = ui_key_confirm;  h[n++].verb = TN("Look again");
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = TN("Settings");
   }
   else if(tab_is(TAB_RECENT))
   {
-    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
-    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
-    h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? "Play" : "Continue";
+    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = TN("Game card");
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = TN("Settings");
+    h[n].keys = ui_key_confirm;  h[n++].verb = L.rec_row ? TN("Play") : TN("Continue");
   }
   else if(tab_is(TAB_FOLDERS))
   {
     int empty = (L.fold_count == 0) || ((L.fold_count == 1) && (L.fold_kind[0] == ROW_UP));
     if(L.fold_dir != 0)
     {
-      h[n].keys = ui_key_back;     h[n++].verb = "Up a folder";
+      h[n].keys = ui_key_back;     h[n++].verb = TN("Up a folder");
     }
     if(!empty && (L.fold_kind[L.fold_cur] == ROW_GAME))
     {
-      h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
+      h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = TN("Game card");
     }
     if(!empty)
     {
-      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
+      h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? TN("View") : TN("Sort");
     }
-    h[n].keys = PSP_CTRL_START;    h[n++].verb = "Settings";
+    h[n].keys = PSP_CTRL_START;    h[n++].verb = TN("Settings");
     if(!empty)
     {
       h[n].keys = ui_key_confirm;  h[n++].verb =
-       (L.fold_kind[L.fold_cur] == ROW_GAME) ? "Play" : "Open";
+       (L.fold_kind[L.fold_cur] == ROW_GAME) ? TN("Play") : TN("Open");
     }
   }
   else if(L.n == 0)
   {
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
-    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? TN("View") : TN("Sort");
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = TN("Settings");
   }
   else
   {
-    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = "Game card";
-    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? "View" : "Sort";
-    h[n].keys = PSP_CTRL_START;  h[n++].verb = "Settings";
+    h[n].keys = PSP_CTRL_TRIANGLE; h[n++].verb = TN("Game card");
+    h[n].keys = PSP_CTRL_SELECT; h[n++].verb = has_view_row() ? TN("View") : TN("Sort");
+    h[n].keys = PSP_CTRL_START;  h[n++].verb = TN("Settings");
     if(jump_here())
     {
-      h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Jump";
+      h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = TN("Jump");
     }
-    h[n].keys = ui_key_confirm;  h[n++].verb = "Play";
+    h[n].keys = ui_key_confirm;  h[n++].verb = TN("Play");
   }
+  for(i = 0; i < n; i++)
+    h[i].verb = (char *)T(h[i].verb);
   ui_hint_packed(h, n, 14);
 }
 
@@ -2869,16 +2872,16 @@ static void draw_empty(void)
 {
   int r, c;
   char line[128];
-  static const char body[] =
-   "Copy .gba or .zip files to ms0:/GBA/ on the Memory Stick, then look again.";
+  const char *body =
+   T("Copy .gba or .zip files to ms0:/GBA/ on the Memory Stick, then look again.");
 
   ui_round_fill(196, 52, 88, 72, 4, UI_COL_CARD);
   for(r = 0; r < 11; r++)
     for(c = 0; c < 11; c++)
       if(icon_folder[r] & (1 << (10 - c)))
         ui_fill(218 + c * 4, 68 + r * 4, 4, 4, UI_COL_TANGERINE);
-  ui_print(240 - ui_print_width("No games yet", UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) / 2,
-   136, "No games yet", UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
+  ui_print(240 - ui_print_width(T("No games yet"), UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X) / 2,
+   136, T("No games yet"), UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
   for(r = 0; r < 3; r++)
   {
     if(!ui_wrap_line(body, r, 360, UI_FONT_BODY, line, sizeof(line)))
@@ -2894,7 +2897,7 @@ static void draw_tab_bar(void)
   int i;
 
   for(i = 0; i < L.tab_count; i++)
-    labels[i] = tab_names[L.tab_ids[i]];
+    labels[i] = T(tab_names[L.tab_ids[i]]);
   ui_tabs(UI_MARGIN, labels, L.tab_count, L.tab, L.tab_prev, L.tab_f);
 }
 
@@ -3291,7 +3294,7 @@ static void draw_loading(int t, int fill_256)
   ui_round_fill(x + 4, y + 4, w, h, 3, UI_COL_SHADE);
   ui_round_fill(x, y, w, h, 3, UI_COL_CARD);
   ui_fill(x, y + 4, 4, h - 8, UI_COL_TANGERINE);
-  ex = ui_print(x + 16, y + 10, "Loading", UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
+  ex = ui_print(x + 16, y + 10, T("Loading"), UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD);
   for(i = 0; i < 3; i++)
     ui_fill(ex + 4 + i * 8, y + 19 - ((i == (t / UI_F_LOADING) % 3) ? 3 : 0), 4, 4,
      UI_COL_TANGERINE);
@@ -3316,8 +3319,8 @@ s32 ui_library_load(const char *dir, char *name)
   loaded = load_gamepak(name);
   progress_hook = NULL;
   if(loaded == -1)
-    ui_error_card("This game won't open", "The file is damaged, or it is not a GBA game.",
-     "OK", NULL, UI_COL_PINK);
+    ui_error_card(T("This game won't open"), T("The file is damaged, or it is not a GBA game."),
+     T("OK"), NULL, UI_COL_PINK);
   return loaded;
 }
 
@@ -3537,7 +3540,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
       draw_card();
       if(L.toast_f >= 0)
       {
-        if(!ui_toast_at(L.toast, L.toast_edge, (L.toast_undo >= 0) ? "Undo" : NULL,
+        if(!ui_toast_at(L.toast, L.toast_edge, (L.toast_undo >= 0) ? T("Undo") : NULL,
          L.toast_f, 6))
         {
           L.toast_f = -1;
@@ -3580,7 +3583,7 @@ int ui_library(char *dir, int dir_size, char *name, int name_size, int *slot)
     }
     if(L.help)
     {
-      ui_help_card("Add a GBA BIOS", "Copy gba_bios.bin into kai's folder, then restart kai.",
+      ui_help_card(T("Add a GBA BIOS"), T("Copy gba_bios.bin into kai's folder, then restart kai."),
        UI_COL_TANGERINE, L.help_f, L.help_out);
       if(L.help_f < (L.help_out ? UI_F_HELP_OUT : UI_F_HELP_IN))
         L.help_f++;
