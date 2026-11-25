@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.10.0](https://github.com/pichayakorn/gpsp-kai/compare/v3.9.1...v3.10.0) (2026-11-25)
+
+
+### Features
+
+* **cheats:** a cheat's code may be up to 32 KB ([#176](https://github.com/pichayakorn/gpsp-kai/issues/176)) ([b20329c](https://github.com/pichayakorn/gpsp-kai/commit/b20329c64cfee40ffc3e6ea5f1d974b7edad988e))
+* **cheats:** Action Replay and GameShark ROM patch codes run ([#171](https://github.com/pichayakorn/gpsp-kai/issues/171)) ([bf181f1](https://github.com/pichayakorn/gpsp-kai/commit/bf181f1617f1d6db1d8275c5a82122f3907e3ad4))
+* **ui4:** the 4.0 interface's texts can be translated ([#181](https://github.com/pichayakorn/gpsp-kai/issues/181)) ([f4479b0](https://github.com/pichayakorn/gpsp-kai/commit/f4479b0690e6ee7ec852fc032338b604775284c7))
+* **ui4:** the library's letter jump ([#170](https://github.com/pichayakorn/gpsp-kai/issues/170)) ([5e163a1](https://github.com/pichayakorn/gpsp-kai/commit/5e163a194587a24144ee8a4bef598b56e48b270f))
+
+
+### Performance Improvements
+
+* **dynarec:** a dispatch cache for indirect jumps ([#175](https://github.com/pichayakorn/gpsp-kai/issues/175)) ([3e58f71](https://github.com/pichayakorn/gpsp-kai/commit/3e58f71a3a09ac6cca5feb7116883c710fa726e6))
+
 ## [3.9.1](https://github.com/pichayakorn/gpsp-kai/compare/v3.9.0...v3.9.1) (2026-11-24)
 
 
