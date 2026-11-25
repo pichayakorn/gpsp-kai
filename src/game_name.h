@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #ifndef GAME_NAME_H
 #define GAME_NAME_H
 

@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #include "../common.h"
 #include "ui.h"
 #include "ui_help_pics.h"

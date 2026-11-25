@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #define HELP_PIC_W 41
 #define HELP_PIC_H 27
 static const u16 help_smooth_pics[3][HELP_PIC_W * HELP_PIC_H] =

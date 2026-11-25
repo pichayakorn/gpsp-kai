@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 /* .fbm layout (tools/fonts/bdf2fbm.py), little-endian: a 9-byte header
  * (u16 glyph count, u16 map count, u16 default glyph, u8 cell width, u8 cell
  * height, u8 bytes per glyph), maps of (u16 first, u16 last, u16 distance)

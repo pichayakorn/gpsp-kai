@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 typedef struct { u8 w; u8 bits[16][13]; } ui_lang_mask_t;
 static const ui_lang_mask_t ui_lang_masks[12] =
 {

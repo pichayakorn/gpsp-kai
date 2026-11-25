@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 /* Colours, sizes and timings from the 4.0 design, shared by every screen. */
 #ifndef UI_TOKENS_H
 #define UI_TOKENS_H
