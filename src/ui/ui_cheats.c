@@ -1,42 +1,25 @@
-/* ui_cheats.c - Cheats (spec section 4, "Cheats 4.0: groups and rules"; #166)
- *
- * The pause screen's Cheats tile, over the cheat engine (cheat_engine.c).
- * A game's cheats come in groups (a file each in its cheat folder): the
- * list of groups opens first, with On now above them (every cheat that is
- * on, from every group); a game with one group opens straight on it.
- *
- * A group's page: × switches a cheat, △ turns every unlocked one off (with
- * Undo), SELECT locks a cheat on (All off skips it; it turns off only after
- * unlocking; a ROM fix or master code locks itself when switched on, and
- * kai never switches a cheat on by itself). Cheats the engine can't run
- * are folded at the bottom under one "Can't run (N)" row (× opens it);
- * opened they are greyed, and the tip line says why. In a page taller than
- * the screen ←→ jumps along a rail of marks made from the part of the
- * names that differs. A group's rule changes its rows:
- * one at a time has round marks (choosing one switches the one before
- * off, with Undo), runs once has Apply (it runs when the game goes on,
- * then switches itself off), needs a restart offers to restart the game.
- * □ explains a row.
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
  */
 
 #include "../common.h"
 #include "ui.h"
 
-#define LIST_T     36          /* the list area: under the title ... */
-#define LIST_B     226         /* ... to the tip line */
+#define LIST_T     36
+#define LIST_B     226
 #define ROW_Y0     (LIST_T + 2)
 #define PITCH      UI_ROW_PITCH
-#define ROWS_SEEN  ((LIST_B - ROW_Y0) / PITCH)   /* whole rows only: 7 */
+#define ROWS_SEEN  ((LIST_B - ROW_Y0) / PITCH)
 #define TOAST_Y    214
-#define ON_NOW     (-1)        /* the page of every cheat that is on */
-#define GROUPS     (-2)        /* the list of groups */
-#define FOLD       0xFFFF      /* the "Can't run (N)" row of a page */
-#define ON_ROW     0xFFFE      /* a one-group page's On now row */
-#define MARKS      11          /* the jump rail: marks every ~10 % */
+#define ON_NOW     (-1)
+#define GROUPS     (-2)
+#define FOLD       0xFFFF
+#define ON_ROW     0xFFFE
+#define MARKS      11
 #define RAIL_X     464
 #define RAIL_Y     38
 #define MARK_PITCH 17
-#define JUMP_F     24          /* the big tile after a jump */
+#define JUMP_F     24
 
 static const u16 icon_lock[11] =
  { 0x000, 0x0F8, 0x104, 0x104, 0x3FE, 0x3FE, 0x3DE, 0x3DE, 0x3FE, 0x3FE, 0x000 };
@@ -47,42 +30,40 @@ static const u16 icon_folder[11] =
 static const u16 icon_star[11] =
  { 0x020, 0x020, 0x070, 0x070, 0x7FF, 0x3FE, 0x1FC, 0x1FC, 0x3DE, 0x306, 0x202 };
 
-/* what a row is */
 enum { R_ON_NOW, R_GROUP, R_CANT, R_SWITCH, R_RADIO, R_ONCE, R_FOLD };
 
-/* what Undo puts back */
 enum { UNDO_NONE, UNDO_ALL_OFF, UNDO_CHOICE };
 
 static struct
 {
-  int page;                    /* GROUPS, ON_NOW or a group */
-  int n;                       /* rows */
-  int single;                  /* one group: no list of groups */
-  int list_cur;                /* the list's cursor while a page is open */
-  int cur, from, cur_f;        /* the cursor and its flight */
-  int top, top_from, top_f;    /* the first row in view; the slide from top_from px */
-  int value_f, value_row;      /* the switch or mark that moved */
-  int lock_f, lock_row;        /* the padlock that popped */
-  int rest;                    /* frames the cursor has rested (the tip) */
-  int toast_f;                 /* -1: none */
+  int page;
+  int n;
+  int single;
+  int list_cur;
+  int cur, from, cur_f;
+  int top, top_from, top_f;
+  int value_f, value_row;
+  int lock_f, lock_row;
+  int rest;
+  int toast_f;
   char toast[80];
-  int undo, undo_cheat;        /* UNDO_*; the cheat a choice switched off */
-  int help, help_f, help_out;  /* the □ help card */
-  int restart;                 /* Restart now was chosen */
+  int undo, undo_cheat;
+  int help, help_f, help_out;
+  int restart;
   int dirty;
-  int view_b;                  /* the bottom of the last whole row in view */
-  int fold_open;               /* the cheats that can't run are shown */
-  int n_cant;                  /* cheats under the fold */
-  int marks, mark_row[MARKS];  /* the jump rail; 0: none */
+  int view_b;
+  int fold_open;
+  int n_cant;
+  int marks, mark_row[MARKS];
   char mark_text[MARKS][12];
-  int dots;                    /* the marks aren't in order: plain dots, no tile */
-  int jump_f, jump_mark;       /* the big tile; -1: none */
-  int marq_f;                  /* frames the cursor has rested (the marquee) */
-  int label_x, label_w;        /* the selected row's name, for the marquee */
+  int dots;
+  int jump_f, jump_mark;
+  int marq_f;
+  int label_x, label_w;
 } c;
 
-static u16 rows[CE_MAX_CHEATS + 1];   /* a page's cheats, or the list's groups */
-static u8 undo_on[CE_MAX_CHEATS];     /* the cheats All off turned off */
+static u16 rows[CE_MAX_CHEATS + 1];
+static u8 undo_on[CE_MAX_CHEATS];
 
 static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
 {
@@ -94,14 +75,11 @@ static void draw_icon11(int x, int y, const u16 *bits, u16 color, int scale)
         ui_fill(x + k * scale, y + r * scale, scale, scale, color);
 }
 
-/* ---- rows ------------------------------------------------------------------------- */
-
 static int on_list(void)
 {
   return c.page == GROUPS;
 }
 
-/* the cheat a page row shows */
 static int cheat_at(int r)
 {
   return rows[r];
@@ -133,7 +111,6 @@ static int row_kind(int r)
   return R_SWITCH;
 }
 
-/* a ROM fix or a master code, by its name */
 static int fix_or_master(int i)
 {
   char low[CE_NAME_LENGTH];
@@ -146,7 +123,6 @@ static int fix_or_master(int i)
   return strstr(low, "fix") || strstr(low, "master");
 }
 
-/* runs-once cheats marked Ready, counted apart from the ones that are on */
 static int is_ready(int i)
 {
   return cheat_is_on(i) && (rule_of(i) == CE_RULE_ONCE);
@@ -188,15 +164,12 @@ static void group_counts(int g, int *on, int *cant)
   }
 }
 
-/* SELECT locks a switch; on On now a chosen mark too. Runs-once cheats
-   and the marks of a one-at-a-time page are not locked. */
 static int lockable(int r)
 {
   int k = row_kind(r);
   return (k == R_SWITCH) || ((k == R_RADIO) && (c.page == ON_NOW));
 }
 
-/* does △ All off apply on this page? */
 static int all_off_here(void)
 {
   int i, r;
@@ -225,9 +198,6 @@ static int top_px(void)
   return ui_ease_out_back(c.top_from, c.top * PITCH, c.top_f, UI_F_SCROLL);
 }
 
-/* ---- drawing ------------------------------------------------------------------------- */
-
-/* a chip of the header at x; returns the next x, or 0 when it doesn't fit */
 static int chip(int x, const char *s, u16 fill)
 {
   int w = ui_print_width(s, UI_FONT_SMALL, 0) + 12;
@@ -239,7 +209,6 @@ static int chip(int x, const char *s, u16 fill)
   return x + w + 6;
 }
 
-/* past kai's limit: "first 1024 of 1210" */
 static int limit_chip(int x)
 {
   char s[40];
@@ -289,7 +258,7 @@ static void draw_header(void)
     int on, cant, i, rule = cheat_group_rule(c.page);
     group_counts(c.page, &on, &cant);
     for(i = cheat_group_first(c.page); i < (int)(cheat_group_first(c.page) + cheat_group_size(c.page)); i++)
-      on -= is_ready(i);  /* Ready ones aren't on yet */
+      on -= is_ready(i);
     snprintf(s1, sizeof(s1), "%d of %d on", on, (int)cheat_group_size(c.page));
     if(rule != CE_RULE_ONCE)
       x = chip(x, s1, UI_COL_LIME);
@@ -309,7 +278,6 @@ static void draw_header(void)
   }
 }
 
-/* text right-aligned at xr in the small font; returns its left edge */
 static int print_r(int xr, int y, const char *s, u16 color)
 {
   int w = ui_print_width(s, UI_FONT_SMALL, 0);
@@ -317,7 +285,6 @@ static int print_r(int xr, int y, const char *s, u16 color)
   return xr - w;
 }
 
-/* a pill whose right edge is xr; returns its left edge */
 static int pill_r(int xr, int y, const char *s, u16 fill, u16 ink)
 {
   int w = ui_print_width(s, UI_FONT_SMALL, 0) + 12;
@@ -326,7 +293,6 @@ static int pill_r(int xr, int y, const char *s, u16 fill, u16 ink)
   return xr - w;
 }
 
-/* one row at y; sel: the lifted look */
 static void draw_row(int r, int y, int sel)
 {
   static const char *const rule_words[] = { "", "one at a time", "runs once", "needs a restart" };
@@ -391,7 +357,6 @@ static void draw_row(int r, int y, int sel)
       }
       case R_RADIO:
       {
-        /* a round mark: the rows read as a choice */
         int cx = xr - 7, cy = yy + 10, on = cheat_is_on(i);
         ui_ring(cx, cy, 7, 2, sel ? UI_COL_PLUM : (on ? UI_COL_LIME : UI_COL_MUTE));
         if(on && !((r == c.value_row) && (c.value_f < 3)))
@@ -410,7 +375,7 @@ static void draw_row(int r, int y, int sel)
         xr = print_r(xr, yy + 3, "\xE2\x80\x94", note) - 10;
         break;
     }
-    if(cheat_is_locked(i) && !((r == c.lock_row) && (c.lock_f < 3)))  /* it pops in */
+    if(cheat_is_locked(i) && !((r == c.lock_row) && (c.lock_f < 3)))
     {
       draw_icon11(xr - 14, yy + 4, icon_lock, sel ? UI_COL_PLUM : UI_COL_TANGERINE, 1);
       xr -= 20;
@@ -421,7 +386,6 @@ static void draw_row(int r, int y, int sel)
   }
   if(meta[0])
   {
-    /* the note keeps at most half the row; the name runs to 6 px before it */
     int w = ui_print_width(meta, UI_FONT_SMALL, 0), max = (xr - lx) / 2;
     if(w > max)
     {
@@ -456,7 +420,6 @@ static void draw_hints(void)
   {
     h[n].keys = PSP_CTRL_LEFT | PSP_CTRL_RIGHT; h[n++].verb = "Jump";
   }
-  /* while a toast offers Undo, SELECT is Undo */
   if(c.undo != UNDO_NONE)
   {
     h[n].keys = PSP_CTRL_SELECT; h[n++].verb = "Undo";
@@ -477,7 +440,7 @@ static void draw_hints(void)
     case R_GROUP:  h[n++].verb = "Open"; break;
     case R_FOLD:   h[n++].verb = c.fold_open ? "Close" : "Open"; break;
     case R_SWITCH:
-      if(!cheat_is_locked(cheat_at(c.cur)))  /* a locked cheat ignores confirm */
+      if(!cheat_is_locked(cheat_at(c.cur)))
         h[n++].verb = "Switch";
       break;
     case R_RADIO:
@@ -507,7 +470,6 @@ static void draw_empty(void)
   ui_print_fit(240 - w / 2, 166, b, UI_COL_MUTE, UI_FONT_SMALL, 0, 440);
 }
 
-/* the mark the cursor is at: the last one at or above it */
 static int mark_at(int r)
 {
   int j = 0;
@@ -531,7 +493,6 @@ static void draw_rail(void)
   }
 }
 
-/* the big tile after a jump: the mark at 2x */
 static void draw_jump_tile(void)
 {
   const char *t = c.mark_text[c.jump_mark];
@@ -554,7 +515,6 @@ static void build_ground(void)
     draw_empty();
   else
   {
-    /* every row unselected; whole rows only down to the tip line */
     int vb = LIST_T;
     for(r = 0; r < c.n; r++)
     {
@@ -588,7 +548,6 @@ static void build_ground(void)
   ui_layer_end();
 }
 
-/* the tip line for the row under the cursor, or NULL */
 static const char *tip_text(void)
 {
   int i;
@@ -615,7 +574,6 @@ static const char *tip_text(void)
   return NULL;
 }
 
-/* the help card's words for the row under the cursor */
 static void help_text(const char **t, const char **b)
 {
   int rule = CE_RULE_NONE;
@@ -656,8 +614,6 @@ static void help_text(const char **t, const char **b)
   }
 }
 
-/* A name longer than its row runs sideways once the cursor has rested, as
-   the library's do: 1 px a frame, a wait at the end, then again. */
 static void draw_marquee(int yy)
 {
   int kind = row_kind(c.cur), w, over, t, cycle, shift;
@@ -682,7 +638,6 @@ static void draw_marquee(int yy)
   ui_clip_reset();
 }
 
-/* the selected row over the ground, the cursor frame, the tip */
 static void draw_selection(void)
 {
   int top = top_px(), y0, y1;
@@ -708,7 +663,6 @@ static void draw_selection(void)
   }
 }
 
-/* the page as it is, for a question card to come down over */
 static void draw_page(void)
 {
   if(c.dirty)
@@ -725,11 +679,6 @@ static void draw_page(void)
   ui_frame_end();
 }
 
-/* ---- the restart question ----------------------------------------------------------- */
-
-/* A dialog card with two buttons over the screen as it is: ←→ moves, ×
- * takes the selected button, ○ goes back. ok_verb: the hint for ×, or NULL
- * for the selected button's own name. Returns 0 or 1, or -1 for back. */
 static int ask(const char *title, const char *body, const char *b0, const char *b1, u16 edge,
  const char *back_verb, const char *ok_verb)
 {
@@ -794,7 +743,6 @@ static int ask(const char *title, const char *body, const char *b0, const char *
   return result;
 }
 
-/* A cheat that works from the game's start was switched on. */
 static void ask_restart(void)
 {
   const char *body = g_gpsp_config.save_on_leave ?
@@ -804,8 +752,6 @@ static void ask_restart(void)
   if(ask("Restart the game?", body, "Restart now", "Later", UI_COL_TANGERINE, "Later", NULL) == 0)
     c.restart = 1;
 }
-
-/* ---- acting ------------------------------------------------------------------------- */
 
 static void select_row(int i)
 {
@@ -822,11 +768,11 @@ static void select_row(int i)
   c.marq_f = 0;
   if((i < c.top) || (i >= c.top + ROWS_SEEN))
   {
-    c.top_from = top_px();  /* a new slide starts from where it is now */
+    c.top_from = top_px();
     c.top = (i < c.top) ? i : i - ROWS_SEEN + 1;
     c.top_f = 0;
   }
-  c.dirty = 1;  /* the hints follow the row */
+  c.dirty = 1;
 }
 
 static void show_toast(const char *text, int undo)
@@ -837,12 +783,6 @@ static void show_toast(const char *text, int undo)
   c.dirty = 1;
 }
 
-/* the part of a name after the start every name shares, cut back to a
-   word; its first word, as much as the rail's 16 px holds */
-/* A mark's label, at most 3 characters so it fits the rail; *num is the
-   number it was made from, or -1 for a word. A number drops its leading
-   zeros down to 3 digits ("001"); a bigger one is cut down, never rounded
-   up: 1500 "1k", 999999 ".9M", 2000000 "2M". */
 static void mark_text(const char *name, int skip, char *out, long long *num)
 {
   int k = 0, w;
@@ -896,8 +836,6 @@ static void mark_text(const char *name, int skip, char *out, long long *num)
     snprintf(out, 12, "\xC2\xB7");
 }
 
-/* the jump rail of a page taller than the screen: ~10 marks evenly
-   through its cheats, named by what differs */
 static void build_marks(void)
 {
   static u16 at[CE_MAX_CHEATS + 1];
@@ -913,7 +851,6 @@ static void build_marks(void)
       at[n++] = r;
   if(n < 2)
     return;
-  /* the start every name shares */
   for(r = 1; r < n; r++)
   {
     const char *a = cheat_name(cheat_at(at[0])), *b = cheat_name(cheat_at(at[r]));
@@ -925,7 +862,7 @@ static void build_marks(void)
   {
     const char *a = cheat_name(cheat_at(at[0]));
     while((skip > 0) && (a[skip - 1] != ' '))
-      skip--;  /* back to a whole word */
+      skip--;
   }
   c.marks = (n < MARKS) ? n : MARKS;
   for(j = 0; j < c.marks; j++)
@@ -933,8 +870,6 @@ static void build_marks(void)
     c.mark_row[j] = at[j * (n - 1) / (c.marks - 1)];
     mark_text(cheat_name(cheat_at(c.mark_row[j])), skip, c.mark_text[j], &num[j]);
   }
-  /* labels only help when they run one way: numbers all up or all down,
-     words A to Z; otherwise plain dots */
   {
     int up = 1, down = 1, words = 1;
     for(j = 0; j < c.marks; j++)
@@ -957,7 +892,6 @@ static void build_marks(void)
   }
 }
 
-/* a one-group game: an On now row heads the page while any cheat is on */
 static int on_row_wanted(void)
 {
   int i;
@@ -970,7 +904,6 @@ static int on_row_wanted(void)
   return 0;
 }
 
-/* a page's rows: runnable cheats, then the fold, then (open) the rest */
 static void fill_rows(void)
 {
   int i, k;
@@ -978,14 +911,12 @@ static void fill_rows(void)
   c.n = c.n_cant = 0;
   if(c.page == GROUPS)
   {
-    rows[c.n++] = 0;  /* On now */
+    rows[c.n++] = 0;
     for(i = 0; i < (int)cheat_group_count(); i++)
       rows[c.n++] = i;
   }
   else if(c.page == ON_NOW)
   {
-    /* what is on now: the list stays as it is while the page is open, so a
-       cheat switched off here can be switched back on; Ready ones last */
     for(k = 0; k < 2; k++)
       for(i = 0; i < (int)cheat_count(); i++)
         if(cheat_is_on(i) && (is_ready(i) == k))
@@ -1013,11 +944,10 @@ static void fill_rows(void)
   build_marks();
 }
 
-/* a page: GROUPS, ON_NOW or a group, its cursor on row cur */
 static void open_page(int page, int cur)
 {
   c.page = page;
-  c.fold_open = 0;  /* shut each time a page opens */
+  c.fold_open = 0;
   fill_rows();
   c.cur = c.from = (cur < c.n) ? cur : 0;
   c.cur_f = UI_F_CURSOR;
@@ -1033,7 +963,6 @@ static void open_page(int page, int cur)
   c.dirty = 1;
 }
 
-/* × on the fold: the cheats that can't run show or go */
 static void toggle_fold(void)
 {
   c.fold_open = !c.fold_open;
@@ -1046,7 +975,6 @@ static void toggle_fold(void)
   }
   if(c.fold_open && (c.cur + 1 < c.n) && (c.cur + 1 >= c.top + ROWS_SEEN))
   {
-    /* the first one shows under the fold */
     c.top_from = top_px();
     c.top = c.cur + 2 - ROWS_SEEN;
     c.top_f = 0;
@@ -1055,9 +983,6 @@ static void toggle_fold(void)
   c.dirty = 1;
 }
 
-/* The On now row comes when the first cheat goes on and goes with the
-   last; the rows under it move by one and the view moves with them, so
-   nothing on screen jumps. A cursor on the row moves to the first cheat. */
 static void sync_on_row(void)
 {
   int has = (c.n > 0) && (rows[0] == ON_ROW), d;
@@ -1084,7 +1009,6 @@ static void sync_on_row(void)
   c.dirty = 1;
 }
 
-/* ←→ on a page with a rail: the next mark, or back to this one's start */
 static void jump(int dir)
 {
   int j = mark_at(c.cur);
@@ -1097,11 +1021,10 @@ static void jump(int dir)
     return;
   select_row(c.mark_row[j]);
   c.jump_mark = j;
-  c.jump_f = c.dots ? -1 : 0;  /* dots have no label for the tile */
+  c.jump_f = c.dots ? -1 : 0;
   c.dirty = 1;
 }
 
-/* × on a group row: its page */
 static void open_group(int g)
 {
   c.list_cur = c.cur;
@@ -1110,9 +1033,6 @@ static void open_group(int g)
 
 static void after_on(int i, int r)
 {
-  /* a ROM fix or master code locks itself as it is switched on: All off
-     then leaves it; kai never switches a code on by itself (maintainer,
-     2026-11-20) */
   if(cheat_is_on(i) && fix_or_master(i) && (rule_of(i) != CE_RULE_ONCE))
   {
     cheat_set_locked(i, 1);
@@ -1147,7 +1067,6 @@ static void press_confirm(void)
     return;
   if((k == R_RADIO) && !cheat_is_on(i))
   {
-    /* choosing: the one before goes off, with Undo */
     int g = cheat_group_of(i), j, before = -1;
     int end = cheat_group_first(g) + cheat_group_size(g);
     for(j = cheat_group_first(g); j < end; j++)
@@ -1182,10 +1101,9 @@ static void press_select(void)
         cheat_set_on(i, 1);
   }
   else if(c.undo == UNDO_CHOICE)
-    cheat_set_on(c.undo_cheat, 1);  /* the one chosen after it goes off */
+    cheat_set_on(c.undo_cheat, 1);
   else if(!on_list() && lockable(r))
   {
-    /* SELECT locks a cheat on; unlocking leaves it as it is */
     int was_on;
     i = cheat_at(r);
     was_on = cheat_is_on(i);
@@ -1233,8 +1151,6 @@ static void press_all_off(void)
   show_toast("All cheats off", UNDO_ALL_OFF);
 }
 
-/* Returns 1 when the player chose Restart now (the pause screen restarts
-   the game), 0 when they went back. */
 int ui_cheats(void)
 {
   u32 mark = ui_pool_mark();
@@ -1247,11 +1163,9 @@ int ui_cheats(void)
   ui_input_init();
   c.single = cheat_group_count() <= 1;
   if(!c.single)
-    open_page(GROUPS, 1);  /* on the first group, On now above it */
+    open_page(GROUPS, 1);
   else
   {
-    /* one group, or no cheats (no rows, and where the files go); the
-       cursor starts on the first cheat, under On now if it shows */
     open_page(0, 0);
     if((c.n > 1) && (rows[0] == ON_ROW))
       open_page(0, 1);
@@ -1262,7 +1176,6 @@ int ui_cheats(void)
     ui_input_update();
     if(c.help)
     {
-      /* the help card takes every key; □ or ○ closes it */
       if(!c.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
       {
         c.help_out = 1;
@@ -1272,7 +1185,7 @@ int ui_cheats(void)
     else if(ui_pressed(ui_key_back))
     {
       if(c.single && (c.page == ON_NOW))
-        open_page(0, 0);  /* back on the On now row, or the first cheat when none is left */
+        open_page(0, 0);
       else if(on_list() || c.single)
         break;
       else
@@ -1325,7 +1238,7 @@ int ui_cheats(void)
       {
         c.toast_f = -1;
         c.undo = UNDO_NONE;
-        c.dirty = 1;  /* SELECT goes back to Lock */
+        c.dirty = 1;
       }
       else
         c.toast_f++;
@@ -1343,7 +1256,7 @@ int ui_cheats(void)
     ui_frame_end();
   }
 
-  cheat_engine_save();  /* which cheats are on and locked */
+  cheat_engine_save();
   ui_layer_reset();
   ui_pool_release(mark);
   return c.restart;

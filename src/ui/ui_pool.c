@@ -1,10 +1,11 @@
-/* UI memory pool: one block reserved before the game buffer. */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #include "../common.h"
 #include <malloc.h>
 #include "ui.h"
 
-/* The spec's UI budget: fonts (up to ~610 KB for Korean), the 261 KB
- * ground layer, messages, savestate thumbnails and screen state. */
 #define UI_POOL_SIZE (1024 * 1024)
 #define UI_POOL_ALIGN 16
 

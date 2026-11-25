@@ -17,14 +17,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-/* cheat_engine.c - kai 4.0's cheat engine (#166)
+/* cheat_engine.c - kai's cheat engine
  *
  * Where. A game's cheats come from its folder, GBA/CHT/<game>/, where every
- * .cht file is a group named by its file (a part all the names share, such
- * as "Pokemon - FireRed Version - ", is left out); or else from one file,
- * GBA/CHT/<game>.cht, as kai has always read it. <game> is the ROM's file
- * name without its extension, or the name the library shows for it
- * ("Pokemon - FireRed Version (USA).gba" finds "Pokemon - FireRed Version").
+ * .cht file is a group named by its file (a part all the names share is
+ * left out); or else from one file, GBA/CHT/<game>.cht. <game> is the ROM's
+ * file name without its extension, or the name the library shows for it
+ * ("Game Title (USA, Europe) (Rev 1).gba" finds "Game Title").
  * Inside a file, a line "[[Name]]" starts a group of that name.
  *
  * Rules. A group may say how its cheats behave, on a line of its own:
@@ -36,11 +35,9 @@
  *
  * Files come in any of three shapes, line by line:
  *   - kai's own: a header line "gameshark_v1 Name" (also gameshark_v2/v3,
- *     PAR_v1/v2/v3, direct_v1/v3), then "XXXXXXXX YYYYYYYY" code lines up to
- *     a blank line. Kept exactly as kai has always run them, so existing
- *     files work unchanged; the one difference is that ROM patches (v1
- *     opcode 6) go in once when the cheat is switched on and the original
- *     bytes come back when it is switched off.
+ *     PAR_v1/v2/v3, direct_v1/v2/v3), then "XXXXXXXX YYYYYYYY" code lines up to
+ *     a blank line. ROM patches (v1 opcode 6) go in when the cheat is
+ *     switched on and the original bytes come back when it is switched off.
  *   - the cheat-database format: cheatN_desc = "...", cheatN_code = "..."
  *     ('+' joins lines). cheatN_enable is ignored: a downloaded file never
  *     switches a cheat on.
@@ -52,15 +49,14 @@
  * "GS1RAW:" or "AR3RAW:". They may only read and write the work RAM, or
  * patch the ROM (GameShark's and Action Replay's ROM patch codes, put in
  * and taken out as for kai's own); a code that would write to the save,
- * I/O or video can't be switched on,
- * and bare 8 + 8 digit codes are read the four ways they can be meant
- * (GameShark v1/v2 or Action Replay v3, each encrypted or already
- * decrypted): the file is read with the one under which the most of its
- * cheats can run (maintainer, 2026-11-19: kai tells the kind itself).
- * Master codes ("(M) Must Be On") only mattered to a cheat device: they
- * are skipped, neither kept nor counted. A game keeps its first 1024
- * cheats; cheat_total() says how many its files hold. One cheat's code
- * may be up to 32 KB of text; a longer one can't run, never cut short.
+ * I/O or video can't be switched on. Bare 8 + 8 digit codes are read the
+ * four ways they can be meant (GameShark v1/v2 or Action Replay v3, each
+ * encrypted or already decrypted): the file is read with the one under
+ * which the most of its cheats can run.
+ * Master codes ("(M) Must Be On") are skipped, neither kept nor counted.
+ * A game keeps its first 1024 cheats; cheat_total() says how many its
+ * files hold. One cheat's code may be up to 32 KB of text; a longer one
+ * can't run, never cut short.
  * Ported from another GPL-2.0 PSP GBA emulator; the
  * cipher tables in cheats_gs_cipher.h keep their own MPL-2.0 notice.
  *
@@ -76,15 +72,13 @@
 
 extern u32 gamepak_size;
 
-#define CE_RECORDS      12288  /* code records of every cheat, shared */
-#define CE_PATCHES      4096   /* ROM patch halfwords of every cheat */
-#define CE_FRAME_MAX    8192   /* worst-case RAM reads and writes a frame */
+#define CE_RECORDS      12288
+#define CE_PATCHES      4096
+#define CE_FRAME_MAX    8192
 #define CE_SLIDE_MAX    4096u
-#define CE_CODE_TEXT    32768  /* one cheat's code text while it is read: about
-                                  1800 lines, so a whole table patch (FireRed's
-                                  1384-line Japanese names) is one cheat */
-#define CE_LINE_TEXT    4096   /* one line of a file */
-#define CE_DB_TEXT      (64 * 1024)  /* a database file's descriptions and codes */
+#define CE_CODE_TEXT    32768
+#define CE_LINE_TEXT    4096
+#define CE_DB_TEXT      (64 * 1024)
 
 typedef struct
 {
@@ -94,8 +88,8 @@ typedef struct
 
 typedef struct
 {
-  u32 offset;       /* in the ROM */
-  u16 value, old;   /* the patch, the byte pair it replaced */
+  u32 offset;
+  u16 value, old;
   u8 has_old;
 } rom_patch;
 
@@ -105,28 +99,28 @@ typedef struct
 {
   char name[CE_NAME_LENGTH];
   u32 hash;
-  u32 first, count;               /* records */
-  u32 first_patch, patches;       /* ROM patches */
-  u32 work;                       /* worst-case accesses a frame */
+  u32 first, count;
+  u32 first_patch, patches;
+  u32 work;
   u16 group;
   u8 family, status, on, locked;
-  u8 detail;                      /* ce_error: the engine's own reason */
-  u8 started;                     /* on when the game last started */
+  u8 detail;
+  u8 started;
 } cheat_entry;
 
 typedef struct
 {
   char name[CE_NAME_LENGTH];
-  u32 first, count;               /* cheats */
-  u8 rule;                        /* CE_RULE_* */
+  u32 first, count;
+  u8 rule;
 } cheat_group;
 
 static cheat_group ce_groups[CE_MAX_GROUPS];
 static u32 ce_group_count;
-static u32 ce_answer;   /* how bare codes are read: a TAG_*, or 0 (they wait) */
-static u32 ce_applied;  /* runs-once cheats that ran, since the last ask */
-static u32 ce_counting, ce_counted;  /* cheat_engine_peek(): only count */
-static u32 ce_total;                 /* every cheat the files hold, kept or not */
+static u32 ce_answer;
+static u32 ce_applied;
+static u32 ce_counting, ce_counted;
+static u32 ce_total;
 static char ce_applied_name[CE_NAME_LENGTH];
 
 static cheat_entry ce[CE_MAX_CHEATS];
@@ -138,14 +132,7 @@ static u32 ce_patch_used;
 static u32 ce_work_used;
 static char ce_rom[MAX_FILE];
 static u32 ce_smc_pending;
-static u32 ce_bad_region;  /* the region of the last code refused for it */
-
-/* ---- work RAM access (the only memory new-format codes can touch) -----------
- * kai keeps the translation tag of every RAM halfword beside its data: EWRAM
- * in 64 KB pages (32 KB tags, then 32 KB data), IWRAM as 32 KB tags then
- * 32 KB data. A write that changes bytes the recompiler has translated
- * flushes the RAM cache once, after every cheat has run. A write that
- * doesn't change anything is not made. */
+static u32 ce_bad_region;
 
 static u8 *ce_ram(u32 address, u8 **tag)
 {
@@ -221,9 +208,6 @@ static int ce_in_ram(u32 address)
   ce_bad_region = r;
   return 0;
 }
-
-/* ---- CodeBreaker ------------------------------------------------------------- */
-
 
 /* records one CodeBreaker code takes: a slide (4) and a super code (5)
    carry payload records */
@@ -351,8 +335,6 @@ static void run_codebreaker(const cheat_entry *c, u16 pad)
   }
 }
 
-/* ---- the code text reader ------------------------------------------------------ */
-
 static int is_sep(char c)
 {
   return (c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') || (c == '+') ||
@@ -419,7 +401,6 @@ static int push(cheat_entry *c, u32 address, u32 value)
   return 1;
 }
 
-/* "GS1:", "GS1RAW:", "AR3:", "AR3RAW:" at the start, any case */
 enum { TAG_GS1 = 1, TAG_GS1_RAW, TAG_AR3, TAG_AR3_RAW };
 static u32 family_tag(const char *s, u32 n, u32 *used)
 {
@@ -447,10 +428,6 @@ static u32 family_tag(const char *s, u32 n, u32 *used)
 
 #include "cheats_gs_cipher.h"
 
-/* GameShark / Action Replay, decoded once into private records:
- * top nibble 0/1/2 write 8/16/32; 3/4/5 a fill (count record follows);
- * 6/7/8 compare 8/16/32 (a record with the comparison and how many whole
- * operations to skip follows). */
 enum { GS_EQ, GS_NE, GS_LE, GS_GE, GS_ULT, GS_UGT, GS_AND };
 
 static u32 gs_len(const cheat_rec *r, u32 i)
@@ -670,7 +647,6 @@ static ce_error gs_compile(cheat_entry *c, const char *s, u32 family)
   }
   if(patching || (!c->count && !c->patches))
     return CE_E_SYNTAX;
-  /* a compare needs the operations it controls */
   for(i = 0; i < c->count; i += gs_len(ce_recs + c->first, i))
     if((ce_recs[c->first + i].address >> 28) >= 6)
     {
@@ -739,9 +715,6 @@ static ce_error cb_validate(cheat_entry *c)
   return CE_E_NONE;
 }
 
-/* A new-format cheat's code text to records. */
-/* Bare 8 + 8 digit codes: read the way read_path() found for the file;
-   on the first reading they only wait. */
 static ce_error bare_pair(cheat_entry *c, const char *code)
 {
   if(!ce_answer)
@@ -754,7 +727,7 @@ static ce_error compile_new(cheat_entry *c, const char *code)
 {
   const char *s = code, *t, *t2;
   u32 n, n2, used, fam;
-  int kind = 0;  /* 1 CodeBreaker, 2 raw */
+  int kind = 0;
 
   c->family = FAM_CB;
   while(*s && is_sep(*s))
@@ -826,12 +799,6 @@ static ce_error compile_new(cheat_entry *c, const char *code)
   return cb_validate(c);
 }
 
-/* ---- kai's own format ------------------------------------------------------------
- * As kai has always run it (process_cheat_gs1 / gs3 in cheats.c): writes go
- * through the memory handlers to wherever they point, the v3 fill takes its
- * repeat count from the value's top byte. Only ROM patches change: see the
- * top of this file. */
-
 static void kai_decrypt(u32 *a, u32 *v, int v3)
 {
   static const u32 seeds_v1[4] = { 0x09f4fbbd, 0x9681884a, 0x352027e9, 0xf3dee5a7 };
@@ -854,7 +821,6 @@ static int add_patch(cheat_entry *c, u32 offset, u16 value)
   return 1;
 }
 
-/* lines: "XXXXXXXX YYYYYYYY" pairs; encrypted: the gameshark / PAR kinds */
 static ce_error compile_kai(cheat_entry *c, const char *code, int v3, int encrypted)
 {
   const char *s = code, *t, *t2;
@@ -994,11 +960,8 @@ static void run_kai3(const cheat_entry *c)
   }
 }
 
-/* ---- ROM patches --------------------------------------------------------------
- * A whole ROM in memory is patched in place. A ROM too big for memory is read
- * in 32 KB pages: a page in memory is patched now, and every page read later
- * gets its patches as it arrives (cheat_engine_page_loaded). The recompiler's
- * ROM translations are thrown away after a change. */
+/* A ROM too big for memory is read in 32 KB pages: every page read later
+ * gets its patches as it arrives (cheat_engine_page_loaded). */
 
 static u8 *rom_byte_pair(u32 offset)
 {
@@ -1012,7 +975,6 @@ static u8 *rom_byte_pair(u32 offset)
   }
 }
 
-/* the patch of a cheat that is on, put in over p at its place */
 static rom_patch *patch_over(const rom_patch *p)
 {
   u32 i, k;
@@ -1062,8 +1024,6 @@ static void apply_patches(cheat_entry *c, int on)
       }
       else
       {
-        /* another cheat's patch went in over this one: that one gives
-           back what this one found */
         rom_patch *q = patch_over(p);
         if(q)
           q->old = p->old;
@@ -1099,15 +1059,13 @@ void cheat_engine_page_loaded(u32 physical_index, u8 *page)
   }
 }
 
-/* ---- loading a file -------------------------------------------------------------- */
-
 static u32 hash_text(u32 h, const char *s, int code)
 {
   for(; *s; s++)
   {
     char ch = *s;
     if(code && (is_sep(ch) || (ch == ':')))
-      continue;  /* a code's digits only: rewrapping keeps the hash */
+      continue;
     if((ch >= 'a') && (ch <= 'z'))
       ch -= 'a' - 'A';
     h = (h ^ (u8)ch) * 16777619u;
@@ -1117,14 +1075,14 @@ static u32 hash_text(u32 h, const char *s, int code)
 
 static char code_text[CE_CODE_TEXT];
 static u32 code_len;
-static u32 code_cut;  /* some of the code didn't fit: it can't run */
+static u32 code_cut;
 
 static void code_add(const char *s)
 {
   u32 n = strlen(s);
   if(code_len + n + 2 >= CE_CODE_TEXT)
   {
-    code_cut = 1;  /* never run a code cut short */
+    code_cut = 1;
     return;
   }
   if(code_len)
@@ -1134,7 +1092,6 @@ static void code_add(const char *s)
   code_text[code_len] = 0;
 }
 
-/* kinds of a cheat being read: KAI_* from its header, or NEW */
 enum { K_NONE, K_NEW, K_KAI1, K_KAI1_ENC, K_KAI3, K_KAI3_ENC };
 
 static void finish_cheat(const char *name, int kind)
@@ -1145,7 +1102,6 @@ static void finish_cheat(const char *name, int kind)
 
   if((kind == K_NONE) || (!code_len && !code_cut) || cheat_name_is_master(name))
   {
-    /* nothing to run; a master code does nothing in kai: not kept, not counted */
     code_len = 0;
     code_cut = 0;
     return;
@@ -1185,7 +1141,6 @@ static void finish_cheat(const char *name, int kind)
   }
   else
   {
-    /* kept, greyed, with its reason; its records are given back */
     c->status = (err == CE_E_GAMESHARK) ? CE_ASK :
      ((err == CE_E_REGION) && ((ce_bad_region == 0xD) || (ce_bad_region == 0xE))) ?
      CE_CANT_SAVE : CE_CANT_KIND;
@@ -1194,7 +1149,7 @@ static void finish_cheat(const char *name, int kind)
     ce_patch_used = save_patch;
   }
   c->detail = err;
-  code_text[code_len] = 0;  /* no code kept: the text before isn't this cheat's */
+  code_text[code_len] = 0;
   c->hash = hash_text(hash_text(2166136261u, c->name, 0), code_text, 1);
   c->group = ce_group_count - 1;
   ce_groups[c->group].count++;
@@ -1203,7 +1158,6 @@ static void finish_cheat(const char *name, int kind)
   code_cut = 0;
 }
 
-/* A new group from here on; an empty one before it takes its place. */
 static void group_begin(const char *name)
 {
   cheat_group *g;
@@ -1213,7 +1167,7 @@ static void group_begin(const char *name)
   if((ce_group_count > 0) && (ce_groups[ce_group_count - 1].count == 0))
     g = &ce_groups[ce_group_count - 1];
   else if(ce_group_count >= CE_MAX_GROUPS)
-    return;  /* the rest go in the last group */
+    return;
   else
     g = &ce_groups[ce_group_count++];
   memset(g, 0, sizeof(*g));
@@ -1221,7 +1175,6 @@ static void group_begin(const char *name)
   g->first = ce_count;
 }
 
-/* "#kai: one-at-a-time" and the others: the group's rule */
 static int rule_line(const char *s)
 {
   static const struct { const char *word; u8 rule; } rules[] =
@@ -1243,7 +1196,6 @@ static int rule_line(const char *s)
   return 1;
 }
 
-/* kai's header word, as the old parser knew them */
 static int kai_header(const char *line, const char **name)
 {
   static const struct { const char *word; int kind; } words[] =
@@ -1269,7 +1221,6 @@ static int kai_header(const char *line, const char **name)
   return K_NONE;
 }
 
-/* does the whole line read as codes? */
 static int code_line(const char *s)
 {
   const char *t;
@@ -1302,12 +1253,10 @@ static void trim(char *s)
     s[--n] = 0;
 }
 
-/* the database format: cheatN_desc / cheatN_code, collected, then compiled
-   in N order */
 static char db_text[CE_DB_TEXT];
 static u32 db_used;
 static struct { u32 desc, code; u8 cut; } db[CE_MAX_CHEATS];
-static u32 db_top, db_past;  /* db_past: entries past CE_MAX_CHEATS */
+static u32 db_top, db_past;
 
 static int db_line(char *line, int cut)
 {
@@ -1332,12 +1281,11 @@ static int db_line(char *line, int cut)
       *q = 0;
   }
   if(strcmp(key, "desc") && strcmp(key, "code"))
-    return 1;  /* cheatN_enable and the rest: not read */
+    return 1;
   if(db_used + strlen(v) + 1 > CE_DB_TEXT)
   {
     if(!strcmp(key, "code"))
     {
-      /* no room for the code: the cheat is kept, too big to run */
       if(n + 1 > db_top)
         db_top = n + 1;
       db[n].code = 0;
@@ -1374,8 +1322,6 @@ static void read_file(FILE *f)
     const char *after;
     int k;
     char *s = line;
-    /* a line longer than the buffer: the rest is skipped, and a code on
-       it can't run (never a code cut short) */
     cut = (strlen(line) == sizeof(line) - 1) && (line[sizeof(line) - 2] != '\n');
     if(cut)
     {
@@ -1383,7 +1329,6 @@ static void read_file(FILE *f)
       char *end = strrchr(line, ' '), *plus = strrchr(line, '+');
       while(((ch = fgetc(f)) != EOF) && (ch != '\n'))
         ;
-      /* back to the last whole code, so the line still reads as codes */
       if(plus > end)
         end = plus;
       if(end && (end > line))
@@ -1413,7 +1358,7 @@ static void read_file(FILE *f)
     if(!*s)
     {
       if(kind >= K_KAI1)
-        closed = 1;  /* kai's format: a cheat's codes end at a blank line */
+        closed = 1;
       continue;
     }
     if(rule_line(s))
@@ -1442,13 +1387,12 @@ static void read_file(FILE *f)
       }
       if(kind == K_NONE)
       {
-        kind = K_NEW;  /* codes before any name */
+        kind = K_NEW;
         name[0] = 0;
       }
       code_add(s);
       continue;
     }
-    /* a name line: the next plain-list cheat */
     finish_cheat(name, kind);
     if(((s[0] == '[') || (s[0] == '"')) && (strlen(s) > 1))
     {
@@ -1471,7 +1415,7 @@ static void read_file(FILE *f)
         if(db[i].code)
           code_add(db_text + db[i].code - 1);
         else
-          code_add("!");  /* kept so it shows, with its reason */
+          code_add("!");
         code_cut |= db[i].cut;
         finish_cheat(db[i].desc ? db_text + db[i].desc - 1 : "", K_NEW);
       }
@@ -1480,8 +1424,6 @@ static void read_file(FILE *f)
   else if(ce_group_count)
     ce_total += db_past;
 }
-
-/* ---- what is on ---------------------------------------------------------------- */
 
 static void on_path_for(const char *rom, char *path)
 {
@@ -1525,7 +1467,6 @@ static void read_on(void)
   fclose(f);
 }
 
-/* on and kept for next time: a runs-once cheat made ready is not */
 static int kept_on(u32 i)
 {
   return ce[i].on && (ce_groups[ce[i].group].rule != CE_RULE_ONCE);
@@ -1544,7 +1485,7 @@ void cheat_engine_save(void)
     any |= kept_on(i);
   if(!any)
   {
-    sceIoRemove(path);  /* nothing on: no file */
+    sceIoRemove(path);
     return;
   }
   f = fopen(path, "w");
@@ -1556,8 +1497,6 @@ void cheat_engine_save(void)
   fclose(f);
 }
 
-/* ---- the engine ------------------------------------------------------------------ */
-
 void cheat_engine_clear(void)
 {
   ce_count = ce_rec_used = ce_patch_used = ce_work_used = ce_total = 0;
@@ -1566,8 +1505,6 @@ void cheat_engine_clear(void)
   ce_rom[0] = 0;
 }
 
-
-/* What a file's reading added, to take back for another reading */
 typedef struct
 {
   u32 count, rec_used, patch_used, work_used, group_count, total;
@@ -1606,19 +1543,15 @@ static u32 runs_since(const read_mark *m, u32 status)
   return n;
 }
 
-/* One file: a group named name (more when it has [[headers]]). Bare 8 + 8
-   digit codes can be GameShark or Action Replay, encrypted or already
-   decrypted, and files don't say: when the file has some, it is read again
-   each of the four ways, and kept the way most of its cheats run. Codes
-   that make sense no way can't run. */
-static int read_path(const char *path, const char *file, const char *name)
+/* Bare 8 + 8 digit codes can be GameShark or Action Replay, encrypted or
+   already decrypted, and files don't say. */
+static int read_path(const char *path, const char *name)
 {
   static const u32 ways[4] = { TAG_GS1, TAG_GS1_RAW, TAG_AR3, TAG_AR3_RAW };
   FILE *f = fopen(path, "rb");
   read_mark m;
   u32 k, best = 0, best_runs;
 
-  (void)file;
   if(!f)
     return 0;
   ce_answer = 0;
@@ -1648,7 +1581,7 @@ static int read_path(const char *path, const char *file, const char *name)
     read_file(f);
     for(k = m.count; k < ce_count; k++)
       if(ce[k].status == CE_ASK)
-        ce[k].status = CE_CANT_KIND;  /* no way made sense */
+        ce[k].status = CE_CANT_KIND;
   }
   ce_answer = 0;
   fclose(f);
@@ -1666,9 +1599,6 @@ static int name_order(const void *a, const void *b)
   return strcasecmp((const char *)a, (const char *)b);
 }
 
-/* The game's folder: every .cht in it a group, in name order. The part
-   every file name starts with, up to its last " - ", is left out of the
-   group names ("Pokemon - FireRed Version - All.cht" shows "All"). */
 static int read_folder(const char *dir)
 {
   static char names[CE_MAX_GROUPS][MAX_FILE];
@@ -1710,12 +1640,11 @@ static int read_folder(const char *dir)
     if(!name[0])
       snprintf(name, sizeof(name), "%.*s", (int)sizeof(name) - 1, names[i]);
     path_printf(path, sizeof(path), "%s/%s", dir, names[i]);
-    read_path(path, names[i], name);
+    read_path(path, name);
   }
   return 1;
 }
 
-/* A group with no cheats left (a file of comments) is dropped. */
 static void drop_empty_groups(void)
 {
   u32 g, k = 0, i;
@@ -1734,7 +1663,6 @@ static void drop_empty_groups(void)
   ce_group_count = k;
 }
 
-/* The game's folder or file, by the ROM's own name, then the library's */
 static void read_cheats_for(const char *rom_name)
 {
   char path[MAX_PATH], names[2][MAX_FILE], *dot;
@@ -1759,7 +1687,7 @@ static void read_cheats_for(const char *rom_name)
       break;
     snprintf(file, sizeof(file), "%.*s.cht", MAX_FILE - 1, names[k]);
     path_printf(path, sizeof(path), "%s/%s", g_default_cheat_dir, file);
-    found = read_path(path, file, "Cheats");
+    found = read_path(path, "Cheats");
   }
 }
 
@@ -1774,7 +1702,6 @@ void cheat_engine_load(const char *rom_name)
   read_cheats_for(rom_name);
   drop_empty_groups();
   read_on();
-  /* the ROM patches of what is on, before the game runs */
   for(i = 0; i < ce_count; i++)
   {
     if(ce[i].on && ce[i].patches)
@@ -1807,7 +1734,6 @@ void cheat_engine_frame(void)
     run_cheat(&ce[i], pad);
     if(ce_groups[ce[i].group].rule == CE_RULE_ONCE)
     {
-      /* ran once: it switches itself off and says so */
       ce[i].on = 0;
       if(ce_applied++ == 0)
         memcpy(ce_applied_name, ce[i].name, sizeof(ce_applied_name));
@@ -1815,7 +1741,6 @@ void cheat_engine_frame(void)
   }
   if(ce_smc_pending)
   {
-    /* a code rewrote RAM the recompiler had translated */
     flush_translation_cache_ram();
     reg[CHANGED_PC_STATUS] = 1;
     ce_smc_pending = 0;
@@ -1832,7 +1757,6 @@ u32 cheat_total(void)
   return (ce_total > ce_count) ? ce_total : ce_count;
 }
 
-/* "(M) Must Be On" and the like: a master code a cheat device needed */
 u32 cheat_name_is_master(const char *name)
 {
   char low[CE_NAME_LENGTH];
@@ -1860,7 +1784,6 @@ const char *cheat_why(u32 i)
     return NULL;
   if(cheat_status(i) == CE_CANT_SAVE)
     return "This code would write to the game's save.";
-  /* the finest reason kai knows */
   switch(ce[i].detail)
   {
     case CE_E_TOOBIG:    return "This code is cut short or too long for kai.";
@@ -1887,10 +1810,9 @@ void cheat_set_on(u32 i, u32 on)
   if((i >= ce_count) || (ce[i].status != CE_OK) || ((u32)ce[i].on == (on ? 1u : 0u)))
     return;
   if(!on && ce[i].locked)
-    return;  /* a locked cheat turns off only after unlocking */
+    return;
   if(on && (ce_groups[ce[i].group].rule == CE_RULE_ONE))
   {
-    /* the others in its group go off first (their ROM patches too) */
     const cheat_group *g = &ce_groups[ce[i].group];
     u32 k;
     for(k = g->first; k < g->first + g->count; k++)
@@ -1912,10 +1834,8 @@ void cheat_set_locked(u32 i, u32 locked)
     return;
   ce[i].locked = locked ? 1 : 0;
   if(locked && !ce[i].on)
-    cheat_set_on(i, 1);  /* SELECT locks a cheat on */
+    cheat_set_on(i, 1);
 }
-
-/* ---- groups and rules ------------------------------------------------------------ */
 
 u32 cheat_waits_restart(u32 i);
 
@@ -1988,7 +1908,6 @@ u32 cheat_engine_peek(const char *rom_name, u32 *on)
   *on = 0;
   if(ce_rom[0] && !strcmp(rom_name, ce_rom))
   {
-    /* the game that is running */
     for(i = 0; i < ce_count; i++)
       *on += kept_on(i);
     return cheat_total();
@@ -2006,7 +1925,7 @@ u32 cheat_engine_peek(const char *rom_name, u32 *on)
     {
       unsigned int h;
       char mode;
-      if((line[0] != 'K') && (sscanf(line, "%8x %c", &h, &mode) == 2))
+      if(sscanf(line, "%8x %c", &h, &mode) == 2)
         (*on)++;
     }
     fclose(f);

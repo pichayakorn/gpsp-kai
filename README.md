@@ -21,8 +21,11 @@ development and releases work.
 
 Tested on a PSP-3000 running ARK-5 custom firmware, with the English UI:
 game loading (`.gba` and `.zip`), savestates, sleep/resume, screenshots, the
-in-game menu and performance. Other models and other languages have not been
-tested on hardware yet.
+in-game menu and performance. Reports from other PSP models, firmware and
+languages are welcome: please open an issue.
+
+A new interface for 4.0 is in development. It builds with `make UI4=1` and is
+not part of the releases yet.
 
 Custom firmware is required; the EBOOT is not signed for official firmware.
 
@@ -164,15 +167,22 @@ tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
   - **Kim Jeong-Hwan**: Baekmuk; the 10px bitmap `batang10.fbm` was made by Won-kyu Park
   - **Markus Kuhn** and the X11 misc-fixed contributors: most glyphs of `gpsp10.fbm`
 - **ITOU Hiroki**: bdf2bmp/bmp2bdf font tools (`tools/fonts/bdf_tool`)
+- **TakWolf**: Fusion Pixel, the 4.0 interface's font, with glyphs from Ark
+  Pixel, Cubic 11 and Galmuri (SIL Open Font License 1.1; see
+  `data/font/ui/`)
 
-Code ported from other GPL projects (each port is also credited in its
-commit message):
+Code ported from other open-source projects (each port is also credited in
+its commit message):
 
 - **Normmatt and the VBA/VBA-M team**: the open-source GBA BIOS replacement
   built into kai (`bios/`, GPL-2.0-or-later)
 - **libretro gpSP** (GPL-2.0-or-later): the built-in BIOS and its fallback,
   and CPU and interrupt fixes
-- **GBAdhoc** (GPL-2.0): the sharp bilinear screen filter and dynarec fixes
+- **GBAdhoc** (GPL-2.0): the sharp bilinear screen filter, dynarec fixes, and
+  the 4.0 cheat engine's CodeBreaker, raw and GameShark/Action Replay code
+  handling
+- **mGBA** (MPL-2.0): the GameShark/Action Replay cipher and seed tables
+  (`src/cheats_gs_cipher.h`; licence in `licenses/LICENSE.mgba-MPL-2.0`)
 
 ## License
 
@@ -195,6 +205,7 @@ own terms or none stated:
 | `tools/fonts/ucs_tool/any2ucs.pl` | Based on Markus Kuhn's ucs2any.pl (per its header); no license stated |
 | `tools/fonts/ucs_tool/sjis.map` | Shift_JIS to Unicode mapping table; no source or license stated |
 | `tools/fonts/bdf2fbm.py` | GPL-2.0-or-later (see its header) |
+| `src/cheats_gs_cipher.h` | Tables adapted from mGBA, Mozilla Public License 2.0 (`licenses/LICENSE.mgba-MPL-2.0`) |
 
 The Naga10 BDF sources are not included: Naga10's terms allow the original
 files to be distributed only as the unchanged original archive. To rebuild the

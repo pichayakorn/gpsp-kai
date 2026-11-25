@@ -2513,8 +2513,8 @@ typedef struct
          block of its own as thumb_blh, which takes its target from LR. So   \
          when this is the block's last instruction, do the low word's own    \
          work: LR = PC + 4 + (offset << 12). Without it the high word jumped \
-         to (stale LR + offset). Ported from GBAdhoc (GPL-2.0),              \
-         cpu_threaded.c. */                                                   \
+         to (stale LR + offset). Ported from another GPL-2.0 PSP             \
+         GBA emulator. */                                                     \
       if((pc + 2) == block_end_pc)                                            \
       {                                                                       \
         u32 bl_lr = pc + 4 + ((s32)((opcode & 0x07FF) << 21) >> 9);           \

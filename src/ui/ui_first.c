@@ -1,8 +1,5 @@
-/* ui_first.c - first run (spec section 4, First run; r5 first; step 7)
- *
- * Once, the first time kai starts: three cards that say how to pause, which
- * keys confirm and go back, and where help is, then Start. The language
- * comes from the PSP (kai's own setting until changed).
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
  */
 
 #include "../common.h"
@@ -12,8 +9,6 @@
 #define CARD_H  140
 #define CARD_Y  54
 
-/* the first-run cards' own 26 px glyphs: a cream disc with a 2 px plum
-   symbol (never the 13 px glyph scaled) */
 static void glyph26(int x, int y, u32 key)
 {
   u16 P = UI_COL_PLUM;
@@ -30,7 +25,7 @@ static void glyph26(int x, int y, u32 key)
     ui_rect(x + 8, y + 8, 10, 10, 2, P);
   else if(key == PSP_CTRL_CIRCLE)
     ui_ring(x + 13, y + 13, 6, 2, P);
-  else  /* triangle: apex at the top, a 14 px base, 2 px strokes */
+  else
     for(j = 0; j < 11; j++)
     {
       int half = 1 + (j * 6 + 5) / 10, lx = x + 13 - half, rx = x + 12 + half;
@@ -44,8 +39,6 @@ static void glyph26(int x, int y, u32 key)
     }
 }
 
-/* the language in its own script (maintainer, 2026-11-20); the menu
-   language's own font is loaded, so it never draws as boxes here */
 static const char *language_name(u32 lang)
 {
   static const char *names[12] =
@@ -73,8 +66,6 @@ static void draw(int t)
   keys[0] = PSP_CTRL_TRIANGLE;
   keys[1] = ui_key_confirm;
   keys[2] = PSP_CTRL_SQUARE;
-  /* the glyphs in the sentence follow the keys above it; a no-break space
-     keeps each with its word */
   snprintf(confirm_body, sizeof(confirm_body), "Same as your PSP: %s\xC2\xA0" "confirms, %s\xC2\xA0goes back.",
    (ui_key_confirm == PSP_CTRL_CROSS) ? "\xC3\x97" : "\xE2\x97\x8B",
    (ui_key_confirm == PSP_CTRL_CROSS) ? "\xE2\x97\x8B" : "\xC3\x97");
@@ -88,7 +79,6 @@ static void draw(int t)
    welcome, UI_COL_CREAM, UI_FONT_BODY, UI_TEXT_BOLD | UI_TEXT_2X);
   for(i = 0; i < 3; i++)
   {
-    /* 12 f each, 4 f apart: they drop 20 px into place */
     int f = t - i * 4, x = 20 + i * 150, y;
     char line[160];
     if(f <= 0)
@@ -105,7 +95,6 @@ static void draw(int t)
   }
   if(t >= 8 + UI_F_FIRST_RUN)
   {
-    /* the cards are in: the language line, the Start button, × Start */
     char lang[64];
     int w = ui_print_width("Start", UI_FONT_BODY, 0) + 30;
     ui_hint_t h[1];
@@ -120,11 +109,10 @@ static void draw(int t)
     ui_hint_packed(h, 1, 14);
   }
   else
-    ui_hint_packed(NULL, 0, 14);  /* nothing to press yet */
+    ui_hint_packed(NULL, 0, 14);
   ui_frame_end();
 }
 
-/* Shows the first-run cards once; returns at × Start. */
 void ui_first_run(void)
 {
   int t = 0;

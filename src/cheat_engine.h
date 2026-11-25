@@ -1,9 +1,5 @@
-/* cheat_engine.h - kai 4.0's cheat engine (#166)
- *
- * A game's cheats from the .cht files people already have, in groups (a
- * file each, or [[headers]]), every cheat checked when it loads, the ones
- * that are on remembered by name. See cheat_engine.c for the formats and
- * the rules.
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
  */
 
 #ifndef CHEAT_ENGINE_H
@@ -22,8 +18,7 @@ enum
   CE_ASK            /* only while a file is read: bare codes, kind not known yet */
 };
 
-/* The engine's own reason a cheat can't run (cheat_detail), finer than
-   CE_*: for tools that explain it; kai's screen says CE_* in plain words */
+/* Why a cheat can't run, finer than CE_* (cheat_detail) */
 typedef enum
 {
   CE_E_NONE = 0,
@@ -82,12 +77,12 @@ u32 cheat_group_size(u32 g);
 u32 cheat_group_of(u32 i);
 /* On since the game started, in a group that needs a restart */
 u32 cheat_waits_restart(u32 i);
-/* The game was just restarted (the pause screen's Restart) */
+/* The game was just restarted */
 void cheat_engine_restarted(void);
 /* Runs-once cheats that ran since the last call, and the first one's name */
 u32 cheat_engine_applied(char *name, u32 size);
-/* Any game's cheats without loading them (the library's game card): how
-   many, and how many it remembers on */
+/* Any game's cheats without loading them: how many, and how many it
+   remembers on */
 u32 cheat_engine_peek(const char *rom_name, u32 *on);
 u32 cheat_detail(u32 i);           /* ce_error */
 /* Where the game's cheat files go: GBA/CHT/<game>/ */

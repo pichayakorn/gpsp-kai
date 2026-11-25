@@ -1,4 +1,6 @@
-/* ui_cover.h - preset covers (spec section 5) */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
 
 #ifndef UI_COVER_H
 #define UI_COVER_H
@@ -8,8 +10,7 @@
 #endif
 
 /* Draw the cover art for a title into a size x size square of dst: the art
- * alone. From 32 px up the caller puts the name on a plate at the bottom
- * (spec section 5), in ui_cover_plate_color(). */
+ * alone; the caller puts the name on a plate in ui_cover_plate_color(). */
 void ui_cover_art(u16 *dst, int pitch, int size, const char *title);
 u16 ui_cover_plate_color(const char *title);
 u32 ui_cover_seed(const char *title);

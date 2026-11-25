@@ -1,9 +1,7 @@
-/* Step 2 component screen (UI4=1 builds only; hold L while kai starts).
- * A Settings-like page that uses every component: tabs, card rows with a
- * cycle value, segments, a switch, blocks, a per-game mark, a disabled row
- * and an action, the cursor frame, a toast with Undo, a hold bar and a
- * dialog. Shows how long each frame takes to draw. Texts are placeholders
- * in English; the real screens take them from the .msg files. */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #include "../common.h"
 #include "ui.h"
 
@@ -117,7 +115,7 @@ void ui_components(void)
 
       {
         int to = ui_step(cursor, ROW_COUNT, PSP_CTRL_UP, PSP_CTRL_DOWN);
-        if(to == ROW_DISABLED)  /* the cursor skips a disabled row */
+        if(to == ROW_DISABLED)
           to += to - cursor;
         if(to != cursor)
         {
@@ -246,7 +244,6 @@ void ui_components(void)
 
     ui_text(UI_MARGIN, 210, (char *)row_tips[cursor], UI_COL_MUTE);
 
-    /* the hold bar for START, while it fills or drains */
     if(hold.p > 0)
     {
       ui_round_fill(UI_MARGIN + 3, 227, 200, 18, 2, UI_COL_SHADE);

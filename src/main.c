@@ -216,7 +216,7 @@ SceKernelCallbackFunction power_callback(int unknown, int powerInfo, void *commo
     power_flag = 1;
 #ifdef UI4
     // With "Save when leaving a game" on, Last is written before the PSP
-    // sleeps (spec: Sleep): hold the suspend off until the pause screen
+    // sleeps: hold the suspend off until the pause screen
     // has written it. Only while a game runs, where the pause screen opens
     // next frame and lets go.
     if(g_gpsp_config.save_on_leave && gamepak_filename[0] &&
@@ -448,8 +448,8 @@ int main(int argc, char *argv[])
   s32 bios_ret = load_bios("gba_bios.bin");
   if(bios_ret == -1) // missing or not a GBA BIOS
   {
-    // Built-in BIOS (#73). Ported from libretro gpSP (GPL-2.0-or-later),
-    // which falls back the same way.
+    // Built-in BIOS (#73). Ported from another GPL-2.0-or-later
+    // GBA emulator, which falls back the same way.
     load_builtin_bios();
 #ifdef UI4
     ui_no_bios = 1;  /* the library says so on a banner */
@@ -684,7 +684,7 @@ u32 update_gba()
         }
 
         // The HBlank IRQ is raised on every line, including the V-blank
-        // lines 160-227 (GBATEK; libretro gpSP and mGBA do the same).
+        // lines 160-227 (GBATEK).
         // HBlank DMA above runs only on visible lines.
         if(dispstat & 0x10)
           irq_raised |= IRQ_HBLANK;

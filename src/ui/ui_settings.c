@@ -1,21 +1,7 @@
-/* The 4.0 Settings screen (spec section 4, "Settings"; step 4). Tabs
- * Display / Sound / Controls / Play / System; each row keeps kai's fixed
- * scope: global, or saved for this game only (the cartridge mark). A dot
- * marks a setting changed from its default; holding START resets the tab
- * (with Undo); the tip line explains the selected row once the cursor
- * rests. Rows bind straight to g_gpsp_config / g_game_config, so leaving
- * the screen applies them the way the old menu did (screen settings when
- * the game takes the LCD again, the CPU speed on resume, the rest live).
- *
- * Only the cursor, the selected row and its value move; every other row,
- * the legend and the hint strip are drawn into the ground layer, rebuilt
- * when the cursor moves, the list scrolls or the tab changes (spec section
- * 6: repeated actions move little, text is drawn once).
- *
- * No TV output row (#151, maintainer 2026-11-25): it waits for a design
- * that can be tested with a TV cable. TV output still uses the ratio and
- * interlace settings saved by the old menu. Texts are English placeholders
- * until they move to the .msg files. */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
+
 #include "../common.h"
 #include "ui.h"
 #include "ui_help_pics.h"
@@ -29,14 +15,14 @@ typedef struct
   const char *tip;
   u8 kind;
   u8 per_game;
-  u8 count;            /* choices (segments, blocks, cycle names) */
+  u8 count;
   const char *opts[4];
-  u32 *value;          /* the config field */
-  const u8 *map;       /* choice -> stored value; NULL: the same */
-  int def;             /* the default stored value */
-  int lo, hi;          /* K_CYCLE with numbers: the range */
-  const char *fmt;     /* K_CYCLE with numbers: "%d frames" */
-  const char **names;  /* K_CYCLE with names (count of them) */
+  u32 *value;
+  const u8 *map;
+  int def;
+  int lo, hi;
+  const char *fmt;
+  const char **names;
 } row_t;
 
 #define TABS 5
@@ -48,18 +34,13 @@ typedef struct
 #define ROW_W  (UI_SCREEN_W - UI_MARGIN * 2)
 #define SCREEN_ROW_H 40
 
-/* K_ACTION rows keep their action in def */
 enum { ACT_RESET_ALL, ACT_RESTART, ACT_QUIT };
-#define LANG_TAB 4  /* System: the Language row is its first */
-#define PAD_TAB 2   /* Controls */
+#define LANG_TAB 4
+#define PAD_TAB 2
 
 static const u8 map_frameskip[3] = { no_frameskip, auto_frameskip, manual_frameskip };
 static const u8 map_ff[2] = { FF_HOLD, FF_TOGGLE };
-static const u8 map_clock[3] = { 10, 7, 9 };  /* 222, 266, 333 MHz */
-/* Sensitivity runs the intuitive way: a higher level reacts to a lighter
-   push. The stored value keeps kai's old scale (threshold 92 - 4 x level,
-   higher needed a bigger push), so old .cfg files keep their feel: level
-   L shows the old value 10 - L (maintainer, 2026-11-20). */
+static const u8 map_clock[3] = { 10, 7, 9 };
 static const u8 map_sens[10] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 };
 
 static const char *language_names[12] =
@@ -71,7 +52,7 @@ static const char *language_names[12] =
 
 static row_t rows[TABS][MAX_ROWS] =
 {
-  { /* Display */
+  {
     { "Screen size", "Original keeps the GBA's pixels exact; Fit fills the height; Full fills the screen.",
       K_SCREEN, 0, 3, { "Original", "Fit", "Full" }, &g_gpsp_config.screen_mode, NULL, scaled_aspect },
     { "Smoothing", "Sharp keeps pixels crisp when the picture is scaled; Smooth softens them.",
@@ -85,12 +66,12 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Picture scale", "Below 100 % the picture shrinks inside its screen size.",
       K_CYCLE, 0, 0, { NULL }, &g_gpsp_config.screen_scale, NULL, 100, 50, 200, "%d%%" },
   },
-  { /* Sound */
+  {
     { "Sound", "Off mutes the game and runs a little faster.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
     { "Sound delay", "Less delay feels faster; more delay stops crackles in busy games.",
       K_BLOCKS, 1, 11, { NULL }, &g_game_config.audio_buffer_size_number, NULL, 2 },
   },
-  { /* Controls: the Stick page; the Buttons page is drawn on its own */
+  {
     { "Use the stick", "The stick works like the d-pad, or does what you pick for each direction.",
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_analog, NULL, NO },
     { "Sensitivity", "The ring shows where a push starts to count.",
@@ -98,7 +79,7 @@ static row_t rows[TABS][MAX_ROWS] =
     { "Tilt sensor", "For tilt-cartridge games: the stick stands in for tilting.",
       K_SWITCH, 1, 2, { NULL }, &g_game_config.allocate_sensor, NULL, NO },
   },
-  { /* Play */
+  {
     { "Save when leaving a game", "Continue on the Home screen picks up exactly here.",
       K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.save_on_leave, NULL, YES },
     { "Fast forward", "Hold: fast while the button is down. Toggle: one press on, one press off.",
@@ -110,7 +91,7 @@ static row_t rows[TABS][MAX_ROWS] =
       &g_game_config.rapidfire_speed, NULL, RAPIDFIRE_FAST },
     { "Show FPS", "Shows the frames per second in the top-left corner.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.show_fps, NULL, NO },
   },
-  { /* System */
+  {
     { "Language", "The language comes from your PSP until you pick one.",
       K_CYCLE, 0, 12, { NULL }, &g_gpsp_config.language, NULL, 1, 0, 0, NULL, language_names },
     { "CPU speed", "333 MHz runs every game at full speed; lower saves battery.",
@@ -149,15 +130,11 @@ static int row_height(const row_t *r)
   return (r->kind == K_SCREEN) ? SCREEN_ROW_H : UI_ROW_H;
 }
 
-/* Settings rows sit on a 26 px pitch (6 px between cards keeps the
- * selected card's cursor frame clear of the row above); the Stick page's
- * rows beside the stick use the compact 22 px one. */
 static int row_pitch(int tab, const row_t *r)
 {
   return row_height(r) + ((tab == PAD_TAB) ? UI_ROW_PITCH_COMPACT : UI_ROW_PITCH) - UI_ROW_H;
 }
 
-/* The choice shown for a stored value; -1 when it is none of them. */
 static int row_index(const row_t *r)
 {
   int i;
@@ -185,43 +162,36 @@ static int row_changed(const row_t *r)
   return r->value && ((int)*r->value != r->def);
 }
 
-/* ---- state ---------------------------------------------------------------- */
-
 static struct
 {
   int tab, tab_prev, tab_f;
   int cur, cursor_from, cursor_f, rest;
-  int cursor_h_from;              /* the frame's height as it left the last row */
-  int top;                        /* scroll: where the list rests */
-  int top_from, top_f;            /* and where it slides from (scroll token) */
-  int value_f, value_from;        /* the selected row's value motion */
-  int dirty;                      /* the ground needs drawing again */
-  ui_hold_t reset_hold;           /* START: reset this tab */
-  ui_hold_t action_hold;          /* confirm on Reset all */
-  u32 undo[TABS][MAX_ROWS];       /* the values before a reset */
-  int undo_all;                   /* the undo covers every tab */
+  int cursor_h_from;
+  int top;
+  int top_from, top_f;
+  int value_f, value_from;
+  int dirty;
+  ui_hold_t reset_hold;
+  ui_hold_t action_hold;
+  u32 undo[TABS][MAX_ROWS];
+  int undo_all;
   char toast[48];
   int toast_f, toast_undo;
   u16 toast_edge;
-  int restart;                    /* leave Settings and restart kai */
-  /* Controls */
-  int page;                       /* 0 Buttons, 1 Stick */
-  int btn;                        /* the selected chip on the Buttons page */
-  int dir;                        /* the selected stick chip, or -1 on the rows */
-  int pick_map;                   /* the map entry the picker edits */
-  int pick, pick_f, pick_out;     /* the action picker: open, its motion */
-  int help, help_f, help_out;     /* the □ help card: open, its motion */
-  int pcur, pcur_from, pcur_f;    /* the picker's cursor */
+  int restart;
+  int page;
+  int btn;
+  int dir;
+  int pick_map;
+  int pick, pick_f, pick_out;
+  int help, help_f, help_out;
+  int pcur, pcur_from, pcur_f;
   u32 undo_map[MAX_GAMEPAD_CONFIG_MAP];
   u32 undo_map_default;
 } s;
 
-/* The picture of the game under the pause screen, for the Controls tab's
- * PSP (240 x 160); NULL draws an empty screen. */
 const u16 *ui_settings_game;
 
-/* The language kai started with; the Language row may differ until a
- * restart. */
 u32 ui_start_language;
 
 static int lang_pending(void)
@@ -240,7 +210,6 @@ static int action_of(int tab, int i)
   return (rows[tab][i].kind == K_ACTION) ? rows[tab][i].def : -1;
 }
 
-/* The Stick page keeps its rows on the right, beside the stick. */
 static int row_x(int tab)  { return (tab == PAD_TAB) ? 236 : ROW_X; }
 static int row_w(int tab)  { return (tab == PAD_TAB) ? 224 : ROW_W; }
 static int rows_y0(int tab) { return (tab == PAD_TAB) ? 70 : ROWS_Y; }
@@ -259,15 +228,11 @@ static int rows_bottom(int tab)
   return row_y(tab, row_count(tab));
 }
 
-/* Where the list is now: sliding to s.top with the scroll token. */
 static int top_now(void)
 {
   return ui_ease_out_back(s.top_from, s.top, s.top_f, UI_F_SCROLL);
 }
 
-/* Scroll by whole rows, so the first row in view always sits at the top of
- * the list and no row is ever cut there; the cursor stays a row from the
- * bottom edge (spec: Settings; the r4 mockups' settings_top). */
 static void scroll_to_cursor(void)
 {
   int n = row_count(s.tab), bottom = rows_bottom(s.tab), top = 0, i;
@@ -281,7 +246,6 @@ static void scroll_to_cursor(void)
       want = bottom - VIEW_B;
     if(want > 0)
     {
-      /* the first row start at or past it, else the last one */
       top = row_y(s.tab, n - 1) - y0;
       for(i = 0; i < n; i++)
         if(row_y(s.tab, i) - y0 >= want)
@@ -300,10 +264,6 @@ static void scroll_to_cursor(void)
   }
 }
 
-/* ---- drawing ---------------------------------------------------------------- */
-
-/* Screen size as three little PSP screens with the game's area in sky, so
- * the choice shows what it does. */
 static void draw_screen_choices(const row_t *r, int x, int y, int selected, u16 group)
 {
   static const u8 inner_w[3] = { 15, 26, 30 }, inner_h[3] = { 10, 17, 17 };
@@ -365,8 +325,6 @@ static void draw_row(int tab, int i, int y, int selected, int f)
   ui_card_row(rx, y, rw, r->label, selected, g, flags, &vx, &vy);
   if(is_lang_row(tab, i) && lang_pending())
   {
-    /* "next start": a sky pill 10 px after the label, 3 px down, 7 px
-       either side of its text, which is centred in it */
     int lift = selected ? UI_LIFT : 0;
     int px = rx + 8 - lift + ui_print_width(r->label, UI_FONT_BODY, 0) + 10;
     int pw = ui_print_width("next start", UI_FONT_SMALL, 0) + 14;
@@ -392,7 +350,6 @@ static void draw_row(int tab, int i, int y, int selected, int f)
     case K_CYCLE:
       if(r->names == language_names)
       {
-        /* each language in its own script, from its pre-drawn mask */
         const ui_lang_mask_t *m = &ui_lang_masks[(k >= 0) && (k < 12) ? k : 1];
         ui_row_cycle_mask(vx, vy, m->bits, m->w, selected, g, selected ? f : UI_F_VALUE);
         break;
@@ -404,19 +361,13 @@ static void draw_row(int tab, int i, int y, int selected, int f)
       ui_row_cycle(vx, vy, text, selected, g, selected ? f : UI_F_VALUE);
       break;
     case K_ACTION:
-      ui_row_action(vx, vy, selected);  /* its hold bar is in the tip line */
+      ui_row_action(vx, vy, selected);
       break;
   }
 }
 
 static void show_toast(const char *text, int undo, u16 edge);
 
-/* ---- Controls: the Buttons page ------------------------------------------ */
-
-/* The PSP drawn with each button's job (spec Settings › Controls). Chips
- * sit in three groups: left (L and the d-pad), right (R and the face
- * buttons) and below (SELECT, START). The map is the game's own: editing
- * it makes the game keep its own map (use_default_gamepad_map off). */
 extern const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP];
 
 #define PAD_BX 128
@@ -425,17 +376,16 @@ extern const u32 gamepad_config_map_init[MAX_GAMEPAD_CONFIG_MAP];
 #define PAD_BH 120
 #define CHIP_W 112
 #define CHIP_H 18
-#define PAD_ACTIONS 22  /* BUTTON_ID_UP .. BUTTON_ID_NONE */
+#define PAD_ACTIONS 22
 
 typedef struct
 {
-  u8 map;     /* index in gamepad_config_map */
-  u32 key;    /* its glyph */
-  s16 x, y;   /* the chip */
-  s16 ax, ay; /* where its line meets the button */
+  u8 map;
+  u32 key;
+  s16 x, y;
+  s16 ax, ay;
 } chip_t;
 
-/* 0-4 left, 5-9 right, 10-11 below */
 static const chip_t chips[12] =
 {
   {  4, PSP_CTRL_LTRIGGER,   8,  46, PAD_BX + 26,          PAD_BY - 3 },
@@ -452,11 +402,6 @@ static const chip_t chips[12] =
   { 11, PSP_CTRL_START,    248, 188, PAD_BX + 137,         PAD_BY + 99 },
 };
 
-/* The picker's 21 choices with their 4.0 labels (maintainer, 2026-11-20):
-   Volume up and down are dropped (they do nothing in kai), so a map that
-   still holds one reads as None; Cheats opens the Cheats page straight from
-   the game (an option, never a default). pick_ids[] turns a picker cell
-   into an action id. */
 #define PICKS 21
 static const u8 pick_ids[PICKS] =
 {
@@ -480,7 +425,6 @@ static const char *action_name(u32 id)
   return names[(id < PAD_ACTIONS) ? id : PAD_ACTIONS - 1];
 }
 
-/* the picker cell of an action (a dropped one is None's) */
 static int pick_cell(u32 id)
 {
   int i;
@@ -496,7 +440,6 @@ static int chip_remapped(int i)
   return gamepad_config_map[m] != gamepad_config_map_init[m];
 }
 
-/* The button itself on the drawn PSP, lime when its chip is selected. */
 static void draw_pad_button(int i, u16 color)
 {
   int dx = PAD_BX + 26, dy = PAD_BY + 46, fx = PAD_BX + PAD_BW - 26, fy = PAD_BY + 46;
@@ -536,8 +479,8 @@ static void draw_chip(int i, int selected)
   ui_round_fill(x, y, CHIP_W, CHIP_H, 2, selected ? UI_COL_LIME : UI_COL_CARD);
   gx = ui_glyph(x + 4, y + 3, c->key) + 4;
   ui_print_fit(gx, y + 2, action_name(gamepad_config_map[c->map]),
-   selected ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, x + 100 - gx);  /* clear of the dot */
-  if(chip_remapped(i))  /* remapped: a dot inside the chip's right end */
+   selected ? UI_COL_PLUM : UI_COL_CREAM, UI_FONT_SMALL, 0, x + 100 - gx);
+  if(chip_remapped(i))
     ui_fill(x + 102, y + 7, 4, 4, selected ? UI_COL_PLUM : UI_COL_TANGERINE);
   draw_pad_button(i, selected ? UI_COL_LIME :
    (((c->map >= 6) && (c->map <= 9)) || (c->map <= 3) ? UI_COL_CREAM : UI_COL_MUTE));
@@ -546,7 +489,7 @@ static void draw_chip(int i, int selected)
 #define PAD_SHOT_W 96
 #define PAD_SHOT_H 64
 static u16 pad_shot[PAD_SHOT_W * PAD_SHOT_H];
-static int pad_shot_ok;  /* cleared each time Settings opens: a new picture */
+static int pad_shot_ok;
 
 static void draw_pad_body(void)
 {
@@ -557,8 +500,6 @@ static void draw_pad_body(void)
   ui_fill(PAD_BX + 52, PAD_BY + 14, 120, 68, UI_COL_SHADE);
   if(ui_settings_game)
   {
-    /* the game's 3:2 picture fills the drawn screen's height, centred,
-       averaged down once (the ground is rebuilt on every move) */
     if(!pad_shot_ok)
     {
       ui_shrink_box(ui_settings_game, 240, 160, pad_shot, PAD_SHOT_W, PAD_SHOT_H);
@@ -571,7 +512,6 @@ static void draw_pad_body(void)
       draw_chip(i, 0);
 }
 
-/* Spatial moves between the chips; never wraps. */
 static int chip_step(int i, u32 dir)
 {
   switch(dir)
@@ -597,10 +537,8 @@ static int chip_step(int i, u32 dir)
 #define PAD_TIP "Confirm picks what this button does in this game."
 #define STICK_DIR_TIP "Confirm picks what this direction does in this game."
 
-/* ---- Controls: the action picker ------------------------------------------ */
-
 #define PICK_W 400
-#define PICK_H 176  /* 28 + 24 per row of four + 4: six rows */
+#define PICK_H 176
 #define PICK_X ((UI_SCREEN_W - PICK_W) / 2)
 #define PICK_Y 46
 #define PICK_CW 92
@@ -654,7 +592,7 @@ static void picker_input(void)
     if(gamepad_config_map[m] != pick_ids[s.pcur])
     {
       gamepad_config_map[m] = pick_ids[s.pcur];
-      g_game_config.use_default_gamepad_map = NO;  /* the game keeps its own map */
+      g_game_config.use_default_gamepad_map = NO;
       s.dirty = 1;
     }
     s.pick_out = 1;
@@ -679,7 +617,6 @@ static void picker_cell(int i, int *x, int *y, int top)
   *y = top + 28 + (i / 4) * (PICK_CH + 4);
 }
 
-/* Returns 0 once it has closed. */
 static int draw_picker(void)
 {
   int top, i, fx, fy, ax, ay, bx, by, n;
@@ -723,7 +660,6 @@ static int draw_picker(void)
       ui_print_fit(x + 6, y + 3, action_name(pick_ids[i]), UI_COL_PLUM, UI_FONT_SMALL, 0, PICK_CW - 10);
     }
   }
-  /* the cursor frame glides between cells */
   picker_cell(s.pcur_from, &ax, &ay, top);
   picker_cell(s.pcur, &bx, &by, top);
   fx = ui_ease_out_back(ax, bx, s.pcur_f, UI_F_CURSOR);
@@ -735,8 +671,6 @@ static int draw_picker(void)
   ui_hint_packed(hints, 2, 14);
   return 1;
 }
-
-/* ---- Controls: the Stick page ---------------------------------------------- */
 
 #define STICK_CX 122
 #define STICK_CY 140
@@ -758,11 +692,8 @@ static void draw_page_switch(void)
   ui_glyph(x + 6, 40, PSP_CTRL_SELECT);
 }
 
-/* The direction chips, in map order 12-15: up, down, left, right. */
 static const u32 stick_keys[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
 
-/* They can be picked while the stick is in use (the old menu remapped them
- * too). */
 static int stick_pickable(void)
 {
   return g_gpsp_config.enable_analog != NO;
@@ -773,21 +704,14 @@ static void draw_stick(void)
   static const s8 dirs[4][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } };
   int sens = g_gpsp_config.analog_sensitivity_level + 1;
   int dz = STICK_R * (75 - sens * 6) / 100, use = stick_pickable(), i;
-  u16 nub = COLOR16(25, 22, 23);  /* cream and mute, half each */
+  u16 nub = COLOR16(25, 22, 23);
 
   draw_page_switch();
-  /* the travel, the ring where a push starts to count (smaller = more
-     sensitive; mute while the stick is off) and the nub */
   ui_disc(STICK_CX, STICK_CY, STICK_R + 3, UI_COL_SHADE);
   ui_disc(STICK_CX, STICK_CY, STICK_R, UI_COL_CARD);
   ui_ring(STICK_CX, STICK_CY, dz, 2, use ? UI_COL_LIME : UI_COL_MUTE);
   ui_disc(STICK_CX, STICK_CY, 12, UI_COL_CREAM);
   ui_disc(STICK_CX, STICK_CY, 8, nub);
-  /* what each push does (map entries 12-15): card chips 6 px off the disc,
-     the glyph at +4 and the name 4 px after it. The ← chip stays 20 px in
-     and the → chip ends by x 226, 10 px clear of the rows; a long name
-     slides over the disc's edge but never over the ring (2 px clear), cut
-     to fit. The selected chip is lime and lifted, as on the Buttons page. */
   for(i = 0; i < 4; i++)
   {
     const char *name = action_name(gamepad_config_map[12 + i]);
@@ -819,8 +743,6 @@ static void draw_stick(void)
   }
 }
 
-/* ---- Controls: reset and undo ------------------------------------------------ */
-
 static void pad_remember(void)
 {
   memcpy(s.undo_map, gamepad_config_map, sizeof(s.undo_map));
@@ -839,14 +761,6 @@ static void pad_undo(void)
   g_game_config.use_default_gamepad_map = s.undo_map_default;
 }
 
-/* Steady hints first, then the row's own (spec: Hint strip). */
-/* ---- help (the square key) -------------------------------------------------------------------------
- * The selected row's help card: its text from help_copy below (spec
- * section 4, Help copy); Smoothing has its own card with a picture for
- * each choice (draw_smooth_help). Returns 0 when the selection has no
- * help. */
-/* the help text of each row, by its label (spec section 4, Help copy;
-   maintainer, 2026-11-20) */
 static const char *const help_copy[][2] =
 {
   { "Screen size", "Original shows the GBA's pixels at their own size. Fit fills the height and keeps the shape. Full stretches to the whole screen." },
@@ -881,10 +795,6 @@ static const char *const help_copy[][2] =
 
 #define HELP_PAD "Pick what this button does in this game: a GBA button, rapid fire, fast forward, quick save or load, the pause screen, or Show FPS."
 
-/* The selected item's help card: its label and its help text (the Buttons
- * page and the stick's direction chips share the button help). Smoothing's
- * card shows its three samples (draw_smooth_help). Returns 0 when the
- * selection has no help. */
 static int help_topic(const char **title, const char **body)
 {
   const row_t *r;
@@ -920,9 +830,6 @@ static int help_topic(const char **title, const char **body)
   return 1;
 }
 
-/* Smoothing's help: the card with the three samples, each shown at exactly
-   3x in a 3 px frame (Sharp's lime, the default), its name and its line
-   (spec section 4, Help; r5 help5) */
 static void draw_smooth_help(int f, int closing)
 {
   static const char *names[3] = { "Off", "Smooth", "Sharp" };
@@ -1009,10 +916,6 @@ static void draw_hints(void)
   ui_hint_packed(hints, n, 14);
 }
 
-/* The ground: the check, the legend, every row but the selected one, the
- * scroll bar and the hint strip. */
-/* The bottom of the list as drawn with the list at top: under the last
- * row that fits whole above the tip line, its shadow included. */
 static int list_bottom(int top)
 {
   int i, n = row_count(s.tab), vb = VIEW_T;
@@ -1049,9 +952,6 @@ static void build_ground(void)
     ui_per_game_mark(UI_MARGIN, 40, UI_COL_TANGERINE);
     ui_text(UI_MARGIN + 16, 39, "Saved for this game only", UI_COL_MUTE);
   }
-  /* every row as it looks unselected; the selected look is drawn over it
-     each frame inside the cursor frame. While the list slides, rows are cut
-     at the top of the list and at the bottom of the last whole row. */
   top = top_now();
   ui_clip_set(0, VIEW_T, UI_SCREEN_W, list_bottom(top) - VIEW_T);
   for(i = 0; i < n; i++)
@@ -1073,11 +973,6 @@ static void build_ground(void)
   ui_layer_end();
 }
 
-/* ---- the selection and the tip line ---------------------------------------- */
-
-/* The cursor frame flies between rows with the cursor token; inside it the
- * rows show their selected look (the lime fill moves with the frame), and
- * outside it they stay as the ground drew them. */
 static void draw_selection(void)
 {
   int top = top_now(), n = row_count(s.tab), i;
@@ -1086,7 +981,6 @@ static void draw_selection(void)
   int cy = ui_ease_out_back(s.cursor_from, row_y(s.tab, s.cur), s.cursor_f, UI_F_CURSOR) - top;
   int bx = rx - 4, by = cy - 2, bw = rw + 6, bh = hh + 3, lb = list_bottom(top);
 
-  /* the box, cut to the list area */
   if(by < VIEW_T) { bh -= VIEW_T - by; by = VIEW_T; }
   if(by + bh > lb) bh = lb - by;
   if(bh > 0)
@@ -1101,15 +995,12 @@ static void draw_selection(void)
       if(i != s.cur)
         draw_row(s.tab, i, y, row_selectable(&rows[s.tab][i]), UI_F_VALUE);
     }
-    /* the selected row last, so its value motion is on top */
     draw_row(s.tab, s.cur, row_y(s.tab, s.cur) - top, 1, s.value_f);
     ui_clip_reset();
   }
   ui_cursor_frame(rx - UI_LIFT, cy - UI_LIFT, rw, hh);
 }
 
-/* A hold's bar in the tip line's place: 440 x 6 at (20, 235) on a card
- * track, from 12 f like every hold. Returns 1 while it shows. */
 static int tip_hold_bar(const ui_hold_t *h, u16 color)
 {
   if(!h->shown || (h->p <= 0))
@@ -1119,10 +1010,6 @@ static int tip_hold_bar(const ui_hold_t *h, u16 color)
   return 1;
 }
 
-/* The tip line: "▸ " and one line at (20, 231), cut at 440 px. It waits
- * for the cursor to rest, then fades in rising 6 px. A hold's bar takes its
- * place: START's tangerine, Restart kai's and Language's sky, Reset all's
- * pink (it loses data). */
 static void draw_tip_line(void)
 {
   const char *tip = NULL;
@@ -1135,13 +1022,13 @@ static void draw_tip_line(void)
    (action_of(s.tab, s.cur) == ACT_QUIT)) ? UI_COL_PINK : UI_COL_SKY))
     return;
   if(s.reset_hold.fired || s.action_hold.fired)
-    return;  /* done, key still down: the tip stays away */
+    return;
 
   if(s.rest < UI_F_TIP_DELAY + 8)
     s.rest++;
   if(s.rest <= UI_F_TIP_DELAY)
     return;
-  k = s.rest - UI_F_TIP_DELAY;  /* 1..8 */
+  k = s.rest - UI_F_TIP_DELAY;
   if(k > 8)
     k = 8;
 
@@ -1149,7 +1036,6 @@ static void draw_tip_line(void)
     tip = (s.page == 0) ? PAD_TIP : ((s.dir >= 0) ? STICK_DIR_TIP : rows[s.tab][s.cur].tip);
   else if(is_lang_row(s.tab, s.cur) && lang_pending())
   {
-    /* the glyph is whichever key confirms */
     snprintf(text, sizeof(text), "Applies after a restart: hold %s to restart now, or it waits for the next start.",
      (ui_key_confirm == PSP_CTRL_CIRCLE) ? "\xE2\x97\x8B" : "\xC3\x97");
     tip = text;
@@ -1167,7 +1053,6 @@ static void draw_tip_line(void)
     char line[168];
     int c, col = UI_COL_MUTE & 0x8000;
     snprintf(line, sizeof(line), "\xE2\x96\xB8 %s", text);
-    /* plum to mute as it rises */
     for(c = 0; c < 15; c += 5)
     {
       int a = (UI_COL_PLUM >> c) & 31, b = (UI_COL_MUTE >> c) & 31;
@@ -1177,8 +1062,6 @@ static void draw_tip_line(void)
      UI_FONT_SMALL, 0, ROW_W);
   }
 }
-
-/* ---- actions ---------------------------------------------------------------- */
 
 static void remember_tab(int tab)
 {
@@ -1202,8 +1085,6 @@ static void reset_tab(int tab)
       *rows[tab][i].value = rows[tab][i].def;
 }
 
-/* edge: the group colour of what happened (a tab reset lime; a refused
- * pick pink, with no button as nothing changed) */
 static void show_toast(const char *text, int undo, u16 edge)
 {
   snprintf(s.toast, sizeof(s.toast), "%s", text);
@@ -1247,7 +1128,6 @@ static void move_cursor(int to)
     s.toast_f = (s.toast_f < UI_F_TOAST_IN + UI_F_TOAST_HOLD) ? UI_F_TOAST_IN + UI_F_TOAST_HOLD : s.toast_f;
 }
 
-/* The next selectable row from cur in direction dir; a fresh press wraps. */
 static int next_row(int dir)
 {
   int n = row_count(s.tab), i = s.cur, k;
@@ -1258,7 +1138,7 @@ static int next_row(int dir)
     if((i < 0) || (i >= n))
     {
       if(!ui_pressed(PSP_CTRL_UP | PSP_CTRL_DOWN))
-        return s.cur;  /* a repeat stops at the end */
+        return s.cur;
       i = (i + n) % n;
     }
     if(row_selectable(&rows[s.tab][i]))
@@ -1281,7 +1161,7 @@ static void first_row(void)
   s.top = s.top_from = 0;
   s.top_f = UI_F_SCROLL;
   scroll_to_cursor();
-  s.top_from = s.top;   /* a new tab or page opens in place */
+  s.top_from = s.top;
   s.top_f = UI_F_SCROLL;
   s.cursor_from = row_y(s.tab, s.cur);
   s.cursor_h_from = row_height(&rows[s.tab][s.cur]);
@@ -1302,7 +1182,7 @@ static void change_value(int dir)
         k = (dir > 0) ? -1 : r->count;
       k += dir;
       if((k < 0) || (k >= r->count))
-        return;  /* segments stop at their ends */
+        return;
       s.value_from = row_index(r);
       row_set_index(r, k);
       break;
@@ -1331,31 +1211,25 @@ static void change_value(int dir)
   s.value_f = 0;
 }
 
-/* ---- the screen ---------------------------------------------------------------- */
-
 #ifdef UI_PERF_SETTINGS
-/* Measuring build (make UI4=1 PERF=settings, #152): the first time Settings
- * opens it drives itself through a fixed script that only moves the cursor,
- * the tabs and the Controls pages (never ←→ or ×, so nothing changes), logs
- * every frame, then gives the pad back and writes <kai>/perf_settings.csv. */
 static const struct
 {
   const char *name;
   int frames;
   u32 keys;
-  int tap_every;  /* 0: held the whole phase */
+  int tap_every;
 } perf_phases[] =
 {
   { "still",       60, 0,                  0 },
-  { "tap_down",   160, PSP_CTRL_DOWN,     20 },  /* the cursor flies row to row */
-  { "hold_down",  120, PSP_CTRL_DOWN,      0 },  /* the list slides */
+  { "tap_down",   160, PSP_CTRL_DOWN,     20 },
+  { "hold_down",  120, PSP_CTRL_DOWN,      0 },
   { "hold_up",    120, PSP_CTRL_UP,        0 },
-  { "tabs_right", 120, PSP_CTRL_RTRIGGER, 30 },  /* Sound, Controls, Play, System */
-  { "tabs_left",   60, PSP_CTRL_LTRIGGER, 30 },  /* back to Controls */
+  { "tabs_right", 120, PSP_CTRL_RTRIGGER, 30 },
+  { "tabs_left",   60, PSP_CTRL_LTRIGGER, 30 },
   { "pad_still",   30, 0,                  0 },
-  { "chips_right",120, PSP_CTRL_RIGHT,    20 },  /* Buttons page: chip to chip */
+  { "chips_right",120, PSP_CTRL_RIGHT,    20 },
   { "chips_down",  80, PSP_CTRL_DOWN,     20 },
-  { "to_stick",    30, PSP_CTRL_SELECT,   30 },  /* the Stick page */
+  { "to_stick",    30, PSP_CTRL_SELECT,   30 },
   { "stick_down", 120, PSP_CTRL_DOWN,     20 },
   { "still_end",   60, 0,                  0 },
 };
@@ -1432,7 +1306,6 @@ static void perf_write(void)
   sceIoClose(fd);
 }
 
-/* the script ran its course: the pad comes back and the file is written */
 static void perf_finish(void)
 {
   ui_input_script = NULL;
@@ -1456,20 +1329,19 @@ int ui_settings(int tab, int row)
   s.toast_f = -1;
   s.dir = -1;
   pad_shot_ok = 0;
-  /* the language row's default is the PSP's own language */
   {
     int lang = 1;
     sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &lang);
     rows[4][0].def = lang;
   }
   if((tab > 0) && (tab < TABS))
-    s.tab = tab;  /* back where a restart left it */
+    s.tab = tab;
   first_row();
   if((row > 0) && (row < row_count(s.tab)) && row_selectable(&rows[s.tab][row]))
   {
     s.cur = row;
     scroll_to_cursor();
-    s.top_from = s.top;  /* back where it was, without a slide */
+    s.top_from = s.top;
     s.top_f = UI_F_SCROLL;
     s.cursor_from = row_y(s.tab, s.cur);
     s.cursor_h_from = row_height(&rows[s.tab][s.cur]);
@@ -1497,12 +1369,11 @@ int ui_settings(int tab, int row)
     ui_input_update();
     if(s.pick)
     {
-      picker_input();  /* the picker takes every key while it is up */
+      picker_input();
       goto draw;
     }
     if(s.help)
     {
-      /* the help card takes every key; □ or ○ closes it */
       if(!s.help_out && (ui_pressed(PSP_CTRL_SQUARE) || ui_pressed(ui_key_back)))
       {
         s.help_out = 1;
@@ -1520,8 +1391,6 @@ int ui_settings(int tab, int row)
     if(ui_pressed(ui_key_back))
       break;
 
-    /* tabs: L R step and repeat while held, stopping at the first and the
-       last tab */
     if(ui_repeat(PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER) &&
      (ui_repeat(PSP_CTRL_RTRIGGER) ? (s.tab < TABS - 1) : (s.tab > 0)))
     {
@@ -1537,7 +1406,6 @@ int ui_settings(int tab, int row)
 
     if((s.tab == PAD_TAB) && (s.page == 0))
     {
-      /* the Buttons page: move between the chips, × opens the picker */
       static const u32 dirs[4] = { PSP_CTRL_UP, PSP_CTRL_DOWN, PSP_CTRL_LEFT, PSP_CTRL_RIGHT };
       int d;
       for(d = 0; d < 4; d++)
@@ -1557,8 +1425,6 @@ int ui_settings(int tab, int row)
     }
     else if((s.tab == PAD_TAB) && (s.dir >= 0))
     {
-      /* the stick's direction chips: each arrow takes its own chip; → on
-         the right one goes back to the rows beside it */
       int d;
       for(d = 0; d < 4; d++)
         if(!moved && ui_repeat(stick_keys[d]))
@@ -1574,13 +1440,12 @@ int ui_settings(int tab, int row)
       if((s.dir >= 0) && ui_pressed(ui_key_confirm))
         open_picker(12 + s.dir);
     }
-    /* rows; ↓ from the last row on the Stick page goes to the stick's chips */
     else if(!moved && ui_repeat(PSP_CTRL_UP | PSP_CTRL_DOWN))
     {
       int dn = ui_repeat(PSP_CTRL_DOWN) != 0, to = next_row(dn ? 1 : -1);
       if((s.tab == PAD_TAB) && dn && (to <= s.cur) && stick_pickable())
       {
-        s.dir = 3;  /* the right chip sits nearest the rows */
+        s.dir = 3;
         s.dirty = 1;
         s.rest = 0;
       }
@@ -1593,19 +1458,18 @@ int ui_settings(int tab, int row)
       if(ui_repeat(PSP_CTRL_RIGHT)) change_value(1);
       if(ui_repeat(PSP_CTRL_LEFT)) change_value(-1);
       if(lang_pending() != pending)
-        s.dirty = 1;  /* the hint strip gains or loses "Restart now" */
+        s.dirty = 1;
       if((s.tab == PAD_TAB) && (ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT) || ui_pressed(ui_key_confirm)))
-        s.dirty = 1;  /* the drawn stick follows the sensitivity */
+        s.dirty = 1;
       if((rows[s.tab][s.cur].value == &g_gpsp_config.confirm_button) && ui_repeat(PSP_CTRL_LEFT | PSP_CTRL_RIGHT))
       {
-        ui_input_init();  /* the new confirm and back keys, at once */
-        s.dirty = 1;      /* every hint shows them */
+        ui_input_init();
+        s.dirty = 1;
       }
       if((rows[s.tab][s.cur].kind == K_SWITCH) && ui_pressed(ui_key_confirm))
-        change_value(1);  /* a switch also flips on confirm, as in Cheats */
+        change_value(1);
     }
 
-    /* SELECT: Undo while the toast offers it; on Controls, Buttons/Stick */
     if(ui_released(PSP_CTRL_SELECT))
     {
       if(ui_toast_up(s.toast_f) && s.toast_undo)
@@ -1622,7 +1486,6 @@ int ui_settings(int tab, int row)
       }
     }
 
-    /* hold START: reset this tab */
     ui_hold_step(&s.reset_hold, PSP_CTRL_START);
     if(s.reset_hold.done)
     {
@@ -1639,12 +1502,10 @@ int ui_settings(int tab, int row)
 
     if((s.dir >= 0) && !stick_pickable())
     {
-      s.dir = -1;  /* a reset turned the stick off */
+      s.dir = -1;
       s.dirty = 1;
     }
 
-    /* Restart kai, or a changed Language: hold × so a stray press never
-       restarts */
     if((action_of(s.tab, s.cur) == ACT_RESTART) || (is_lang_row(s.tab, s.cur) && lang_pending()))
     {
       ui_hold_step(&s.action_hold, ui_key_confirm);
@@ -1655,8 +1516,6 @@ int ui_settings(int tab, int row)
       }
     }
 
-    /* Quit kai: hold ×, its bar pink like Exit; the caller saves like
-       Exit and closes kai */
     if(action_of(s.tab, s.cur) == ACT_QUIT)
     {
       ui_hold_step(&s.action_hold, ui_key_confirm);
@@ -1667,7 +1526,6 @@ int ui_settings(int tab, int row)
       }
     }
 
-    /* hold confirm on Reset all */
     if(action_of(s.tab, s.cur) == ACT_RESET_ALL)
     {
       ui_hold_step(&s.action_hold, ui_key_confirm);
@@ -1689,7 +1547,7 @@ int ui_settings(int tab, int row)
     if(s.top_f < UI_F_SCROLL)
     {
       s.top_f++;
-      s.dirty = 1;  /* the list slides: its ground follows */
+      s.dirty = 1;
     }
 #ifdef UI_PERF_SETTINGS
     perf_t1 = sceKernelGetSystemTimeLow();
@@ -1700,7 +1558,6 @@ int ui_settings(int tab, int row)
     perf_t2 = sceKernelGetSystemTimeLow();
 #endif
 
-    /* draw */
     ui_frame_begin();
     ui_ground();
     if(s.tab_f < UI_F_TAB) s.tab_f++;
@@ -1714,7 +1571,7 @@ int ui_settings(int tab, int row)
       draw_selection();
     draw_tip_line();
     if(s.pick && !draw_picker())
-      s.dirty = 1;  /* closed: the chip shows its new job */
+      s.dirty = 1;
     if(s.help)
     {
       const char *t, *b;
@@ -1750,23 +1607,18 @@ int ui_settings(int tab, int row)
   }
 
 #ifdef UI_PERF_SETTINGS
-  perf_finish();  /* left early: keep what was measured */
+  perf_finish();
 #endif
-  /* the screen keeps no memory; the caller rebuilds its own ground */
   ui_pool_release(mark);
   return s.restart;
 }
 
-/* Where Settings stands, for the restart note. */
 void ui_settings_where(int *tab, int *row)
 {
   *tab = s.tab;
   *row = s.cur;
 }
 
-/* How many of a game's own settings differ from their defaults, read from
- * a game_config_t that need not be the running game's (the library's game
- * card: "Settings: 5 saved for this game"). */
 int ui_settings_saved_for_game(const game_config_t *cfg)
 {
   int tab, i, n = 0;

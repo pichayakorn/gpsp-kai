@@ -1,4 +1,6 @@
-/* game_name.h - a game's name from its file name (game_name.c) */
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 Hachi
+ */
 
 #ifndef GAME_NAME_H
 #define GAME_NAME_H
