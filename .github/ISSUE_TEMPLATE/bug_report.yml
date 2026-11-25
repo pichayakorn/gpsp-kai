@@ -1,0 +1,48 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please don't attach or link ROMs, BIOS dumps or game box art.
+  - type: input
+    id: version
+    attributes:
+      label: kai version
+      description: As shown on the XMB, e.g. 3.9.1
+    validations:
+      required: true
+  - type: input
+    id: psp
+    attributes:
+      label: PSP model and firmware
+      description: e.g. PSP-3000, ARK-5
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: Name and region, if the problem is in a game
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see the problem
+      placeholder: |
+        1. Start the game
+        2. Open the menu
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Settings you changed, whether it happens every time, a photo of the screen

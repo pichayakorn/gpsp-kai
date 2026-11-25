@@ -22,7 +22,8 @@ development and releases work.
 Tested on a PSP-3000 running ARK-5 custom firmware, with the English UI:
 game loading (`.gba` and `.zip`), savestates, sleep/resume, screenshots, the
 in-game menu and performance. Reports from other PSP models, firmware and
-languages are welcome: please open an issue.
+languages are welcome: please open an issue. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for reports and changes.
 
 A new interface for 4.0 is in development. It builds with `make UI4=1` and is
 not part of the releases yet.
@@ -162,6 +163,7 @@ tools/fonts/    font tools and the BDF sources of gpsp10 and batang10
 - **pochi**, **frmb0001**: icons and images
 - **ErikPshat**: build 225, with its translations
 - **Oldvic**: build 230
+- **Hachi**: this continuation, from 3.5.0, developed with Claude Code (Anthropic)
 - Fonts:
   - **NAGAO Sadakazu**: Naga10 (`knj10`, `knj10B`, `maru10`, `min10`, `5x10*`)
   - **Kim Jeong-Hwan**: Baekmuk; the 10px bitmap `batang10.fbm` was made by Won-kyu Park
