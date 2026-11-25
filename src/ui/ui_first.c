@@ -55,9 +55,9 @@ static const char *language_name(u32 lang)
 
 static void draw(int t)
 {
-  static const char welcome[] = "Welcome to gpSP kai";
-  const char *titles[3] = { "Pause any time", "Confirm and back", "Help in Settings" };
-  char confirm_body[96];
+  const char *welcome = T("Welcome to gpSP kai");
+  const char *titles[3] = { T("Pause any time"), T("Confirm and back"), T("Help in Settings") };
+  char confirm_body[192];
   const char *bodies[3];
   u32 keys[3];
   u16 cols[3] = { UI_COL_TANGERINE, UI_COL_SKY, UI_COL_LIME };
@@ -66,12 +66,12 @@ static void draw(int t)
   keys[0] = PSP_CTRL_TRIANGLE;
   keys[1] = ui_key_confirm;
   keys[2] = PSP_CTRL_SQUARE;
-  snprintf(confirm_body, sizeof(confirm_body), "Same as your PSP: %s\xC2\xA0" "confirms, %s\xC2\xA0goes back.",
+  snprintf(confirm_body, sizeof(confirm_body), T("Same as your PSP: %s\xC2\xA0" "confirms, %s\xC2\xA0goes back."),
    (ui_key_confirm == PSP_CTRL_CROSS) ? "\xC3\x97" : "\xE2\x97\x8B",
    (ui_key_confirm == PSP_CTRL_CROSS) ? "\xE2\x97\x8B" : "\xC3\x97");
-  bodies[0] = "\xE2\x96\xB3 or HOME opens and closes the pause screen.";
+  bodies[0] = T("\xE2\x96\xB3 or HOME opens and closes the pause screen.");
   bodies[1] = confirm_body;
-  bodies[2] = "\xE2\x96\xA1 explains the selected setting.";
+  bodies[2] = T("\xE2\x96\xA1 explains the selected setting.");
 
   ui_frame_begin();
   ui_ground();
@@ -95,17 +95,18 @@ static void draw(int t)
   }
   if(t >= 8 + UI_F_FIRST_RUN)
   {
-    char lang[64];
-    int w = ui_print_width("Start", UI_FONT_BODY, 0) + 30;
+    char lang[128];
+    const char *start = T("Start");
+    int w = ui_print_width(start, UI_FONT_BODY, 0) + 30;
     ui_hint_t h[1];
-    snprintf(lang, sizeof(lang), "Language: %s, from your PSP", language_name(g_gpsp_config.language));
+    snprintf(lang, sizeof(lang), T("Language: %s, from your PSP"), language_name(g_gpsp_config.language));
     ui_print(240 - ui_print_width(lang, UI_FONT_SMALL, 0) / 2, 206, lang, UI_COL_MUTE, UI_FONT_SMALL, 0);
     ui_round_fill(240 - w / 2 + 2, 224, w, 20, 2, UI_COL_SHADE);
     ui_round_fill(240 - w / 2, 222, w, 20, 2, UI_COL_TANGERINE);
     ui_glyph(240 - w / 2 + 6, 225, ui_key_confirm);
-    ui_print(240 - w / 2 + 24, 223, "Start", UI_COL_PLUM, UI_FONT_BODY, 0);
+    ui_print(240 - w / 2 + 24, 223, start, UI_COL_PLUM, UI_FONT_BODY, 0);
     h[0].keys = ui_key_confirm;
-    h[0].verb = "Start";
+    h[0].verb = (char *)start;
     ui_hint_packed(h, 1, 14);
   }
   else

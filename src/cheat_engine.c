@@ -1778,21 +1778,27 @@ u32 cheat_status(u32 i)
   return (i < ce_count) ? ce[i].status : CE_CANT_KIND;
 }
 
+/* TN() marks a text for the interface's translations (src/ui/ui.h); the
+   engine is also built on its own, where it does nothing. */
+#ifndef TN
+#define TN(s) (s)
+#endif
+
 const char *cheat_why(u32 i)
 {
   if(cheat_status(i) == CE_OK)
     return NULL;
   if(cheat_status(i) == CE_CANT_SAVE)
-    return "This code would write to the game's save.";
+    return TN("This code would write to the game's save.");
   switch(ce[i].detail)
   {
-    case CE_E_TOOBIG:    return "This code is cut short or too long for kai.";
-    case CE_E_ALIGN:     return "This code writes to an odd address.";
-    case CE_E_WORK:      return "This code does too much each frame.";
+    case CE_E_TOOBIG:    return TN("This code is cut short or too long for kai.");
+    case CE_E_ALIGN:     return TN("This code writes to an odd address.");
+    case CE_E_WORK:      return TN("This code does too much each frame.");
     case CE_E_SYNTAX:
-    case CE_E_GAMESHARK: return "kai can't read this code.";
+    case CE_E_GAMESHARK: return TN("kai can't read this code.");
   }
-  return "This kind of code isn't supported.";
+  return TN("This kind of code isn't supported.");
 }
 
 u32 cheat_is_on(u32 i)

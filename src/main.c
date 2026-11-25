@@ -437,6 +437,7 @@ int main(int argc, char *argv[])
   ui_pool_init();
   ui_layer_init();
   ui_font_init(g_gpsp_config.language);
+  ui_tr_init(g_gpsp_config.language);
 #endif
   init_gamepak_buffer();
   update_progress();
