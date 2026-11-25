@@ -12,10 +12,10 @@
  * when the cursor moves, the list scrolls or the tab changes (spec section
  * 6: repeated actions move little, text is drawn once).
  *
- * Not here yet: the Controls tab (the drawn PSP and the picker), side bars
- * (#104), TV output, the Confirm button setting and Help; their rows show
- * greyed out. Texts are English placeholders until they move to the .msg
- * files. */
+ * No TV output row (#151, maintainer 2026-11-25): it waits for a design
+ * that can be tested with a TV cable. TV output still uses the ratio and
+ * interlace settings saved by the old menu. Texts are English placeholders
+ * until they move to the .msg files. */
 #include "../common.h"
 #include "ui.h"
 #include "ui_help_pics.h"
@@ -84,7 +84,6 @@ static row_t rows[TABS][MAX_ROWS] =
       K_CYCLE, 1, 0, { NULL }, &g_game_config.frameskip_value, NULL, 9, 0, 99, "%d frames" },
     { "Picture scale", "Below 100 % the picture shrinks inside its screen size.",
       K_CYCLE, 0, 0, { NULL }, &g_gpsp_config.screen_scale, NULL, 100, 50, 200, "%d%%" },
-    { "TV output", NULL, K_OFF, 0, 0, { "Comes later" } },
   },
   { /* Sound */
     { "Sound", "Off mutes the game and runs a little faster.", K_SWITCH, 0, 2, { NULL }, &g_gpsp_config.enable_audio, NULL, YES },
@@ -842,11 +841,10 @@ static void pad_undo(void)
 
 /* Steady hints first, then the row's own (spec: Hint strip). */
 /* ---- help (the square key) -------------------------------------------------------------------------
- * The selected row's help card. Written help: Smoothing and Frameskip
- * (spec, help_smooth / help_skip); every other row shows its tip as the
- * text until its own help copy is written (PROTOTYPE: help copy uses the
- * tip). Smoothing's three pictures are not drawn yet: their captions stand
- * in as text. Returns 0 when the selection has no help. */
+ * The selected row's help card: its text from help_copy below (spec
+ * section 4, Help copy); Smoothing has its own card with a picture for
+ * each choice (draw_smooth_help). Returns 0 when the selection has no
+ * help. */
 /* the help text of each row, by its label (spec section 4, Help copy;
    maintainer, 2026-11-20) */
 static const char *const help_copy[][2] =
@@ -857,7 +855,6 @@ static const char *const help_copy[][2] =
   { "Frameskip", "When the PSP can't draw every frame, skipping some keeps the game at full speed. Auto skips only when the game would slow down; Fixed always skips the number set in Skip up to." },
   { "Skip up to", "The most frames in a row that Auto may skip; Fixed always skips this many. Lower looks smoother, higher keeps the speed." },
   { "Picture scale", "Shrinks the picture inside its screen size, for a TV that cuts off the edges of the picture." },
-  { "TV output", "Only with a TV cable on a PSP-2000 or later. Sets the picture's shape on the TV; interlacing follows the cable." },
   { "Sound", "Off mutes the game. With no sound to make, the PSP has a little more time for the picture." },
   { "Sound delay", "If the sound crackles in a busy game, add a block. If the sound feels late, take one away." },
   { "Use the stick", "On: the stick works like the d-pad, or does what you pick for each direction. Off: the stick does nothing." },
